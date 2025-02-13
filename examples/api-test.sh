@@ -53,6 +53,7 @@ API_AUTH_URL="${API_BASE_URL}/api/${API_VERSION}/auth"
 API_USERS_URL="${API_BASE_URL}/api/${API_VERSION}/users"
 
 CURRENT_TOKEN=""
+ADMIN_TOKEN=""
 
 # -----------------------------------------------------------------------------
 # Logging Functions
@@ -242,6 +243,101 @@ test_invalid_payload() {
     fi
 }
 
+test_verify_user() {
+    local username=$1
+    log "INFO" "Testing user verification for $username..."
+
+    # Admin login with pre-seeded credentials
+    local admin_data='{
+        "username": "admin",
+        "password": "Test123!",
+        "grant_type": "password"
+    }'
+    local admin_response
+    admin_response=$(make_request "POST" "${API_AUTH_URL}/token" "" "application/json" "$admin_data")
+
+    if [ -z "$admin_response" ] || [ "$(echo "$admin_response" | jq 'has("access_token")')" != "true" ]; then
+        log "INFO" "Failed to get admin token: $admin_response"
+        print_test_result "Verify user ($username)" 1 "Failed to get admin token"
+        return 1
+    fi
+
+    local admin_token
+    admin_token=$(echo "$admin_response" | jq -r '.access_token')
+
+    # Use the first created user ID for verification
+    local user_id="${CREATED_USER_IDS[0]}"
+    if [ -z "$user_id" ]; then
+        log "INFO" "No user ID available for verification"
+        print_test_result "Verify user ($username)" 1 "No user ID available"
+        return 1
+    fi
+
+    log "INFO" "Attempting to verify user $username (ID: $user_id) with admin token"
+    local verify_response
+    verify_response=$(make_request "PUT" "${API_USERS_URL}/${user_id}/verify" "$admin_token" "application/json")
+
+    if [ "$(echo "$verify_response" | jq -r '.is_verified // false')" = "true" ]; then
+        print_test_result "Verify user ($username)" 0
+        return 0
+    else
+        log "INFO" "Verification response: $verify_response"
+        print_test_result "Verify user ($username)" 1 "Failed to verify user"
+        return 1
+    fi
+}
+
+test_update_user() {
+    local username=$1
+    local user_id="${CREATED_USER_IDS[0]}"
+    local data
+    data=$(printf '{"username": "updated_%s"}' "$username")
+    local response
+    response=$(make_request "PUT" "${API_USERS_URL}/${user_id}" "$CURRENT_TOKEN" "application/json" "$data")
+    local updated_username
+    updated_username=$(echo "$response" | jq -r '.username')
+    if [ "$updated_username" = "updated_${username}" ]; then
+        print_test_result "Update user ($username)" 0
+    else
+        print_test_result "Update user ($username)" 1 "Failed to update: $response"
+    fi
+}
+
+test_delete_user() {
+    local username=$1
+    local user_id="${CREATED_USER_IDS[0]}"
+    log "INFO" "Testing user deletion for $username..."
+    if [ -z "$user_id" ]; then
+        print_test_result "Delete user ($username)" 1 "No user ID available"
+        return 1
+    fi
+    log "INFO" "Deletion may take up to ${DELETE_TIMEOUT}s..."
+    local curl_cmd
+    curl_cmd="curl -s -o /dev/null -w \"%{http_code}\" --connect-timeout ${CURL_CONNECT_TIMEOUT} --max-time ${DELETE_TIMEOUT} -X DELETE"
+    if [ -n "$CURRENT_TOKEN" ]; then
+        curl_cmd+=" -H \"Authorization: Bearer ${CURRENT_TOKEN}\""
+    fi
+    curl_cmd+=" \"${API_USERS_URL}/${user_id}\""
+    log "TRACE" "Executing delete command: ${curl_cmd}"
+    local status_code
+    status_code=$(eval ${curl_cmd})
+    log "DEBUG" "Delete status code: ${status_code}"
+    if [ "$status_code" -eq 204 ]; then
+        print_test_result "Delete user ($username)" 0
+    else
+        print_test_result "Delete user ($username)" 1 "Unexpected HTTP status code: ${status_code}"
+    fi
+
+    # Check if we can still access with the deleted user token
+    local post_delete_response
+    post_delete_response=$(make_request "GET" "${API_USERS_URL}/me" "$CURRENT_TOKEN")
+    if echo "$post_delete_response" | grep -q -E "Not authenticated|Could not validate credentials"; then
+        log "INFO" "Subsequent access correctly indicates deleted user"
+    else
+        log "INFO" "Subsequent access did not return expected error: ${post_delete_response}"
+    fi
+}
+
 test_rate_limiting() {
     log "INFO" "Testing rate limiting on login endpoint..."
     local username="admin"
@@ -250,29 +346,64 @@ test_rate_limiting() {
     local rate_limit_triggered=0
     local i
     local code
-    for i in {1..120}; do
-         code=$(curl -s -o /dev/null -w "%{http_code}" -X POST -H "Content-Type: application/json" -d "$payload" "${API_AUTH_URL}/token")
-         if [ "$code" -eq 429 ]; then
-             rate_limit_triggered=1
-             break
-         fi
-    done
-    if [ "$rate_limit_triggered" -eq 1 ]; then
-         print_test_result "Rate limiting test" 0
+
+    # Don't output iteration numbers in parallel mode
+    if [ "$PARALLEL" = true ]; then
+        for i in {1..120}; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" -X POST -H "Content-Type: application/json" -d "$payload" "${API_AUTH_URL}/token")
+            if [ "$code" -eq 429 ]; then
+                rate_limit_triggered=1
+                break
+            fi
+        done
     else
-         print_test_result "Rate limiting test" 1 "No 429 response received after repeated login attempts"
+        for i in {1..120}; do
+            echo -n "." # Show progress without flooding output
+            if [ $((i % 20)) -eq 0 ]; then echo ""; fi # New line every 20 dots
+            code=$(curl -s -o /dev/null -w "%{http_code}" -X POST -H "Content-Type: application/json" -d "$payload" "${API_AUTH_URL}/token")
+            if [ "$code" -eq 429 ]; then
+                rate_limit_triggered=1
+                break
+            fi
+        done
+        echo "" # Final newline
+    fi
+
+    if [ "$rate_limit_triggered" -eq 1 ]; then
+        print_test_result "Rate limiting test" 0
+    else
+        print_test_result "Rate limiting test" 1 "No 429 response received after repeated login attempts"
     fi
 }
 
 create_admin_user() {
+    log "INFO" "Ensuring admin user exists..."
     local data='{
         "username": "admin",
         "email": "admin@example.com",
-        "password": "Admin123!",
+        "password": "Test123!",
         "is_admin": true,
         "is_verified": true
     }'
-    make_request "POST" "$API_USERS_URL/" "" "application/json" "$data" > /dev/null 2>&1
+
+    # Try to create admin user
+    local response
+    response=$(make_request "POST" "$API_USERS_URL/" "" "application/json" "$data")
+
+    # Check if admin already exists (400 is expected in this case)
+    if [ "$(echo "$response" | jq -r '.detail')" = "Username already exists" ]; then
+        log "INFO" "Admin user already exists"
+        return 0
+    fi
+
+    # Check if admin was created successfully
+    if [ "$(echo "$response" | jq -r '.username // empty')" = "admin" ]; then
+        log "INFO" "Admin user created successfully"
+        return 0
+    fi
+
+    log "INFO" "Warning: Unable to verify admin user state: $response"
+    return 1
 }
 
 # -----------------------------------------------------------------------------
@@ -327,9 +458,6 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
-
-# Ensure admin user exists
-create_admin_user || log "INFO" "Admin user exists"
 
 log "INFO" "Starting API tests..."
 command -v jq &> /dev/null || { log "INFO" "Error: jq is not installed"; exit 1; }
