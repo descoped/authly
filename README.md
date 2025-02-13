@@ -97,17 +97,15 @@ app.include_router(users_router, prefix="/api/v1")
 
 ## Sequence diagrams
 
-# Authly Documentation Links
-
-## System Architecture
+### System Architecture
 - [🏗️ Component Architecture](https://github.com/descoped/authly/blob/master/docs/component-architecture.md)
 
-## Authentication Flows
+### Authentication Flows
 - [🔐 User Registration and Verification Flow](https://github.com/descoped/authly/blob/master/docs/user-registration-and-verification-flow.md)
 - [🔑 User Authentication Flow](https://github.com/descoped/authly/blob/master/docs/user-authentication-flow.md)
 - [🚪 Logout Flow](https://github.com/descoped/authly/blob/master/docs/logout-flow.md)
 
-## Token Management
+### Token Management
 - [🔄 Token Refresh Flow](https://github.com/descoped/authly/blob/master/docs/token-refresh-flow.md)
 - [📊 State Diagram for Token Lifecycle](https://github.com/descoped/authly/blob/master/docs/state-diagram-for-token-lifecycle.md)
 
