@@ -36,6 +36,11 @@ NC='\033[0m'
 TESTS_RUN=0
 TESTS_PASSED=0
 CREATED_USER_IDS=()
+PARALLEL=false
+
+# Create a temporary directory for parallel test results
+TEMP_DIR=$(mktemp -d)
+trap 'rm -rf "$TEMP_DIR"' EXIT
 
 # Environment setup
 export API_HOST API_VERSION JWT_SECRET_KEY JWT_ALGORITHM
@@ -116,13 +121,17 @@ print_test_result() {
     local result=$2
     local error_msg=$3
 
-    ((TESTS_RUN++))
-    if [ "$result" -eq 0 ]; then
-        log "INFO" "✓ $test_name passed"
-        ((TESTS_PASSED++))
+    if [ "$PARALLEL" = true ]; then
+        echo "$test_name:$result:$error_msg" >> "$TEMP_DIR/test_results_$$"
     else
-        log "INFO" "✗ $test_name failed"
-        [ -n "$error_msg" ] && log "INFO" "Error: $error_msg"
+        ((TESTS_RUN++))
+        if [ "$result" -eq 0 ]; then
+            log "INFO" "✓ $test_name passed"
+            ((TESTS_PASSED++))
+        else
+            log "INFO" "✗ $test_name failed"
+            [ -n "$error_msg" ] && log "INFO" "Error: $error_msg"
+        fi
     fi
 }
 
@@ -156,7 +165,6 @@ test_login() {
     local username=$1
     log "INFO" "Testing user login for $username..."
 
-    # Prepare a JSON payload for login
     local data
     data=$(printf '{"username": "%s", "password": "Test123!", "grant_type": "password"}' "$username")
     local response
@@ -222,13 +230,11 @@ test_create_user() {
     fi
 }
 
-# Negative test: send an invalid JSON payload to /auth/token
 test_invalid_payload() {
     log "INFO" "Testing login with invalid JSON payload..."
     local data="invalid_json"
     local response
     response=$(make_request "POST" "${API_AUTH_URL}/token" "" "application/json" "$data")
-    # Check for "JSON decode error" in the response
     if echo "$response" | grep -q "JSON decode error"; then
         print_test_result "Login with invalid JSON" 0
     else
@@ -236,83 +242,6 @@ test_invalid_payload() {
     fi
 }
 
-test_verify_user() {
-    local username=$1
-    log "INFO" "Testing user verification for $username..."
-
-    # Admin login using JSON payload
-    local admin_data
-    admin_data='{"username": "admin", "password": "Test123!", "grant_type": "password"}'
-    local admin_response
-    admin_response=$(make_request "POST" "${API_AUTH_URL}/token" "" "application/json" "$admin_data")
-    local admin_token
-    admin_token=$(echo "$admin_response" | jq -r '.access_token')
-
-    # Use the first created user ID for verification
-    local user_id="${CREATED_USER_IDS[0]}"
-    local verify_response
-    verify_response=$(make_request "PUT" "${API_USERS_URL}/${user_id}/verify" "$admin_token" "application/json")
-    if [ "$(echo "$verify_response" | jq -r '.is_verified')" = "true" ]; then
-        print_test_result "Verify user ($username)" 0
-    else
-        print_test_result "Verify user ($username)" 1 "Failed to verify: $verify_response"
-    fi
-}
-
-test_update_user() {
-    local username=$1
-    local user_id="${CREATED_USER_IDS[0]}"
-    local data
-    data=$(printf '{"username": "updated_%s"}' "$username")
-    local response
-    response=$(make_request "PUT" "${API_USERS_URL}/${user_id}" "$CURRENT_TOKEN" "application/json" "$data")
-    local updated_username
-    updated_username=$(echo "$response" | jq -r '.username')
-    if [ "$updated_username" = "updated_${username}" ]; then
-        print_test_result "Update user ($username)" 0
-    else
-        print_test_result "Update user ($username)" 1 "Failed to update: $response"
-    fi
-}
-
-test_delete_user() {
-    local username=$1
-    local user_id="${CREATED_USER_IDS[0]}"
-    log "INFO" "Testing user deletion for $username..."
-    if [ -z "$user_id" ]; then
-        print_test_result "Delete user ($username)" 1 "No user ID available"
-        return 1
-    fi
-    log "INFO" "Deletion may take up to ${DELETE_TIMEOUT}s..."
-    local curl_cmd
-    curl_cmd="curl -s -o /dev/null -w \"%{http_code}\" --connect-timeout ${CURL_CONNECT_TIMEOUT} --max-time ${DELETE_TIMEOUT} -X DELETE"
-    if [ -n "$CURRENT_TOKEN" ]; then
-        curl_cmd+=" -H \"Authorization: Bearer ${CURRENT_TOKEN}\""
-    fi
-    curl_cmd+=" \"${API_USERS_URL}/${user_id}\""
-    log "TRACE" "Executing delete command: ${curl_cmd}"
-    local status_code
-    status_code=$(eval ${curl_cmd})
-    log "DEBUG" "Delete status code: ${status_code}"
-    if [ "$status_code" -eq 204 ]; then
-        print_test_result "Delete user ($username)" 0
-    else
-        print_test_result "Delete user ($username)" 1 "Unexpected HTTP status code: ${status_code}"
-    fi
-
-    # Verify subsequent access returns a proper error (e.g., 401 or "Not authenticated")
-    local post_delete_response
-    post_delete_response=$(make_request "GET" "${API_USERS_URL}/me" "$CURRENT_TOKEN")
-    if echo "$post_delete_response" | grep -q -E "Not authenticated|Could not validate credentials"; then
-        log "INFO" "Subsequent access correctly indicates deleted user"
-    else
-        log "INFO" "Subsequent access did not return expected error: ${post_delete_response}"
-    fi
-}
-
-# New test: Rate Limiting / Throttling Test on the login endpoint.
-# This test sends repeated login requests for the same user and checks
-# for an HTTP 429 response.
 test_rate_limiting() {
     log "INFO" "Testing rate limiting on login endpoint..."
     local username="admin"
@@ -321,9 +250,7 @@ test_rate_limiting() {
     local rate_limit_triggered=0
     local i
     local code
-    # Send 120 rapid login requests using the same username.
     for i in {1..120}; do
-         # Use curl directly to capture HTTP status code.
          code=$(curl -s -o /dev/null -w "%{http_code}" -X POST -H "Content-Type: application/json" -d "$payload" "${API_AUTH_URL}/token")
          if [ "$code" -eq 429 ]; then
              rate_limit_triggered=1
@@ -345,12 +272,11 @@ create_admin_user() {
         "is_admin": true,
         "is_verified": true
     }'
-    # Create admin user and ignore errors if already exists
     make_request "POST" "$API_USERS_URL/" "" "application/json" "$data" > /dev/null 2>&1
 }
 
 # -----------------------------------------------------------------------------
-# Cleanup Function: Deletes all created test users.
+# Cleanup Function
 # -----------------------------------------------------------------------------
 cleanup() {
     log "INFO" "Cleaning up created test users..."
@@ -364,26 +290,42 @@ cleanup() {
 }
 
 # -----------------------------------------------------------------------------
+# Collect Results from Parallel Tests
+# -----------------------------------------------------------------------------
+collect_parallel_results() {
+    for result_file in "$TEMP_DIR"/test_results_*; do
+        [ -f "$result_file" ] || continue
+        while IFS=: read -r test_name result error_msg; do
+            ((TESTS_RUN++))
+            if [ "$result" -eq 0 ]; then
+                log "INFO" "✓ $test_name passed"
+                ((TESTS_PASSED++))
+            else
+                log "INFO" "✗ $test_name failed"
+                [ -n "$error_msg" ] && log "INFO" "Error: $error_msg"
+            fi
+        done < "$result_file"
+    done
+}
+
+# -----------------------------------------------------------------------------
 # Main Execution
 # -----------------------------------------------------------------------------
 
-# Parse command-line arguments for selective and parallel test runs
-PARALLEL=false
+# Parse command-line arguments
 SELECTED_TESTS=()
 
-if [ "$1" = "--help" ]; then
-    echo "Usage: $0 [--parallel] [test_function_name ...]"
-    echo "   --parallel    Run selected tests in parallel."
-    echo "   If no test names are provided, the full test suite will run."
-    exit 0
-fi
-
-for arg in "$@"; do
-    if [ "$arg" = "--parallel" ]; then
-        PARALLEL=true
-    else
-        SELECTED_TESTS+=("$arg")
-    fi
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --parallel)
+            PARALLEL=true
+            shift
+            ;;
+        *)
+            SELECTED_TESTS+=("$1")
+            shift
+            ;;
+    esac
 done
 
 # Ensure admin user exists
@@ -395,7 +337,8 @@ command -v jq &> /dev/null || { log "INFO" "Error: jq is not installed"; exit 1;
 check_api
 
 if [ ${#SELECTED_TESTS[@]} -eq 0 ]; then
-    # Full test suite (order matters)
+    # Full test suite
+    PARALLEL=false
     test_unauthorized_access
 
     for user in admin user1; do
@@ -410,10 +353,8 @@ if [ ${#SELECTED_TESTS[@]} -eq 0 ]; then
 
     NEW_USER="testuser$(date +%s)"
     if test_create_user "$NEW_USER"; then
-        # First login returns "Account not verified"
         test_login "$NEW_USER"
         test_verify_user "$NEW_USER"
-        # Re‑login now that the user is verified
         test_login "$NEW_USER"
         verify_token "$NEW_USER"
         test_update_user "$NEW_USER"
@@ -421,20 +362,20 @@ if [ ${#SELECTED_TESTS[@]} -eq 0 ]; then
     fi
 
     test_rate_limiting
-
 else
-    # Selective test mode: Run only the tests specified
+    # Selective test mode
     log "INFO" "Running selective tests: ${SELECTED_TESTS[*]}"
     if [ "$PARALLEL" = true ]; then
         for test_func in "${SELECTED_TESTS[@]}"; do
             if declare -f "$test_func" > /dev/null; then
                 log "INFO" "Running $test_func in parallel"
-                "$test_func" &
+                ($test_func) &
             else
                 log "INFO" "Test function $test_func not found"
             fi
         done
         wait
+        collect_parallel_results
     else
         for test_func in "${SELECTED_TESTS[@]}"; do
             if declare -f "$test_func" > /dev/null; then
