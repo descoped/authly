@@ -108,6 +108,7 @@ app.include_router(users_router, prefix="/api/v1")
 ### Token Management
 - [🔄 Token Refresh Flow](https://github.com/descoped/authly/blob/master/docs/token-refresh-flow.md)
 - [📊 State Diagram for Token Lifecycle](https://github.com/descoped/authly/blob/master/docs/state-diagram-for-token-lifecycle.md)
+- [📊 State Diagram for User Account](https://github.com/descoped/authly/blob/master/docs/state-diagram-for-user-account.md)
 
 
 ## API Documentation
