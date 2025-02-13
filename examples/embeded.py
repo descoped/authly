@@ -12,7 +12,7 @@ from psycopg_toolkit import Database, DatabaseSettings
 from testcontainers.postgres import PostgresContainer
 
 from authly import AuthlyConfig, Authly
-from authly.api import auth_router, users_router
+from authly.api import auth_router, users_router, health_router
 from authly.auth import get_password_hash
 from authly.config import StaticSecretProvider, find_root_folder
 from authly.users import UserModel, UserRepository
@@ -32,7 +32,7 @@ Run:
     ./api-test.sh
     
     # Test rate limiting and invalid payload
-    ./api-test.sh test_rate_limiting test_invalid_payload
+    ./api-test.sh test_invalid_payload
      
     # Parallel test rate limiting 
     ./api-test.sh --parallel test_rate_limiting
@@ -157,6 +157,7 @@ async def init_app():
 
     # Create the FastAPI app
     app = FastAPI()
+    app.include_router(health_router)
     app.include_router(auth_router, prefix=config.fastapi_api_version_prefix)
     app.include_router(users_router, prefix=config.fastapi_api_version_prefix)
 
