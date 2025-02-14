@@ -16,11 +16,9 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def custom_test_server(
-        authly: Authly,
+        initialize_authly: Authly,
         test_config: AuthlyConfig,
         db: Database,
-        token_store: TokenStore,
-        token_service: TokenService
 ) -> AsyncGenerator[TestServer, None]:
     """Custom test server creation with full control over lifecycle"""
     server = TestServer()
@@ -29,8 +27,6 @@ async def custom_test_server(
     app_: AppType = server.app
     app_.dependency_overrides.update({
         get_config: lambda: test_config,
-        # get_token_store: lambda: token_store,
-        # get_token_service: lambda: token_service,
     })
 
     try:
@@ -58,14 +54,10 @@ async def test_server(
         initialize_authly: Authly,  # Add this dependency
         test_config: AuthlyConfig,
         _database_instance: Database,
-        token_store: TokenStore,
-        token_service: TokenService
 ) -> AsyncGenerator[TestServer, None]:
     async with custom_test_server(
             initialize_authly,
             test_config,
             _database_instance,
-            token_store,
-            token_service
     ) as server:
         yield server
