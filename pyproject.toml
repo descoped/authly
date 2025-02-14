@@ -110,11 +110,3 @@ exclude = [
     "dist",
     "*.egg-info",
 ]
-
-[tool.poetry.scripts]
-clean = "scripts.clean:main"
-lint = "scripts.fake8-lint:main"
-runserver = "scripts.runserver:main"
-docker-build = "scripts.docker-build:main"
-docker-run = "scripts.docker-run:main"
-docker-it = "scripts.docker-it:main"
