@@ -1,25 +1,16 @@
-import logging
-import os
 import tempfile
 from pathlib import Path
-from typing import Any, AsyncGenerator, Optional
+from typing import AsyncGenerator, Optional
 
 import pytest
 from psycopg_pool import AsyncConnectionPool
-from psycopg_toolkit import TransactionManager
 
 from authly import Authly
-from authly.config import AuthlyConfig, StaticSecretProvider
-from authly.tokens import TokenStore, get_token_store, TokenService, get_token_service, get_token_store_class
+from authly.config import AuthlyConfig, StaticSecretProvider, find_root_folder
 
 pytest_plugins = [
     "fixtures.testing",
 ]
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
 
 _test_config: Optional[AuthlyConfig] = None
 
@@ -32,11 +23,10 @@ def test_config() -> AuthlyConfig:
             secret_key="test-secret-key",
             refresh_secret_key="test-refresh-key"
         )
-        output_dir = os.path.join(os.getcwd(), 'output')
-        os.makedirs(output_dir, exist_ok=True)
+        output_dir = find_root_folder() / "output"
+        output_dir.mkdir(exist_ok=True)
         temp_folder = Path(tempfile.mkdtemp(dir=output_dir))
         _test_config = AuthlyConfig.load(test_provider, temp_folder)
-
     return _test_config
 
 
@@ -60,16 +50,3 @@ async def initialize_authly(
     # 4. The "pool closed" error is avoided since we're not trying to reuse a closed pool
     #
     Authly._instance = None  # This is important!
-
-
-@pytest.fixture
-async def token_store(transaction_manager: TransactionManager) -> TokenStore:
-    """Create a token store with a proper database connection."""
-    async with transaction_manager.transaction() as conn:
-        store_class = get_token_store_class()
-        return store_class.create(conn)
-
-
-@pytest.fixture(scope="function")
-async def token_service() -> AsyncGenerator[TokenService, Any]:
-    yield await get_token_service()
