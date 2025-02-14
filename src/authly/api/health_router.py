@@ -14,7 +14,7 @@ async def health_check(db_connection=Depends(authly_db_connection)) -> Dict[str,
     try:
         async with db_connection.cursor() as cur:
             await cur.execute("SELECT txid_current()")
-            tx_id = await cur.fetchone()
+            _ = await cur.fetchone()
         return {"status": "healthy", "database": "connected"}
     except Exception as e:
         logging.error("Database connection error: %s", str(e))
