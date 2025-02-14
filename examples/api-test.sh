@@ -11,14 +11,28 @@
 # Usage:
 #   ./api-test.sh [--parallel] [test_function_name ...]
 #
-#   --parallel    Run selected tests in parallel.
-#   If no test names are provided, the full test suite will run.
+#   --parallel         Run selected tests in parallel.
+#   --help, -h         Display this help message.
 #
-# Note: In selective mode, tests should be self-contained.
+# Available test functions:
+#   test_unauthorized_access   Test unauthorized access to the API.
+#   test_login                 Test user login (pass username as a parameter).
+#   verify_token               Verify the current token via the /me endpoint.
+#   test_get_users             Retrieve a list of users.
+#   test_create_user           Create a new user.
+#   test_invalid_payload       Test login using an invalid JSON payload.
+#   test_verify_user           Test the user verification process.
+#   test_update_user           Test updating an existing user.
+#   test_delete_user           Test deleting a user.
+#   test_rate_limiting         Test API rate limiting on the login endpoint.
+#
+# Examples:
+#   ./api-test.sh test_rate_limiting
+#   ./api-test.sh --parallel test_invalid_payload test_rate_limiting
 # =============================================================================
 
 # Configuration
-LOG_LEVEL=${LOG_LEVEL:-"INFO"}  # Options: TRACE, DEBUG, INFO
+LOG_LEVEL=${LOG_LEVEL:-"INFO"}
 CURL_CONNECT_TIMEOUT=${CURL_CONNECT_TIMEOUT:-5}
 CURL_MAX_TIME=${CURL_MAX_TIME:-10}
 CURL_RETRY=${CURL_RETRY:-2}
@@ -54,6 +68,36 @@ API_USERS_URL="${API_BASE_URL}/api/${API_VERSION}/users"
 
 CURRENT_TOKEN=""
 ADMIN_TOKEN=""
+
+# -----------------------------------------------------------------------------
+# Help Function
+# -----------------------------------------------------------------------------
+print_help() {
+    cat <<EOF
+Usage: ./api-test.sh [--parallel] [test_function_name ...]
+
+Options:
+  --parallel         Run selected tests in parallel.
+  -h, --help         Display this help message.
+
+Available test functions:
+  test_unauthorized_access   Test unauthorized access to the API.
+  test_login                 Test user login (pass username as a parameter).
+  verify_token               Verify the current token via the /me endpoint.
+  test_get_users             Retrieve a list of users.
+  test_create_user           Create a new user.
+  test_invalid_payload       Test login using an invalid JSON payload.
+  test_verify_user           Test the user verification process.
+  test_update_user           Test updating an existing user.
+  test_delete_user           Test deleting a user.
+  test_rate_limiting         Test API rate limiting on the login endpoint.
+
+Examples:
+  ./api-test.sh test_rate_limiting
+  ./api-test.sh --parallel test_invalid_payload test_rate_limiting
+
+EOF
+}
 
 # -----------------------------------------------------------------------------
 # Logging Functions
@@ -247,7 +291,6 @@ test_verify_user() {
     local username=$1
     log "INFO" "Testing user verification for $username..."
 
-    # Admin login with pre-seeded credentials
     local admin_data='{
         "username": "admin",
         "password": "Test123!",
@@ -265,7 +308,6 @@ test_verify_user() {
     local admin_token
     admin_token=$(echo "$admin_response" | jq -r '.access_token')
 
-    # Use the first created user ID for verification
     local user_id="${CREATED_USER_IDS[0]}"
     if [ -z "$user_id" ]; then
         log "INFO" "No user ID available for verification"
@@ -328,7 +370,6 @@ test_delete_user() {
         print_test_result "Delete user ($username)" 1 "Unexpected HTTP status code: ${status_code}"
     fi
 
-    # Check if we can still access with the deleted user token
     local post_delete_response
     post_delete_response=$(make_request "GET" "${API_USERS_URL}/me" "$CURRENT_TOKEN")
     if echo "$post_delete_response" | grep -q -E "Not authenticated|Could not validate credentials"; then
@@ -344,66 +385,66 @@ test_rate_limiting() {
     local payload
     payload=$(printf '{"username": "%s", "password": "Admin123!", "grant_type": "password"}' "$username")
     local rate_limit_triggered=0
-    local i
-    local code
+    local request_count=0
+    local start_time
+    start_time=$(date +%s)
 
-    # Don't output iteration numbers in parallel mode
-    if [ "$PARALLEL" = true ]; then
-        for i in {1..120}; do
-            code=$(curl -s -o /dev/null -w "%{http_code}" -X POST -H "Content-Type: application/json" -d "$payload" "${API_AUTH_URL}/token")
+    log "INFO" "Starting rate limit test with requests..."
+
+    local pids=()
+    for i in {1..120}; do
+        (
+            code=$(curl -s -o /dev/null -w "%{http_code}" \
+                  -X POST \
+                  -H "Content-Type: application/json" \
+                  -d "$payload" \
+                  "${API_AUTH_URL}/token")
             if [ "$code" -eq 429 ]; then
-                rate_limit_triggered=1
-                break
+                echo "429" > "$TEMP_DIR/rate_limit_triggered"
             fi
-        done
-    else
-        for i in {1..120}; do
-            echo -n "." # Show progress without flooding output
-            if [ $((i % 20)) -eq 0 ]; then echo ""; fi # New line every 20 dots
-            code=$(curl -s -o /dev/null -w "%{http_code}" -X POST -H "Content-Type: application/json" -d "$payload" "${API_AUTH_URL}/token")
-            if [ "$code" -eq 429 ]; then
-                rate_limit_triggered=1
-                break
-            fi
-        done
-        echo "" # Final newline
+            echo "$code" >> "$TEMP_DIR/request_count"
+        ) &
+        pids+=($!)
+        if [ $((i % 10)) -eq 0 ]; then
+            sleep 0.1
+        fi
+    done
+
+    for pid in "${pids[@]}"; do
+        wait $pid
+    done
+
+    local end_time
+    end_time=$(date +%s)
+    local total_time=$((end_time - start_time))
+
+    if [ -f "$TEMP_DIR/request_count" ]; then
+        request_count=$(wc -l < "$TEMP_DIR/request_count")
     fi
+
+    if [ -f "$TEMP_DIR/rate_limit_triggered" ]; then
+        rate_limit_triggered=1
+    fi
+
+    local final_frequency
+    if [ "$total_time" -gt 0 ]; then
+        final_frequency=$(echo "scale=2; $request_count / $total_time" | bc)
+    else
+        final_frequency=$(echo "scale=2; $request_count" | bc)
+    fi
+
+    log "INFO" "Rate limit test completed:"
+    log "INFO" "Total requests sent:      $request_count"
+    log "INFO" "Total time: ${total_time}s"
+    log "INFO" "Average request frequency: ${final_frequency} requests/second"
 
     if [ "$rate_limit_triggered" -eq 1 ]; then
         print_test_result "Rate limiting test" 0
     else
         print_test_result "Rate limiting test" 1 "No 429 response received after repeated login attempts"
     fi
-}
 
-create_admin_user() {
-    log "INFO" "Ensuring admin user exists..."
-    local data='{
-        "username": "admin",
-        "email": "admin@example.com",
-        "password": "Test123!",
-        "is_admin": true,
-        "is_verified": true
-    }'
-
-    # Try to create admin user
-    local response
-    response=$(make_request "POST" "$API_USERS_URL/" "" "application/json" "$data")
-
-    # Check if admin already exists (400 is expected in this case)
-    if [ "$(echo "$response" | jq -r '.detail')" = "Username already exists" ]; then
-        log "INFO" "Admin user already exists"
-        return 0
-    fi
-
-    # Check if admin was created successfully
-    if [ "$(echo "$response" | jq -r '.username // empty')" = "admin" ]; then
-        log "INFO" "Admin user created successfully"
-        return 0
-    fi
-
-    log "INFO" "Warning: Unable to verify admin user state: $response"
-    return 1
+    rm -f "$TEMP_DIR/rate_limit_triggered" "$TEMP_DIR/request_count"
 }
 
 # -----------------------------------------------------------------------------
@@ -442,6 +483,16 @@ collect_parallel_results() {
 # -----------------------------------------------------------------------------
 # Main Execution
 # -----------------------------------------------------------------------------
+
+# If --help or -h is provided, display help and exit
+for arg in "$@"; do
+    case "$arg" in
+        -h|--help)
+            print_help
+            exit 0
+            ;;
+    esac
+done
 
 # Parse command-line arguments
 SELECTED_TESTS=()
