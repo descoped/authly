@@ -8,12 +8,13 @@ from uuid import uuid4
 import pytest
 from fastapi_testing import TestServer
 from jose import jwt
+from psycopg import AsyncConnection
 from psycopg_toolkit import TransactionManager
 
 from authly import AuthlyConfig
 from authly.api import auth_router, users_router
 from authly.auth.core import get_password_hash
-from authly.tokens import TokenStore, TokenType
+from authly.tokens import TokenStore, TokenType, get_token_store_class, TokenService, get_token_service
 from authly.users.models import UserModel
 from authly.users.repository import UserRepository
 
@@ -23,6 +24,19 @@ logger = logging.getLogger(__name__)
 def generate_random_identifier(length: int = 10) -> str:
     """Generate a random string for use in both username and email."""
     return ''.join(random.choices(string.ascii_lowercase, k=length))
+
+
+@pytest.fixture(scope="function")
+async def token_store(db_connection: AsyncConnection) -> TokenStore:
+    """Create a token store with a proper database connection."""
+    store_class = get_token_store_class()
+    return store_class.create(db_connection)
+
+
+@pytest.fixture(scope="function")
+async def token_service(token_store: TokenStore) -> AsyncGenerator[TokenService, Any]:
+    """Create a token service with a proper database connection."""
+    yield await get_token_service(token_store)
 
 
 @pytest.fixture()
