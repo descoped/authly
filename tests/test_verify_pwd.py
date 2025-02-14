@@ -1,6 +1,6 @@
 import pytest
 
-from authly.auth import verify_password
+from authly.auth import verify_password, get_password_hash
 
 
 @pytest.mark.parametrize("password_hash", [
@@ -8,6 +8,8 @@ from authly.auth import verify_password
     "$2b$12$W6WQdp9ioDLkqVbPNx7Bc.hh9Zj4jiw1UAgDeezbn7xOLyGlrZOwC",  # generated from bcrypt
     "$2y$12$MBH0rEzEXrAq8ukNA1LBKeYPWS2CcvoZeGwEtnuFNk4ONjN9LFpKK",  # generated from htpasswd -nbBC 12 "Test123"
     "$2y$12$gKLTXdWkOUFtvUOVh9aO2.S4V.YczMUQxq2foYadyMfpQomfKVnEa",  # generated from htpasswd -nbBC 12 "Test123"
+    get_password_hash("Test123!"),  # generated from bcrypt
+    get_password_hash("Test123!"),  # generated from bcrypt
 ])
 def test_verify(password_hash):
     """
