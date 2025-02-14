@@ -442,6 +442,57 @@ hashed = get_password_hash("user_password")
 is_valid = verify_password("user_password", hashed)
 ```
 
+### Password Hashing with bcrypt in Terminal
+
+This guide shows how to generate bcrypt password hashes using Terminal commands, similar to what authentication libraries do under the hood.
+
+#### Quick Start
+
+```bash
+htpasswd -nbB username password
+```
+
+This generates a bcrypt hash in the format: `username:$2y$05$...`
+
+#### Installation
+
+If htpasswd is not available:
+
+```bash
+brew install apache2
+```
+
+### Advanced Usage
+
+#### Match Python's Default Cost Factor (12)
+
+```bash
+htpasswd -nbBC 12 username password
+```
+
+#### Python Equivalent
+
+For reference, this is equivalent to:
+
+```python
+import bcrypt
+bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt(rounds=12))
+```
+
+### Hash Format
+
+The output hash follows this structure:
+- `$2y$` - bcrypt algorithm identifier
+- `XX$` - cost factor (05 for htpasswd default, 12 for Python default)
+- Rest of string - salt and hash combined
+
+#### Notes
+- Default cost factor in htpasswd is 5
+- Default cost factor in Python's bcrypt is 12
+- Both use the same underlying Blowfish-based bcrypt algorithm
+- Higher cost factors are more secure but slower to compute
+
+
 ### Token Security
 
 Authly implements a comprehensive token security system:
