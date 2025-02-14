@@ -11,14 +11,14 @@ from psycopg_pool import AsyncConnectionPool
 from psycopg_toolkit import Database, DatabaseSettings
 from testcontainers.postgres import PostgresContainer
 
-from authly import AuthlyConfig, Authly
+from authly import Authly
 from authly.api import auth_router, users_router, health_router
 from authly.auth import get_password_hash
-from authly.config import StaticSecretProvider, find_root_folder
+from authly.config import AuthlyConfig, StaticSecretProvider, find_root_folder
 from authly.users import UserModel, UserRepository
 from setup_logging import setup_logging
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("embedded")
 
 """
 Run:
@@ -32,11 +32,12 @@ Run:
     ./api-test.sh
     
     # Test rate limiting and invalid payload
-    ./api-test.sh test_invalid_payload
+    ./api-test.sh test_rate_limiting test_invalid_payload
      
     # Parallel test rate limiting 
     ./api-test.sh --parallel test_rate_limiting
 """
+
 
 async def _post_initialize_db(pool: AsyncConnectionPool) -> None:
     """Execute initialization after Docker Postgres container has run ini-db-and-user.sql
@@ -135,6 +136,11 @@ async def init_app():
         password=postgres.password
     )
 
+    # Log the container details.
+    pg_ip = settings.host
+    pg_port = settings.port
+    logger.info(f"Postgres container is bound to: {pg_ip}:{pg_port}")
+
     # Create the database pool.
     db = Database(settings)
     try:
@@ -205,7 +211,10 @@ async def shutdown(server: uvicorn.Server, db, postgres):
 
 
 async def main():
-    setup_logging()
+    setup_logging(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(name)s - %(message)s'
+    )
 
     # Set specific logger levels
     logging.getLogger('uvicorn').setLevel(logging.INFO)
