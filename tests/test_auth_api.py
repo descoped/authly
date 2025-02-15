@@ -6,7 +6,7 @@ from typing import Any, AsyncGenerator
 from uuid import uuid4
 
 import pytest
-from fastapi_testing import TestServer
+from fastapi_testing import AsyncTestServer
 from jose import jwt
 from psycopg import AsyncConnection
 from psycopg_toolkit import TransactionManager
@@ -80,20 +80,20 @@ async def create_unverified_user(transaction_manager: TransactionManager) -> Use
 
 
 @pytest.fixture()
-async def auth_server(test_server) -> AsyncGenerator[TestServer, Any]:
+async def auth_server(test_server) -> AsyncGenerator[AsyncTestServer, Any]:
     test_server.app.include_router(auth_router, prefix="/api/v1")
     test_server.app.include_router(users_router, prefix="/api/v1")
     yield test_server
 
 
 @pytest.mark.asyncio
-async def test_unauthorized_access(auth_server: TestServer):
+async def test_unauthorized_access(auth_server: AsyncTestServer):
     response = await auth_server.client.get("/api/v1/users/me")
     await response.expect_status(401)
 
 
 @pytest.mark.asyncio
-async def test_login_unverified(auth_server: TestServer, create_unverified_user: UserModel):
+async def test_login_unverified(auth_server: AsyncTestServer, create_unverified_user: UserModel):
     response = await auth_server.client.post(
         "/api/v1/auth/token",
         json={
@@ -109,7 +109,7 @@ async def test_login_unverified(auth_server: TestServer, create_unverified_user:
 
 
 @pytest.mark.asyncio
-async def test_login_success(test_config: AuthlyConfig, auth_server: TestServer, test_user: UserModel):
+async def test_login_success(test_config: AuthlyConfig, auth_server: AsyncTestServer, test_user: UserModel):
     response = await auth_server.client.post(
         "/api/v1/auth/token",
         json={
@@ -136,7 +136,7 @@ async def test_login_success(test_config: AuthlyConfig, auth_server: TestServer,
 
 
 @pytest.mark.asyncio
-async def test_login_invalid_credentials(auth_server: TestServer):
+async def test_login_invalid_credentials(auth_server: AsyncTestServer):
     response = await auth_server.client.post(
         "/api/v1/auth/token",
         json={
@@ -152,7 +152,7 @@ async def test_login_invalid_credentials(auth_server: TestServer):
 
 
 @pytest.mark.asyncio
-async def test_refresh_token_flow(auth_server: TestServer, test_user: UserModel):
+async def test_refresh_token_flow(auth_server: AsyncTestServer, test_user: UserModel):
     # First login
     login_response = await auth_server.client.post(
         "/api/v1/auth/token",
@@ -188,7 +188,7 @@ async def test_refresh_token_flow(auth_server: TestServer, test_user: UserModel)
 
 
 @pytest.mark.asyncio
-async def test_logout(auth_server: TestServer, test_user: UserModel):
+async def test_logout(auth_server: AsyncTestServer, test_user: UserModel):
     # First login
     login_response = await auth_server.client.post(
         "/api/v1/auth/token",
@@ -214,7 +214,7 @@ async def test_logout(auth_server: TestServer, test_user: UserModel):
 
 
 @pytest.mark.asyncio
-async def test_login_stores_tokens(test_config: AuthlyConfig, auth_server: TestServer, test_user: UserModel,
+async def test_login_stores_tokens(test_config: AuthlyConfig, auth_server: AsyncTestServer, test_user: UserModel,
                                    token_store: TokenStore):
     """Test that login creates and stores both access and refresh tokens."""
     response = await auth_server.client.post(
@@ -254,7 +254,7 @@ async def test_login_stores_tokens(test_config: AuthlyConfig, auth_server: TestS
 @pytest.mark.asyncio
 async def test_refresh_invalidates_old_token(
         test_config: AuthlyConfig,
-        auth_server: TestServer,
+        auth_server: AsyncTestServer,
         test_user: UserModel,
         token_store: TokenStore
 ):
@@ -306,7 +306,7 @@ async def test_refresh_invalidates_old_token(
 
 @pytest.mark.asyncio
 async def test_logout_invalidates_all_tokens(
-        auth_server: TestServer,
+        auth_server: AsyncTestServer,
         test_user: UserModel,
         token_store: TokenStore
 ):
@@ -350,7 +350,7 @@ async def test_logout_invalidates_all_tokens(
 
 @pytest.mark.asyncio
 async def test_refresh_token_reuse(
-        auth_server: TestServer,
+        auth_server: AsyncTestServer,
         test_user: UserModel
 ):
     """Test that reusing a refresh token after refresh fails."""

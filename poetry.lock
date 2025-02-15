@@ -460,14 +460,14 @@ standard = ["email-validator (>=2.0.0)", "fastapi-cli[standard] (>=0.0.5)", "htt
 
 [[package]]
 name = "fastapi-testing"
-version = "0.1.1"
+version = "0.2.0"
 description = "A lightweight, async-first testing framework for FastAPI applications"
 optional = false
 python-versions = "<4.0,>=3.11"
 groups = ["test"]
 files = [
-    {file = "fastapi_testing-0.1.1-py3-none-any.whl", hash = "sha256:68ac70aab8a510cd7fa49eb5532048be2cfc1c08a92cb7f7d39e700be7185722"},
-    {file = "fastapi_testing-0.1.1.tar.gz", hash = "sha256:d4fc17c06f08af634cf866dca243849b47f711669e5d5382392db3aa9f3bf4d3"},
+    {file = "fastapi_testing-0.2.0-py3-none-any.whl", hash = "sha256:6951fde5f3dbbe95425e78a6914fb01474e80889fcf0e014d2bb3627482d4f2e"},
+    {file = "fastapi_testing-0.2.0.tar.gz", hash = "sha256:86ac805fa10cefc74a3b9140c804831ab2b2eba7088ddcd010e9b2ef792bf36f"},
 ]
 
 [package.dependencies]
@@ -1492,4 +1492,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.11"
-content-hash = "7d54edc9baa9de045d56512e00a76287d5d5a6eb382144a79941fc2cbc963fd2"
+content-hash = "8fe92c265a98089d2725ce031fa06563ca0f768963e89493a92687daa737dc8c"

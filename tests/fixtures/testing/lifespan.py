@@ -4,7 +4,7 @@ from typing import AsyncGenerator
 
 import pytest
 from fastapi.applications import AppType
-from fastapi_testing import TestServer
+from fastapi_testing import AsyncTestServer
 from psycopg_toolkit import Database
 
 from authly import get_config, Authly
@@ -19,9 +19,9 @@ async def custom_test_server(
         initialize_authly: Authly,
         test_config: AuthlyConfig,
         db: Database,
-) -> AsyncGenerator[TestServer, None]:
+) -> AsyncGenerator[AsyncTestServer, None]:
     """Custom test server creation with full control over lifecycle"""
-    server = TestServer()
+    server = AsyncTestServer()
 
     # Wire up dependencies before server starts
     app_: AppType = server.app
@@ -54,7 +54,7 @@ async def test_server(
         initialize_authly: Authly,  # Add this dependency
         test_config: AuthlyConfig,
         _database_instance: Database,
-) -> AsyncGenerator[TestServer, None]:
+) -> AsyncGenerator[AsyncTestServer, None]:
     async with custom_test_server(
             initialize_authly,
             test_config,

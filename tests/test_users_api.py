@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 import pytest
-from fastapi_testing import TestServer
+from fastapi_testing import AsyncTestServer
 from psycopg_toolkit import TransactionManager
 
 from authly import Authly
@@ -74,7 +74,7 @@ async def test_password_hashing():
 
 class TestUserAPI:
     @pytest.mark.asyncio
-    async def test_create_user(self, test_server: TestServer):
+    async def test_create_user(self, test_server: AsyncTestServer):
         """Test user creation endpoint"""
         # Register the router with the API prefix
         test_server.app.include_router(users_router, prefix="/api/v1")
@@ -104,7 +104,7 @@ class TestUserAPI:
     @pytest.mark.asyncio
     async def test_get_current_user(
             self,
-            test_server: TestServer,
+            test_server: AsyncTestServer,
             test_user: UserModel,
             test_user_token: str
     ):
@@ -126,7 +126,7 @@ class TestUserAPI:
     @pytest.mark.asyncio
     async def test_update_user(
             self,
-            test_server: TestServer,
+            test_server: AsyncTestServer,
             test_user: UserModel,
             test_user_token: str
     ):
@@ -154,7 +154,7 @@ class TestUserAPI:
     @pytest.mark.asyncio
     async def test_delete_user(
             self,
-            test_server: TestServer,
+            test_server: AsyncTestServer,
             test_user: UserModel,
             test_user_token: str
     ):
@@ -177,7 +177,7 @@ class TestUserAPI:
     @pytest.mark.asyncio
     async def test_duplicate_username(
             self,
-            test_server: TestServer,
+            test_server: AsyncTestServer,
             test_user: UserModel
     ):
         """Test creating user with duplicate username"""
@@ -200,7 +200,7 @@ class TestUserAPI:
     @pytest.mark.asyncio
     async def test_get_users_pagination(
             self,
-            test_server: TestServer,
+            test_server: AsyncTestServer,
             test_user: UserModel,
             test_user_token: str,
             transaction_manager
