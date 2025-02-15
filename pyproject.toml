@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "authly"
-version = "0.1.4"
+version = "0.1.5"
 description = "Authentication and Authorization for Python FastAPI"
 authors = ["Ove Ranheim <oranheim@gmail.com>"]
 readme = "README.md"
