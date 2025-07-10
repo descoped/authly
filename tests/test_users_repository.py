@@ -26,7 +26,7 @@ async def sample_user() -> UserModel:
         email="test@example.com",
         password_hash="hashed_password",
         created_at=datetime.now(),
-        updated_at=datetime.now()
+        updated_at=datetime.now(),
     )
 
 

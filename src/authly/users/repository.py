@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime, timezone
-from typing import Optional, List
+from typing import List, Optional
 from uuid import UUID
 
 from psycopg import AsyncConnection
@@ -16,19 +16,11 @@ logger = logging.getLogger(__name__)
 
 class UserRepository(BaseRepository[UserModel, UUID]):
     def __init__(self, db_connection: AsyncConnection):
-        super().__init__(
-            db_connection=db_connection,
-            table_name="users",
-            model_class=UserModel,
-            primary_key="id"
-        )
+        super().__init__(db_connection=db_connection, table_name="users", model_class=UserModel, primary_key="id")
 
     async def get_by_username(self, username: str) -> Optional[UserModel]:
         try:
-            query = PsycopgHelper.build_select_query(
-                table_name="users",
-                where_clause={"username": username}
-            )
+            query = PsycopgHelper.build_select_query(table_name="users", where_clause={"username": username})
             async with self.db_connection.cursor(row_factory=dict_row) as cur:
                 await cur.execute(query, [username])
                 result = await cur.fetchone()
@@ -39,10 +31,7 @@ class UserRepository(BaseRepository[UserModel, UUID]):
 
     async def get_by_email(self, email: str) -> Optional[UserModel]:
         try:
-            query = PsycopgHelper.build_select_query(
-                table_name="users",
-                where_clause={"email": email}
-            )
+            query = PsycopgHelper.build_select_query(table_name="users", where_clause={"email": email})
             async with self.db_connection.cursor(row_factory=dict_row) as cur:
                 await cur.execute(query, [email])
                 result = await cur.fetchone()
@@ -56,7 +45,7 @@ class UserRepository(BaseRepository[UserModel, UUID]):
             query = PsycopgHelper.build_update_query(
                 table_name="users",
                 data={"last_login": "CURRENT_TIMESTAMP_PLACEHOLDER"},
-                where_clause={"id": "USER_ID_PLACEHOLDER"}
+                where_clause={"id": "USER_ID_PLACEHOLDER"},
             )
             async with self.db_connection.cursor(row_factory=dict_row) as cur:
                 await cur.execute(query + SQL(" RETURNING *"), [datetime.now(timezone.utc), user_id])
@@ -72,12 +61,14 @@ class UserRepository(BaseRepository[UserModel, UUID]):
 
     async def get_paginated(self, skip: int = 0, limit: int = 100) -> List[UserModel]:
         # noinspection SqlDialectInspection,SqlNoDataSourceInspection
-        query = SQL("""
+        query = SQL(
+            """
             SELECT *
             FROM users
             ORDER BY created_at DESC
             LIMIT {} OFFSET {}
-        """).format(Placeholder(), Placeholder())
+        """
+        ).format(Placeholder(), Placeholder())
 
         try:
             async with self.db_connection.cursor(row_factory=dict_row) as cur:

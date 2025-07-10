@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional, List
+from typing import List, Optional
 from uuid import UUID
 
 from psycopg import AsyncConnection
@@ -16,7 +16,7 @@ class PostgresTokenStore(TokenStore):
     """
 
     @classmethod
-    def create(cls, db_connection: AsyncConnection) -> 'PostgresTokenStore':
+    def create(cls, db_connection: AsyncConnection) -> "PostgresTokenStore":
         """Factory method to create PostgresTokenStore instance."""
         return cls(db_connection)
 
@@ -32,10 +32,7 @@ class PostgresTokenStore(TokenStore):
         return await self._repo.get_by_jti(token_jti)
 
     async def get_user_tokens(
-            self,
-            user_id: UUID,
-            token_type: Optional[TokenType] = None,
-            valid_only: bool = True
+        self, user_id: UUID, token_type: Optional[TokenType] = None, valid_only: bool = True
     ) -> List[TokenModel]:
         """Get all tokens for a user."""
         return await self._repo.get_user_tokens(user_id, token_type, valid_only)
@@ -48,11 +45,7 @@ class PostgresTokenStore(TokenStore):
         except Exception:
             return False
 
-    async def invalidate_user_tokens(
-            self,
-            user_id: UUID,
-            token_type: Optional[TokenType] = None
-    ) -> int:
+    async def invalidate_user_tokens(self, user_id: UUID, token_type: Optional[TokenType] = None) -> int:
         """Invalidate all tokens for a user."""
         await self._repo.invalidate_user_tokens(user_id, token_type.value if token_type else None)
         return await self._repo.get_invalidated_token_count(user_id, token_type)
@@ -65,10 +58,6 @@ class PostgresTokenStore(TokenStore):
         """Remove expired tokens from storage."""
         return await self._repo.cleanup_expired_tokens(before_datetime)
 
-    async def count_user_valid_tokens(
-            self,
-            user_id: UUID,
-            token_type: Optional[TokenType] = None
-    ) -> int:
+    async def count_user_valid_tokens(self, user_id: UUID, token_type: Optional[TokenType] = None) -> int:
         """Count valid tokens for a user."""
         return await self._repo.count_user_valid_tokens(user_id, token_type)

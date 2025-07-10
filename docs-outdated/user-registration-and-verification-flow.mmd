@@ -1,0 +1,30 @@
+sequenceDiagram
+    participant C as Client
+    participant F as FastAPI
+    participant U as UserRepository
+    participant A as Auth
+    participant D as Database
+
+    C->>F: POST /users/ {username, email, password}
+    F->>U: get_by_username(username)
+    U->>D: SELECT user by username
+    D-->>U: no user found
+    F->>U: get_by_email(email)
+    U->>D: SELECT user by email
+    D-->>U: no user found
+    F->>A: get_password_hash(password)
+    F->>U: create(user_model)
+    U->>D: INSERT user
+    D-->>U: user created
+    F-->>C: 201 Created {user_data}
+
+    Note over C,D: Verification Process
+
+    C->>F: PUT /users/{id}/verify
+    F->>U: get_by_id(user_id)
+    U->>D: SELECT user
+    D-->>U: user data
+    F->>U: update(user_id, {is_verified: true})
+    U->>D: UPDATE user SET is_verified = true
+    D-->>U: updated
+    F-->>C: 200 OK {verified_user}

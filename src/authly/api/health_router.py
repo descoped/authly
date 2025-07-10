@@ -1,8 +1,7 @@
 import logging
 from typing import Dict
 
-from fastapi import APIRouter
-from fastapi import Depends
+from fastapi import APIRouter, Depends
 
 from authly import authly_db_connection
 

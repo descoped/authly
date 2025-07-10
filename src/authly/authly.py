@@ -17,22 +17,22 @@ class Authly:
     _config: Optional[AuthlyConfig] = None
     _pool: Optional[AsyncConnectionPool] = None
 
-    def __init__(
-            self,
-            pool: AsyncConnectionPool,
-            configuration: Optional[AuthlyConfig] = None
-    ):
-        if not hasattr(self, '_initialized'):
+    def __init__(self, pool: AsyncConnectionPool, configuration: Optional[AuthlyConfig] = None):
+        if not hasattr(self, "_initialized"):
             self._pool = pool
-            self._config = configuration or AuthlyConfig.load()
+            if configuration:
+                self._config = configuration
+            else:
+                # Default configuration using environment providers
+                from authly.config.secret_providers import EnvSecretProvider
+                from authly.config.database_providers import EnvDatabaseProvider
+                secret_provider = EnvSecretProvider()
+                database_provider = EnvDatabaseProvider()
+                self._config = AuthlyConfig.load(secret_provider, database_provider)
             self._initialized = True
 
     @classmethod
-    def initialize(
-            cls,
-            pool: AsyncConnectionPool,
-            configuration: Optional[AuthlyConfig] = None
-    ) -> 'Authly':
+    def initialize(cls, pool: AsyncConnectionPool, configuration: Optional[AuthlyConfig] = None) -> "Authly":
         if not cls._instance:
             with cls._lock:
                 if not cls._instance:
@@ -40,7 +40,7 @@ class Authly:
         return cls._instance
 
     @classmethod
-    def get_instance(cls) -> 'Authly':
+    def get_instance(cls) -> "Authly":
         if not cls._instance:
             raise RuntimeError("Authly not initialized")
         return cls._instance

@@ -22,12 +22,7 @@ class RateLimiter:
         self.requests[key] = [t for t in self.requests[key] if t > window_start]
 
         if len(self.requests[key]) >= self.max_requests:
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="Rate limit exceeded"
-            )
+            raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Rate limit exceeded")
 
         self.requests[key].append(now)
         return True
-
-

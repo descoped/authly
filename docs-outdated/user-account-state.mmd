@@ -1,0 +1,41 @@
+stateDiagram-v2
+    [*] --> Created: User Registration
+    Created --> Unverified: Initial State
+    Unverified --> Verified: Verify Account
+    Verified --> Active: First Login
+    Active --> Inactive: Deactivate Account
+    Inactive --> Active: Reactivate Account
+    
+    Active --> Admin: Grant Admin
+    Admin --> Active: Revoke Admin
+    
+    Active --> Locked: Multiple Failed Logins
+    Locked --> Active: Auto Unlock/Manual Unlock
+    
+    Inactive --> [*]: Delete Account
+    Active --> [*]: Delete Account
+    
+    note right of Created
+        Account exists but
+        not yet initialized
+    end note
+    
+    note right of Unverified
+        Limited functionality
+        Cannot login
+    end note
+    
+    note right of Active
+        Full access to
+        system features
+    end note
+    
+    note right of Admin
+        Additional
+        privileges
+    end note
+    
+    note left of Locked
+        Temporary state
+        Rate limit applies
+    end note

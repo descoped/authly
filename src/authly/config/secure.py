@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from enum import Enum
 from json import JSONEncoder
 from pathlib import Path
-from typing import Dict, Optional, List, Any
+from typing import Any, Dict, List, Optional
 
 from cryptography.fernet import Fernet, InvalidToken
 
@@ -55,6 +55,7 @@ class SecretMetadata:
         value_type: Type of the secret value
         version: Secret format version
     """
+
     created_at: datetime
     last_accessed: datetime
     value_type: SecretValueType
@@ -107,7 +108,7 @@ class SecureSecrets:
         self._load_secrets()
         self._check_rotation_schedule()
 
-    def __enter__(self) -> 'SecureSecrets':
+    def __enter__(self) -> "SecureSecrets":
         """Context manager entry.
 
         Returns:
@@ -161,10 +162,10 @@ class SecureSecrets:
         Raises:
             OSError: If file operations fail
         """
-        temp_path = path.with_suffix('.tmp')
+        temp_path = path.with_suffix(".tmp")
         os.umask(0o077)
         try:
-            with open(temp_path, 'wb') as f:
+            with open(temp_path, "wb") as f:
                 f.write(data)
                 f.flush()
                 os.fsync(f.fileno())
@@ -181,8 +182,7 @@ class SecureSecrets:
         metadata_key_rotation = self._metadata.get("key_rotation", {})
         if isinstance(metadata_key_rotation, dict):
             last_rotation = metadata_key_rotation.get("last_rotated")
-            if (last_rotation and
-                    datetime.now() - datetime.fromisoformat(last_rotation) > self.ROTATION_INTERVAL):
+            if last_rotation and datetime.now() - datetime.fromisoformat(last_rotation) > self.ROTATION_INTERVAL:
                 self.rotate_key()
 
     def _validate_value(self, value: Any) -> SecretValueType:
@@ -293,10 +293,7 @@ class SecureSecrets:
         self._create_backup()
 
         self._metadata[key] = SecretMetadata(
-            created_at=datetime.now(),
-            last_accessed=datetime.now(),
-            value_type=value_type,
-            version=self.VERSION
+            created_at=datetime.now(), last_accessed=datetime.now(), value_type=value_type, version=self.VERSION
         )
 
         secrets_dict = self._secrets or {}
@@ -306,7 +303,7 @@ class SecureSecrets:
         store_data = {
             "secrets": secrets_dict,
             "metadata": {k: vars(v) for k, v in self._metadata.items()},
-            "version": self.VERSION
+            "version": self.VERSION,
         }
 
         encrypted = self._fernet.encrypt(json.dumps(store_data, cls=DateTimeEncoder).encode())
@@ -342,7 +339,7 @@ class SecureSecrets:
         store_data = {
             "secrets": secrets_dict,
             "metadata": {k: vars(v) for k, v in self._metadata.items()},
-            "version": self.VERSION
+            "version": self.VERSION,
         }
 
         encrypted = self._fernet.encrypt(json.dumps(store_data, cls=DateTimeEncoder).encode())
@@ -362,7 +359,7 @@ class SecureSecrets:
             store_data = {
                 "secrets": self._secrets,
                 "metadata": {k: vars(v) for k, v in self._metadata.items()},
-                "version": self.VERSION
+                "version": self.VERSION,
             }
             encrypted = new_fernet.encrypt(json.dumps(store_data, cls=DateTimeEncoder).encode())
 
@@ -378,7 +375,7 @@ class SecureSecrets:
                 self._secrets[key] = None
             self._secrets = None
 
-        if hasattr(self, '_key'):
+        if hasattr(self, "_key"):
             self._secure_wipe(self._key)
             self._key = None
 
@@ -410,7 +407,7 @@ class SecureSecrets:
             for k, v in metadata_dict.items():
                 if isinstance(v, dict):
                     try:
-                        v['value_type'] = SecretValueType(v['value_type'])
+                        v["value_type"] = SecretValueType(v["value_type"])
                         self._metadata[k] = SecretMetadata(**v)
                     except (ValueError, TypeError) as e:
                         logger.warning(f"Failed to load metadata for key {k}: {e}")
@@ -449,8 +446,7 @@ class SecureSecrets:
         Returns:
             List of backup timestamp strings
         """
-        return [f.stem.replace('secrets_backup_', '')
-                for f in self._backup_dir.glob('secrets_backup_*.enc')]
+        return [f.stem.replace("secrets_backup_", "") for f in self._backup_dir.glob("secrets_backup_*.enc")]
 
 
 def find_root_folder() -> Path:

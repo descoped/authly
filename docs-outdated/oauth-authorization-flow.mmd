@@ -1,0 +1,116 @@
+sequenceDiagram
+    participant Client as OAuth Client
+    participant Browser as User Browser
+    participant AS as Authorization Server
+    participant CS as ClientService
+    participant SS as ScopeService
+    parameter AuthS as AuthorizationService
+    participant US as UserService
+    participant DB as Database
+
+    Note over Client,DB: OAuth 2.1 Authorization Code Flow with PKCE
+
+    %% 1. Client initiates authorization
+    Client->>Client: Generate code_verifier (random 43-128 chars)
+    Client->>Client: Generate code_challenge = SHA256(code_verifier)
+    Client->>Browser: Redirect to /authorize with PKCE parameters
+    
+    Note right of Client: PKCE Parameters:<br/>code_challenge<br/>code_challenge_method=S256<br/>client_id, redirect_uri<br/>scope, state
+
+    %% 2. Authorization endpoint processing
+    Browser->>AS: GET /authorize?client_id=...&code_challenge=...
+    AS->>CS: validate_client(client_id, redirect_uri)
+    CS->>DB: SELECT client WHERE client_id=...
+    DB-->>CS: client data
+    CS-->>AS: client validation result
+    
+    AS->>SS: validate_scopes(requested_scopes)
+    SS->>DB: SELECT scopes WHERE scope_name IN (...)
+    DB-->>SS: scope data
+    SS-->>AS: scope validation result
+
+    %% 3. User authentication and consent
+    alt User not authenticated
+        AS->>Browser: Serve login form
+        Browser->>AS: POST /authorize (username, password)
+        AS->>US: authenticate_user(username, password)
+        US->>DB: SELECT user WHERE username=...
+        DB-->>US: user data
+        US->>US: verify_password(password, hash)
+        US-->>AS: authentication result
+    end
+
+    AS->>Browser: Serve consent form
+    Note right of AS: Consent Form Shows:<br/>Client name & description<br/>Requested scopes<br/>User can approve/deny
+
+    Browser->>AS: POST /authorize (user consent: approve)
+
+    %% 4. Authorization code generation
+    AS->>AuthS: generate_authorization_code(client_id, user_id, scopes, code_challenge)
+    AuthS->>AuthS: Generate unique authorization code
+    AuthS->>DB: INSERT authorization_codes (code, client_id, user_id, scopes, code_challenge, expires_at)
+    DB-->>AuthS: code stored
+    AuthS-->>AS: authorization_code
+
+    %% 5. Redirect back to client
+    AS->>Browser: Redirect to client redirect_uri?code=...&state=...
+    Browser->>Client: Authorization code + state
+
+    %% 6. Token exchange
+    Client->>Client: Verify state parameter
+    Client->>AS: POST /auth/token (authorization_code grant)
+    
+    Note right of Client: Token Request:<br/>grant_type=authorization_code<br/>code=authorization_code<br/>client_id=...<br/>code_verifier=...<br/>redirect_uri=...
+
+    AS->>CS: authenticate_client(client_id, client_secret/auth_method)
+    CS->>DB: SELECT client WHERE client_id=...
+    DB-->>CS: client data with hashed secret
+    CS->>CS: verify_client_credentials()
+    CS-->>AS: client authentication result
+
+    AS->>AuthS: validate_authorization_code(code, client_id, code_verifier)
+    AuthS->>DB: SELECT authorization_codes WHERE code=... AND client_id=...
+    DB-->>AuthS: code data
+    AuthS->>AuthS: Verify PKCE: SHA256(code_verifier) == code_challenge
+    AuthS->>AuthS: Check code expiration (10 minutes)
+    AuthS->>DB: DELETE authorization_codes WHERE code=... (one-time use)
+    AuthS-->>AS: code validation result + user_id + scopes
+
+    %% 7. Token creation
+    AS->>AS: create_access_token(user_id, scopes, client_id)
+    AS->>AS: create_refresh_token(user_id, scopes, client_id)
+    AS->>DB: INSERT tokens (access_token_jti, refresh_token_jti, user_id, scopes)
+    DB-->>AS: tokens stored
+
+    AS-->>Client: OAuth token response
+    
+    Note right of AS: Token Response:<br/>access_token (JWT)<br/>refresh_token<br/>token_type=Bearer<br/>expires_in=1800<br/>scope=granted_scopes
+
+    %% 8. API access
+    Client->>Client: Store tokens securely
+    Client->>AS: API requests with Authorization: Bearer access_token
+    AS->>AS: Validate JWT signature & expiration
+    AS->>DB: Check token not revoked (JTI lookup)
+    AS-->>Client: Protected resource data
+
+    %% Error handling paths
+    rect rgb(255, 240, 240)
+        Note over Client,DB: Error Scenarios:
+        Note over AS: • Invalid client_id → error page
+        Note over AS: • Invalid redirect_uri → generic error  
+        Note over AS: • Invalid scopes → consent form shows available scopes
+        Note over AS: • PKCE verification failure → invalid_grant error
+        Note over AS: • Expired authorization code → invalid_grant error
+        Note over AS: • User denies consent → access_denied error
+    end
+
+    %% Security highlights
+    rect rgb(240, 255, 240)
+        Note over Client,DB: Security Features:
+        Note over Client: • PKCE prevents authorization code interception
+        Note over AS: • Authorization codes are single-use (10 min expiry)
+        Note over AS: • State parameter prevents CSRF attacks
+        Note over AS: • Secure client authentication (confidential clients)
+        Note over AS: • Scope validation and user consent
+        Note over AS: • JTI-based token revocation support
+    end

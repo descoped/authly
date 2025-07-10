@@ -1,17 +1,11 @@
 import logging
-from typing import AsyncGenerator
-from typing import Callable, Awaitable
-from typing import Generator
-from typing import Optional
+from typing import AsyncGenerator, Awaitable, Callable, Generator, Optional
 
 import psycopg
 import pytest
-from psycopg import AsyncConnection
-from psycopg import AsyncTransaction
+from psycopg import AsyncConnection, AsyncTransaction
 from psycopg_pool import AsyncConnectionPool
-from psycopg_toolkit import Database
-from psycopg_toolkit import DatabaseSettings
-from psycopg_toolkit import TransactionManager
+from psycopg_toolkit import Database, DatabaseSettings, TransactionManager
 from testcontainers.postgres import PostgresContainer
 
 from authly.config import find_root_folder

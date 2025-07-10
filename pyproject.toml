@@ -1,12 +1,16 @@
 [tool.poetry]
 name = "authly"
-version = "0.1.5"
+version = "0.2.0"
 description = "Authentication and Authorization for Python FastAPI"
 authors = ["Ove Ranheim <oranheim@gmail.com>"]
 readme = "README.md"
 packages = [
     { include = "authly", from = "src" }
 ]
+
+[tool.poetry.scripts]
+authly-admin = "authly.admin.cli:main"
+authly = "authly.__main__:cli"
 
 [tool.poetry.dependencies]
 python = "^3.11"
@@ -24,6 +28,10 @@ tomli = "^2.2.1"
 python-jose = { extras = ["cryptography"], version = "^3.3.0" }
 cryptography = "^44.0.1"
 bcrypt = "4.2.1"
+python-multipart = "^0.0.6"
+jinja2 = "^3.1.6"
+click = "^8.1.7"
+httpx = "^0.27.0"
 
 [tool.poetry.group.test.dependencies]
 pytest = "^8.3.4"

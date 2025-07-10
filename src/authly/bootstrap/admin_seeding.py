@@ -1,0 +1,342 @@
+"""
+Admin User Bootstrap and Scope Seeding for Authly authentication service.
+
+This module implements the security bootstrap strategy that solves the
+IAM chicken-and-egg paradox by creating the initial admin user with
+intrinsic authority and registering admin scopes during system initialization.
+"""
+
+import logging
+import os
+from datetime import datetime, timezone
+from typing import Optional
+from uuid import uuid4
+
+from psycopg import AsyncConnection
+from fastapi import HTTPException
+
+from authly.auth import get_password_hash
+from authly.users.models import UserModel
+from authly.users.repository import UserRepository
+from authly.oauth.models import OAuthScopeModel
+from authly.oauth.scope_repository import ScopeRepository
+from authly.api.admin_dependencies import ADMIN_SCOPES
+from authly.oidc.scopes import get_oidc_scopes_with_descriptions
+
+logger = logging.getLogger(__name__)
+
+
+async def bootstrap_admin_user(
+    conn: AsyncConnection,
+    username: Optional[str] = None,
+    email: Optional[str] = None,
+    password: Optional[str] = None
+) -> Optional[UserModel]:
+    """
+    Create the initial admin user with intrinsic authority.
+    
+    This function implements the first part of the security bootstrap strategy
+    by creating an admin user that bypasses OAuth dependency through the
+    database-level is_admin flag.
+    
+    Args:
+        conn: Database connection
+        username: Admin username (defaults to environment variable or "admin")
+        email: Admin email (defaults to environment variable or "admin@localhost")
+        password: Admin password (defaults to environment variable or generated)
+        
+    Returns:
+        Created admin user model, or None if admin already exists
+        
+    Raises:
+        Exception: If admin user creation fails
+    """
+    try:
+        # Get admin credentials from environment or use defaults
+        admin_username = username or os.getenv("AUTHLY_ADMIN_USERNAME", "admin")
+        admin_email = email or os.getenv("AUTHLY_ADMIN_EMAIL", "admin@localhost")
+        admin_password = password or os.getenv("AUTHLY_ADMIN_PASSWORD", "Admin123!")
+        
+        logger.info(f"Bootstrap: Checking for existing admin user: {admin_username}")
+        
+        # Check if admin user already exists
+        user_repo = UserRepository(conn)
+        existing_admin = await user_repo.get_by_username(admin_username)
+        
+        if existing_admin:
+            if existing_admin.is_admin:
+                logger.info(f"Admin user already exists: {admin_username}")
+                return None
+            else:
+                # Upgrade existing user to admin
+                logger.info(f"Upgrading existing user to admin: {admin_username}")
+                update_data = {"is_admin": True}
+                return await user_repo.update(existing_admin.id, update_data)
+        
+        # Create new admin user with intrinsic authority
+        admin_user = UserModel(
+            id=uuid4(),
+            username=admin_username,
+            email=admin_email,
+            password_hash=get_password_hash(admin_password),
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
+            is_active=True,
+            is_verified=True,
+            is_admin=True  # Intrinsic authority - not an OAuth scope
+        )
+        
+        created_user = await user_repo.create(admin_user)
+        
+        logger.info(
+            f"Bootstrap: Created admin user successfully - "
+            f"username: {admin_username}, user_id: {created_user.id}"
+        )
+        
+        # Log important security information
+        if password is None and os.getenv("AUTHLY_ADMIN_PASSWORD") is None:
+            logger.warning(
+                f"Admin user created with default password. "
+                f"Please change the password for user '{admin_username}' immediately!"
+            )
+        
+        return created_user
+        
+    except Exception as e:
+        logger.error(f"Failed to bootstrap admin user: {e}")
+        raise
+
+
+async def register_admin_scopes(conn: AsyncConnection) -> int:
+    """
+    Register admin scopes in the database during system initialization.
+    
+    This function implements the second part of the security bootstrap strategy
+    by registering all admin scopes that can then be granted to admin applications.
+    
+    Args:
+        conn: Database connection
+        
+    Returns:
+        Number of scopes registered (new scopes only)
+        
+    Raises:
+        Exception: If scope registration fails
+    """
+    try:
+        logger.info("Bootstrap: Registering admin scopes")
+        
+        scope_repo = ScopeRepository(conn)
+        registered_count = 0
+        
+        for scope_name, description in ADMIN_SCOPES.items():
+            # Check if scope already exists
+            existing_scope = await scope_repo.get_by_scope_name(scope_name)
+            
+            if existing_scope:
+                logger.debug(f"Admin scope already exists: {scope_name}")
+                # Update description if different
+                if existing_scope.description != description:
+                    logger.info(f"Updating admin scope description: {scope_name}")
+                    await scope_repo.update(
+                        existing_scope.id,
+                        {"description": description}
+                    )
+                continue
+            
+            # Create new admin scope
+            scope_data = {
+                "scope_name": scope_name,
+                "description": description,
+                "is_default": False,  # Admin scopes are not default user scopes
+                "is_active": True
+            }
+            
+            scope = OAuthScopeModel(
+                id=uuid4(),
+                scope_name=scope_name,
+                description=description,
+                is_default=False,
+                is_active=True,
+                created_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(timezone.utc)
+            )
+            
+            await scope_repo.create(scope)
+            registered_count += 1
+            
+            logger.info(f"Registered admin scope: {scope_name}")
+        
+        logger.info(f"Bootstrap: Registered {registered_count} new admin scopes")
+        return registered_count
+        
+    except Exception as e:
+        logger.error(f"Failed to register admin scopes: {e}")
+        raise
+
+
+async def register_oidc_scopes(conn: AsyncConnection) -> int:
+    """
+    Register OIDC scopes in the database during system initialization.
+    
+    This function registers standard OpenID Connect scopes that enable
+    OIDC flows on top of the OAuth 2.1 foundation.
+    
+    Args:
+        conn: Database connection
+        
+    Returns:
+        Number of scopes registered (new scopes only)
+        
+    Raises:
+        Exception: If scope registration fails
+    """
+    try:
+        logger.info("Bootstrap: Registering OIDC scopes")
+        
+        scope_repo = ScopeRepository(conn)
+        registered_count = 0
+        
+        # Get OIDC scopes with descriptions
+        oidc_scopes = get_oidc_scopes_with_descriptions()
+        
+        for scope_name, description in oidc_scopes.items():
+            # Check if scope already exists
+            existing_scope = await scope_repo.get_by_scope_name(scope_name)
+            
+            if existing_scope:
+                logger.debug(f"OIDC scope already exists: {scope_name}")
+                # Update description if different
+                if existing_scope.description != description:
+                    logger.info(f"Updating OIDC scope description: {scope_name}")
+                    await scope_repo.update(
+                        existing_scope.id,
+                        {"description": description}
+                    )
+                continue
+            
+            # Create new OIDC scope
+            scope_data = {
+                "scope_name": scope_name,
+                "description": description,
+                "is_default": False,  # OIDC scopes are not default (except openid in some cases)
+                "is_active": True
+            }
+            
+            scope = OAuthScopeModel(
+                id=uuid4(),
+                scope_name=scope_name,
+                description=description,
+                is_default=False,
+                is_active=True,
+                created_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(timezone.utc)
+            )
+            
+            await scope_repo.create(scope)
+            registered_count += 1
+            
+            logger.info(f"Registered OIDC scope: {scope_name}")
+        
+        logger.info(f"Bootstrap: Registered {registered_count} new OIDC scopes")
+        return registered_count
+        
+    except Exception as e:
+        logger.error(f"Failed to register OIDC scopes: {e}")
+        raise
+
+
+async def bootstrap_admin_system(
+    conn: AsyncConnection,
+    admin_username: Optional[str] = None,
+    admin_email: Optional[str] = None,
+    admin_password: Optional[str] = None
+) -> dict:
+    """
+    Complete admin system bootstrap process.
+    
+    This function orchestrates the full security bootstrap by creating
+    the admin user and registering admin scopes in the correct order.
+    
+    Args:
+        conn: Database connection
+        admin_username: Admin username (optional)
+        admin_email: Admin email (optional) 
+        admin_password: Admin password (optional)
+        
+    Returns:
+        Dictionary with bootstrap results
+        
+    Raises:
+        Exception: If bootstrap process fails
+    """
+    try:
+        logger.info("Starting admin system bootstrap")
+        
+        results = {
+            "admin_user_created": False,
+            "admin_user_id": None,
+            "admin_scopes_registered": 0,
+            "oidc_scopes_registered": 0,
+            "bootstrap_completed": False
+        }
+        
+        # Step 1: Register admin scopes first
+        admin_scopes_registered = await register_admin_scopes(conn)
+        results["admin_scopes_registered"] = admin_scopes_registered
+        
+        # Step 2: Register OIDC scopes
+        oidc_scopes_registered = await register_oidc_scopes(conn)
+        results["oidc_scopes_registered"] = oidc_scopes_registered
+        
+        # Step 3: Create admin user with intrinsic authority
+        admin_user = await bootstrap_admin_user(
+            conn, admin_username, admin_email, admin_password
+        )
+        
+        if admin_user:
+            results["admin_user_created"] = True
+            results["admin_user_id"] = str(admin_user.id)
+            logger.info(f"Admin user bootstrap completed: {admin_user.username}")
+        else:
+            # User already exists, get the existing user ID
+            logger.info("Admin user already exists, skipping creation")
+            admin_username = admin_username or os.getenv("AUTHLY_ADMIN_USERNAME", "admin")
+            user_repo = UserRepository(conn)
+            existing_admin = await user_repo.get_by_username(admin_username)
+            if existing_admin:
+                results["admin_user_id"] = str(existing_admin.id)
+        
+        results["bootstrap_completed"] = True
+        
+        logger.info(
+            f"Admin system bootstrap completed successfully - "
+            f"admin_scopes: {admin_scopes_registered}, oidc_scopes: {oidc_scopes_registered}, "
+            f"admin_created: {admin_user is not None}"
+        )
+        
+        return results
+        
+    except Exception as e:
+        logger.error(f"Admin system bootstrap failed: {e}")
+        raise
+
+
+def get_bootstrap_status() -> dict:
+    """
+    Get current bootstrap configuration status.
+    
+    Returns:
+        Dictionary with bootstrap configuration information
+    """
+    oidc_scopes = get_oidc_scopes_with_descriptions()
+    
+    return {
+        "admin_username": os.getenv("AUTHLY_ADMIN_USERNAME", "admin"),
+        "admin_email": os.getenv("AUTHLY_ADMIN_EMAIL", "admin@localhost"),
+        "admin_password_set": bool(os.getenv("AUTHLY_ADMIN_PASSWORD")),
+        "total_admin_scopes": len(ADMIN_SCOPES),
+        "admin_scopes": list(ADMIN_SCOPES.keys()),
+        "total_oidc_scopes": len(oidc_scopes),
+        "oidc_scopes": list(oidc_scopes.keys())
+    }

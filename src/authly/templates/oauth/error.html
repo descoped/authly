@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}Authorization Error - Authly{% endblock %}
+
+{% block content %}
+<div class="auth-card">
+    <h2>Authorization Error</h2>
+    
+    <div class="alert alert-error">
+        <strong>Error:</strong> {{ error_code | upper }}
+        {% if error_description %}
+        <br>{{ error_description }}
+        {% endif %}
+    </div>
+    
+    {% if error_code == 'invalid_client' %}
+    <p>The application you're trying to authorize is not recognized or has been disabled.</p>
+    {% elif error_code == 'invalid_request' %}
+    <p>The authorization request is missing required parameters or contains invalid values.</p>
+    {% elif error_code == 'unauthorized_client' %}
+    <p>This application is not authorized to use this authorization flow.</p>
+    {% elif error_code == 'unsupported_response_type' %}
+    <p>The authorization server does not support this response type.</p>
+    {% elif error_code == 'invalid_scope' %}
+    <p>The requested scope is invalid, unknown, or malformed.</p>
+    {% elif error_code == 'server_error' %}
+    <p>The authorization server encountered an unexpected condition that prevented it from fulfilling the request.</p>
+    {% elif error_code == 'temporarily_unavailable' %}
+    <p>The authorization server is currently unable to handle the request due to a temporary overloading or maintenance.</p>
+    {% else %}
+    <p>An error occurred during the authorization process. Please try again or contact the application provider.</p>
+    {% endif %}
+    
+    <div class="btn-group">
+        <button onclick="history.back()" class="btn btn-secondary">
+            Go Back
+        </button>
+        {% if client_name %}
+        <a href="#" onclick="window.close()" class="btn btn-primary">
+            Close Window
+        </a>
+        {% endif %}
+    </div>
+    
+    {% if error_code in ['server_error', 'temporarily_unavailable'] %}
+    <div style="margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #e9ecef; text-align: center; color: #6c757d; font-size: 0.85rem;">
+        <p>If this problem persists, please contact support.</p>
+        {% if error_uri %}
+        <p><a href="{{ error_uri }}" target="_blank" style="color: #667eea;">Learn more about this error</a></p>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-close window after 10 seconds for certain errors
+    const autoCloseErrors = ['server_error', 'temporarily_unavailable'];
+    const errorCode = '{{ error_code }}';
+    
+    if (autoCloseErrors.includes(errorCode) && window.opener) {
+        let countdown = 10;
+        const closeBtn = document.querySelector('a[onclick*="window.close"]');
+        
+        if (closeBtn) {
+            const originalText = closeBtn.textContent;
+            
+            const updateCountdown = () => {
+                closeBtn.textContent = `${originalText} (${countdown}s)`;
+                countdown--;
+                
+                if (countdown < 0) {
+                    window.close();
+                } else {
+                    setTimeout(updateCountdown, 1000);
+                }
+            };
+            
+            setTimeout(updateCountdown, 1000);
+        }
+    }
+});
+</script>
+{% endblock %}

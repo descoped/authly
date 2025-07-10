@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Optional, List
+from typing import List, Optional
 from uuid import UUID
 
 from psycopg import AsyncConnection
@@ -16,7 +16,7 @@ class TokenStore(ABC):
 
     @classmethod
     @abstractmethod
-    def create(cls, db_connection: AsyncConnection) -> 'TokenStore':
+    def create(cls, db_connection: AsyncConnection) -> "TokenStore":
         """
         Abstract factory method to create TokenStore instance.
         Must be implemented by concrete subclasses.
@@ -57,10 +57,7 @@ class TokenStore(ABC):
 
     @abstractmethod
     async def get_user_tokens(
-            self,
-            user_id: UUID,
-            token_type: Optional[TokenType] = None,
-            valid_only: bool = True
+        self, user_id: UUID, token_type: Optional[TokenType] = None, valid_only: bool = True
     ) -> List[TokenModel]:
         """
         Get all tokens for a user.
@@ -95,11 +92,7 @@ class TokenStore(ABC):
         pass
 
     @abstractmethod
-    async def invalidate_user_tokens(
-            self,
-            user_id: UUID,
-            token_type: Optional[TokenType] = None
-    ) -> int:
+    async def invalidate_user_tokens(self, user_id: UUID, token_type: Optional[TokenType] = None) -> int:
         """
         Invalidate all tokens for a user.
 
@@ -148,11 +141,7 @@ class TokenStore(ABC):
         pass
 
     @abstractmethod
-    async def count_user_valid_tokens(
-            self,
-            user_id: UUID,
-            token_type: Optional[TokenType] = None
-    ) -> int:
+    async def count_user_valid_tokens(self, user_id: UUID, token_type: Optional[TokenType] = None) -> int:
         """
         Count valid tokens for a user.
 

@@ -1,0 +1,149 @@
+stateDiagram-v2
+    [*] --> Created: Token Generation Request
+    
+    state "Token Created" as Created {
+        [*] --> GenerateJTI: Create Unique JTI
+        GenerateJTI --> SignJWT: JWT Signature
+        SignJWT --> StoreDB: Database Storage
+        StoreDB --> [*]: Ready for Use
+    }
+    
+    Created --> Active: Store in Database with JTI
+    
+    state "Active Token" as Active {
+        [*] --> ValidateRequest: API Request Received
+        ValidateRequest --> CheckSignature: Verify JWT Signature
+        CheckSignature --> CheckExpiration: Validate Expiration
+        CheckExpiration --> CheckJTI: JTI Lookup in Database
+        CheckJTI --> CheckScopes: Scope Validation (OAuth)
+        CheckScopes --> GrantAccess: Access Granted
+        GrantAccess --> [*]: Continue Active State
+        
+        CheckSignature --> InvalidSignature: [Signature Invalid]
+        CheckExpiration --> Expired: [Token Expired]
+        CheckJTI --> Revoked: [JTI Not Found/Invalidated]
+        CheckScopes --> InsufficientScope: [Required Scope Missing]
+        
+        InvalidSignature --> [*]: Reject Request
+        InsufficientScope --> [*]: Reject Request
+    }
+    
+    Active --> Used: Successful Validation
+    Used --> Active: [Still Valid & Not Revoked]
+    Used --> Expired: [Natural Expiration]
+    Used --> Revoked: [Manual Revocation]
+    
+    state "Token Revoked" as Revoked {
+        [*] --> UserLogout: User Logout Action
+        [*] --> AdminRevocation: Admin/API Revocation
+        [*] --> RefreshUsed: Refresh Token Used
+        [*] --> SecurityBreach: Security Event
+        [*] --> ClientDeactivation: OAuth Client Deactivated
+        
+        UserLogout --> InvalidateJTI: Mark JTI as Invalid
+        AdminRevocation --> InvalidateJTI
+        RefreshUsed --> InvalidateJTI
+        SecurityBreach --> InvalidateJTI
+        ClientDeactivation --> InvalidateJTI
+        
+        InvalidateJTI --> AuditLog: Log Revocation Event
+        AuditLog --> [*]: Permanently Invalid
+    }
+    
+    state "Token Expired" as Expired {
+        [*] --> NaturalExpiry: Reached Max Age
+        [*] --> RefreshRequired: Access Token Expired
+        
+        NaturalExpiry --> CleanupEligible: Ready for Cleanup
+        RefreshRequired --> RefreshFlow: Use Refresh Token
+        
+        RefreshFlow --> NewTokens: Generate New Token Pair
+        NewTokens --> [*]: Replace with New Tokens
+        
+        CleanupEligible --> [*]: Database Cleanup
+    }
+    
+    Active --> TokenRefresh: Refresh Token Flow
+    
+    state "Token Refresh" as TokenRefresh {
+        [*] --> ValidateRefreshToken: Check Refresh Token
+        ValidateRefreshToken --> InvalidateOldTokens: Revoke Current Tokens
+        InvalidateOldTokens --> GenerateNewPair: Create New Token Pair
+        GenerateNewPair --> RotateRefreshToken: Generate New Refresh Token
+        RotateRefreshToken --> [*]: Return New Tokens
+        
+        ValidateRefreshToken --> RefreshExpired: [Refresh Token Invalid]
+        RefreshExpired --> [*]: Require Re-authentication
+    }
+    
+    TokenRefresh --> Created: New Token Pair Created
+    
+    Expired --> CleanupProcess: Automated Cleanup
+    Revoked --> CleanupProcess: Automated Cleanup
+    
+    state "Cleanup Process" as CleanupProcess {
+        [*] --> IdentifyExpired: Find Expired Tokens
+        IdentifyExpired --> GracePeriod: Allow Grace Period
+        GracePeriod --> PermanentDelete: Remove from Database
+        PermanentDelete --> AuditRetention: Keep Audit Records
+        AuditRetention --> [*]: Cleanup Complete
+    }
+    
+    CleanupProcess --> [*]: Database Maintenance
+
+    note right of Created
+        Token Types:
+        • Access Token (30 min)
+        • Refresh Token (7 days)
+        
+        OAuth Features:
+        • Scoped permissions
+        • Client association
+        • PKCE verification
+    end note
+
+    note right of Active
+        Validation Checks:
+        • JWT signature
+        • Expiration time
+        • JTI in database
+        • User account status
+        • Required scopes (OAuth)
+        • Client permissions
+    end note
+
+    note right of Revoked
+        Revocation Triggers:
+        • User logout
+        • Token revocation endpoint
+        • Refresh token usage
+        • Client deactivation
+        • Security incidents
+        • Admin intervention
+    end note
+
+    note left of Expired
+        Expiration Handling:
+        • Access tokens: 30 minutes
+        • Refresh tokens: 7 days
+        • Authorization codes: 10 minutes
+        • Cleanup after grace period
+    end note
+
+    note left of TokenRefresh
+        OAuth 2.1 Refresh Flow:
+        • Validate refresh token
+        • Check client authentication
+        • Revoke old token pair
+        • Generate new tokens
+        • Include granted scopes
+        • Automatic token rotation
+    end note
+
+    note right of CleanupProcess
+        Database Maintenance:
+        • Remove expired tokens
+        • Preserve audit trails
+        • Optimize performance
+        • Scheduled cleanup jobs
+    end note

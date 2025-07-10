@@ -5,7 +5,7 @@ import sys
 class LoggerWriter:
     def __init__(self, level_fn):
         self._level_fn = level_fn
-        self._buf = ''
+        self._buf = ""
 
     def write(self, buf):
         # Remove empty lines
@@ -22,7 +22,7 @@ class LoggerWriter:
         return False
 
 
-def setup_logging(level = logging.INFO, format = '%(asctime)s - %(levelname)s - %(message)s'):
+def setup_logging(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"):
     # Configure the root logger
     root_logger = logging.getLogger()
     root_logger.setLevel(level)

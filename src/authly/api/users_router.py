@@ -1,16 +1,14 @@
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import List, Optional
-from uuid import UUID, uuid4
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from psycopg_toolkit.exceptions import OperationError, RecordNotFoundError
+from fastapi import APIRouter, Depends, Query, status
 from pydantic import BaseModel, constr
 
-from authly.api.users_dependencies import get_current_user, get_current_user_no_update, get_user_repository
-from authly.auth.core import get_password_hash
+from authly.api.users_dependencies import get_current_user, get_current_user_no_update, get_user_service
 from authly.users.models import UserModel
-from authly.users.repository import UserRepository
+from authly.users.service import UserService
 
 logger = logging.getLogger(__name__)
 
@@ -52,56 +50,37 @@ router = APIRouter(
         401: {"description": "Unauthorized"},
         403: {"description": "Forbidden"},
         404: {"description": "Not found"},
-        500: {"description": "Internal Server Error"}
-    }
+        500: {"description": "Internal Server Error"},
+    },
 )
 
 
-@router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/",
+    response_model=UserResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a new user account",
+    description="Create a new user account with a unique username and email.",
+)
 async def create_user(
-        user_create: UserCreate,
-        user_repo: UserRepository = Depends(get_user_repository),
+    user_create: UserCreate,
+    user_service: UserService = Depends(get_user_service),
 ):
     """
     Create a new user account.
     """
-    try:
-        # Check for existing username/email
-        if await user_repo.get_by_username(user_create.username):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Username already registered"
-            )
-
-        if await user_repo.get_by_email(user_create.email):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Email already registered"
-            )
-
-        # Create user model
-        user = UserModel(
-            id=uuid4(),
-            username=user_create.username,
-            email=user_create.email,
-            password_hash=get_password_hash(user_create.password),
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc)
-        )
-
-        return await user_repo.create(user)
-
-    except OperationError as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
+    return await user_service.create_user(
+        username=user_create.username,
+        email=user_create.email,
+        password=user_create.password,
+        is_admin=False,
+        is_verified=False,
+        is_active=True,
+    )
 
 
 @router.get("/me", response_model=UserResponse)
-async def get_current_user_info(
-        current_user: UserModel = Depends(get_current_user)
-):
+async def get_current_user_info(current_user: UserModel = Depends(get_current_user)):
     """
     Get information about the currently authenticated user.
     """
@@ -109,171 +88,57 @@ async def get_current_user_info(
 
 
 @router.get("/{user_id}", response_model=UserResponse)
-async def get_user(
-        user_id: UUID,
-        user_repo: UserRepository = Depends(get_user_repository)
-):
+async def get_user(user_id: UUID, user_service: UserService = Depends(get_user_service)):
     """Get user by ID - no auth required"""
-    try:
-        user = await user_repo.get_by_id(user_id)
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="User not found"
-            )
-        return user
-    except RecordNotFoundError:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
+    return await user_service.get_user_by_id(user_id)
 
 
 @router.get("/", response_model=List[UserResponse])
 async def get_users(
-        skip: int = Query(default=0, ge=0),
-        limit: int = Query(default=100, ge=1, le=100),
-        user_repo: UserRepository = Depends(get_user_repository)
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=100, ge=1, le=100),
+    user_service: UserService = Depends(get_user_service),
 ):
     """Get a list of users with pagination."""
-    try:
-        return await user_repo.get_paginated(skip=skip, limit=limit)
-    except OperationError as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
+    return await user_service.get_users_paginated(skip=skip, limit=limit)
 
 
 @router.put("/{user_id}", response_model=UserResponse)
 async def update_user(
-        user_id: UUID,
-        user_update: UserUpdate,
-        current_user: UserModel = Depends(get_current_user),
-        user_repo: UserRepository = Depends(get_user_repository)
+    user_id: UUID,
+    user_update: UserUpdate,
+    current_user: UserModel = Depends(get_current_user),
+    user_service: UserService = Depends(get_user_service),
 ):
     """
     Update user information.
     """
-    # Check permission
-    if current_user.id != user_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to update this user"
-        )
-
-    try:
-        # Check if user exists
-        if not await user_repo.get_by_id(user_id):
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="User not found"
-            )
-
-        # Prepare update data
-        update_data = user_update.model_dump(exclude_unset=True)
-
-        # Handle password update
-        if "password" in update_data:
-            update_data["password_hash"] = get_password_hash(update_data.pop("password"))
-
-        # Set updated_at timestamp
-        update_data["updated_at"] = datetime.now(timezone.utc)
-
-        # Check username uniqueness if being updated
-        if "username" in update_data:
-            existing_user = await user_repo.get_by_username(update_data["username"])
-            if existing_user and existing_user.id != user_id:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Username already taken"
-                )
-
-        # Check email uniqueness if being updated
-        if "email" in update_data:
-            existing_user = await user_repo.get_by_email(update_data["email"])
-            if existing_user and existing_user.id != user_id:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Email already registered"
-                )
-
-        return await user_repo.update(user_id, update_data)
-
-    except OperationError as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
+    update_data = user_update.model_dump(exclude_unset=True)
+    return await user_service.update_user(
+        user_id=user_id,
+        update_data=update_data,
+        requesting_user=current_user,
+        admin_override=False,
+    )
 
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_user(
-        user_id: UUID,
-        current_user: UserModel = Depends(get_current_user_no_update),
-        user_repo: UserRepository = Depends(get_user_repository)
+    user_id: UUID,
+    current_user: UserModel = Depends(get_current_user_no_update),
+    user_service: UserService = Depends(get_user_service),
 ):
-    # Check permission
-    if current_user.id != user_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to delete this user"
-        )
-
-    try:
-        await user_repo.delete(user_id)
-    except RecordNotFoundError:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
-    except OperationError as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
-    # todo: consider removing this or use Exception catch all over the place
-    except Exception as e:
-        logger.error(f"Error deleting user: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
+    """Delete user account."""
+    await user_service.delete_user(user_id=user_id, requesting_user=current_user)
 
 
 @router.put("/{user_id}/verify", response_model=UserResponse)
 async def verify_user(
-        user_id: UUID,
-        current_user: UserModel = Depends(get_current_user),
-        user_repo: UserRepository = Depends(get_user_repository)
+    user_id: UUID,
+    current_user: UserModel = Depends(get_current_user),
+    user_service: UserService = Depends(get_user_service),
 ):
     """
     Verify a user's account.
     """
-    try:
-        user = await user_repo.get_by_id(user_id)
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="User not found"
-            )
-
-        # Allow self-verification or admin action
-        if current_user.id != user_id and not current_user.is_admin:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not authorized to verify this user"
-            )
-
-        update_data = {
-            "is_verified": True,
-            "updated_at": datetime.now(timezone.utc)
-        }
-
-        return await user_repo.update(user_id, update_data)
-
-    except OperationError as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
+    return await user_service.verify_user(user_id=user_id, requesting_user=current_user)

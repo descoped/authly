@@ -1,0 +1,29 @@
+input_paths:
+  - src/authly/auth
+  - src/authly/config
+  - src/authly/tokens
+  - src/authly/users
+  - src/authly/authly.py
+  - src/authly/__init__.py
+
+transform_paths:
+  - src/authly/api
+
+transform_format: idl
+
+exclude_dirs:
+  - .git
+  - __pycache__
+  - venv
+  - node_modules
+
+exclude_files:
+  - setup.py
+  - __init__.py
+
+#header_template: "# File: {filename}\n\n"
+#footer_template: "\n\n"
+#default_extension: .py
+#skip_prompt: false
+#verbose: false
+#non_recursive: false

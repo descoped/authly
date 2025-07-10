@@ -1,0 +1,185 @@
+sequenceDiagram
+    participant Client as OAuth Client/App
+    participant DNS as DNS/Network
+    participant AS as Authorization Server
+    participant DS as DiscoveryService
+    participant SR as ScopeRepository
+    participant DB as Database
+    participant Config as AuthlyConfig
+
+    Note over Client,Config: RFC 8414 OAuth Authorization Server Metadata Discovery
+
+    %% Client Discovery Initiation
+    Client->>Client: Need OAuth server configuration
+    Client->>Client: Construct discovery URL: https://server/.well-known/oauth-authorization-server
+    
+    Note right of Client: Discovery URL Format:<br/>https://{server}/.well-known/<br/>oauth-authorization-server
+
+    %% DNS Resolution and Request
+    Client->>DNS: Resolve authorization server domain
+    DNS-->>Client: IP address resolution
+    Client->>AS: GET /.well-known/oauth-authorization-server
+    
+    Note right of Client: HTTP Headers:<br/>Accept: application/json<br/>User-Agent: client_name/version
+
+    %% Authorization Server Processing
+    AS->>DS: Handle discovery request
+    DS->>Config: Get server configuration
+    Config-->>DS: Base URLs, issuer, algorithms
+    
+    DS->>DS: Build base metadata structure
+    Note right of DS: Core OAuth Metadata:<br/>• issuer<br/>• authorization_endpoint<br/>• token_endpoint<br/>• revocation_endpoint
+
+    %% Dynamic Scope Discovery
+    DS->>SR: get_active_scopes()
+    SR->>DB: SELECT scope_name FROM scopes WHERE is_active=true ORDER BY scope_name
+    DB-->>SR: Active scope list
+    SR-->>DS: Available scopes
+    
+    DS->>DS: Format scopes for metadata
+    Note right of DS: Scope Processing:<br/>• Filter active scopes<br/>• Sort alphabetically<br/>• Include in scopes_supported
+
+    %% Capability Assessment
+    DS->>DS: Assess server capabilities
+    Note right of DS: Server Capabilities:<br/>• response_types_supported: ["code"]<br/>• grant_types_supported: ["authorization_code", "password", "refresh_token"]<br/>• code_challenge_methods_supported: ["S256"]<br/>• token_endpoint_auth_methods_supported
+
+    %% URL Construction
+    DS->>Config: Get base URL configuration
+    Config-->>DS: Server base URL from request or config
+    DS->>DS: Build endpoint URLs
+    
+    Note right of DS: Endpoint URL Construction:<br/>• authorization_endpoint: {base}/authorize<br/>• token_endpoint: {base}/auth/token<br/>• revocation_endpoint: {base}/auth/revoke<br/>• Supports reverse proxy scenarios
+
+    %% Metadata Assembly
+    DS->>DS: Assemble complete metadata object
+    Note right of DS: OAuth Server Metadata:<br/>{<br/>  "issuer": "https://server.com",<br/>  "authorization_endpoint": "https://server.com/authorize",<br/>  "token_endpoint": "https://server.com/auth/token",<br/>  "revocation_endpoint": "https://server.com/auth/revoke",<br/>  "scopes_supported": ["read", "write", "admin"],<br/>  "response_types_supported": ["code"],<br/>  "grant_types_supported": ["authorization_code", "password", "refresh_token"],<br/>  "code_challenge_methods_supported": ["S256"],<br/>  "token_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post"]<br/>}
+
+    %% Response Generation
+    DS->>AS: Return OAuthServerMetadata
+    AS->>AS: Set security headers
+    AS->>AS: Set caching headers
+    AS-->>Client: HTTP 200 + JSON metadata
+
+    Note right of AS: HTTP Response:<br/>Status: 200 OK<br/>Content-Type: application/json<br/>Cache-Control: public, max-age=3600<br/>Access-Control-Allow-Origin: *
+
+    %% Client Processing
+    Client->>Client: Parse JSON metadata
+    Client->>Client: Validate required fields
+    Client->>Client: Store endpoint URLs
+    Client->>Client: Configure OAuth flow parameters
+
+    %% Client Configuration Examples
+    rect rgb(240, 248, 255)
+        Note over Client,Config: Client Auto-Configuration Examples
+        
+        Note over Client: Web Application Configuration:
+        Note over Client: • authorization_endpoint for user redirects
+        Note over Client: • token_endpoint for code exchange
+        Note over Client: • revocation_endpoint for logout
+        Note over Client: • scopes_supported for permission requests
+        Note over Client: • Automatic PKCE enablement (S256 required)
+        
+        Note over Client: Mobile App Configuration:
+        Note over Client: • PKCE mandatory (code_challenge_methods_supported)
+        Note over Client: • No client_secret required (public client)
+        Note over Client: • Custom URI scheme redirect support
+        Note over Client: • Scope validation against scopes_supported
+        
+        Note over Client: Server-to-Server Configuration:
+        Note over Client: • client_secret_basic authentication
+        Note over Client: • Direct token endpoint access
+        Note over Client: • Machine-to-machine scopes
+        Note over Client: • No authorization_endpoint needed
+    end
+
+    %% Error Handling Scenarios
+    rect rgb(255, 240, 240)
+        Note over Client,Config: Error Handling Scenarios
+        
+        alt Server unreachable
+            Client->>AS: GET /.well-known/oauth-authorization-server
+            AS-->>Client: Connection timeout/error
+            Client->>Client: Fallback to manual configuration
+            Note over Client: Error: Cannot auto-discover OAuth configuration
+        end
+        
+        alt Invalid response format
+            AS-->>Client: HTTP 200 + non-JSON response
+            Client->>Client: JSON parsing error
+            Client->>Client: Log error and use defaults
+            Note over Client: Error: Invalid discovery response format
+        end
+        
+        alt Missing required fields
+            AS-->>Client: HTTP 200 + incomplete JSON
+            Client->>Client: Validate OAuth metadata
+            Client->>Client: Identify missing required fields
+            Note over Client: Error: Incomplete server metadata (missing token_endpoint)
+        end
+        
+        alt Database connectivity issues
+            DS->>SR: get_active_scopes()
+            SR->>DB: Database query
+            DB-->>SR: Connection error
+            SR-->>DS: Empty scope list
+            DS->>DS: Return metadata with no scopes_supported
+            Note over DS: Graceful degradation: Core endpoints still functional
+        end
+    end
+
+    %% Caching and Performance
+    rect rgb(248, 255, 248)
+        Note over Client,Config: Caching and Performance Optimization
+        
+        Note over AS: Server-Side Caching:
+        Note over AS: • Metadata cached for 1 hour (HTTP Cache-Control)
+        Note over AS: • Scope list cached to reduce database queries
+        Note over AS: • Configuration cached in memory
+        Note over AS: • Conditional requests support (ETag/Last-Modified)
+        
+        Note over Client: Client-Side Caching:
+        Note over Client: • Cache metadata per server for session duration
+        Note over Client: • Respect HTTP cache headers
+        Note over Client: • Periodic refresh for long-running applications
+        Note over Client: • Fallback to cached data on network errors
+    end
+
+    %% Security Considerations
+    rect rgb(240, 255, 240)
+        Note over Client,Config: Security Considerations
+        
+        Note over AS: Server Security:
+        Note over AS: • HTTPS only for discovery endpoint
+        Note over AS: • No sensitive data in metadata
+        Note over AS: • CORS headers for browser clients
+        Note over AS: • Rate limiting on discovery endpoint
+        
+        Note over Client: Client Security:
+        Note over Client: • Validate issuer matches expected server
+        Note over Client: • Verify HTTPS for all discovered endpoints
+        Note over Client: • Check for required OAuth 2.1 features
+        Note over Client: • Validate scopes against business requirements
+    end
+
+    %% Integration Patterns
+    rect rgb(255, 248, 240)
+        Note over Client,Config: Common Integration Patterns
+        
+        Note over Client: Development/Testing:
+        Note over Client: 1. Auto-discover during app initialization
+        Note over Client: 2. Cache configuration for session
+        Note over Client: 3. Fall back to hardcoded URLs if discovery fails
+        Note over Client: 4. Log configuration for debugging
+        
+        Note over Client: Production Deployment:
+        Note over Client: 1. Pre-fetch configuration during deployment
+        Note over Client: 2. Store in application configuration
+        Note over Client: 3. Periodic refresh via scheduled job
+        Note over Client: 4. Health check integration
+        
+        Note over Client: Multi-Environment:
+        Note over Client: 1. Environment-specific discovery URLs
+        Note over Client: 2. Configuration validation per environment
+        Note over Client: 3. Automatic failover between servers
+        Note over Client: 4. Configuration drift detection
+    end

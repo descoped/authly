@@ -14,24 +14,18 @@ logger = logging.getLogger(__name__)
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a password against its hash."""
     return bcrypt.checkpw(
-        plain_password.encode('utf-8'),
-        hashed_password.encode('utf-8') if isinstance(hashed_password, str) else hashed_password
+        plain_password.encode("utf-8"),
+        hashed_password.encode("utf-8") if isinstance(hashed_password, str) else hashed_password,
     )
 
 
 def get_password_hash(password: str) -> str:
     """Generate password hash."""
-    return bcrypt.hashpw(
-        password.encode('utf-8'),
-        bcrypt.gensalt()
-    ).decode('utf-8')
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 
 def create_access_token(
-        data: dict,
-        secret_key: str,
-        algorithm: str = "HS256",
-        expires_delta: Optional[int] = None
+    data: dict, secret_key: str, algorithm: str = "HS256", expires_delta: Optional[int] = None
 ) -> str:
     if expires_delta:
         expire = datetime.now(timezone.utc) + timedelta(minutes=expires_delta)
@@ -57,22 +51,13 @@ def create_refresh_token(user_id: str, secret_key: str, jti: Optional[str] = Non
     # Generate a new JTI if one is not provided
     token_jti = jti or secrets.token_hex(32)
     expire = datetime.now(timezone.utc) + timedelta(days=7)
-    payload = {
-        "sub": user_id,
-        "type": "refresh",
-        "jti": token_jti,
-        "exp": int(expire.timestamp())
-    }
+    payload = {"sub": user_id, "type": "refresh", "jti": token_jti, "exp": int(expire.timestamp())}
     config = get_config()
 
     return jwt.encode(payload, secret_key, algorithm=config.algorithm)
 
 
-def decode_token(
-        token: str,
-        secret_key: str,
-        algorithm: str = "HS256"
-) -> dict:
+def decode_token(token: str, secret_key: str, algorithm: str = "HS256") -> dict:
     """
     Decode and verify JWT token.
 

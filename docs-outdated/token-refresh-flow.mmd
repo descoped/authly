@@ -1,0 +1,25 @@
+sequenceDiagram
+    participant C as Client
+    participant F as FastAPI
+    participant T as TokenService
+    participant S as TokenStore
+    participant U as UserRepository
+    participant D as Database
+
+    C->>F: POST /auth/refresh {refresh_token}
+    F->>T: decode_token(refresh_token)
+    F->>S: is_token_valid(token_jti)
+    S->>D: SELECT token
+    D-->>S: token data
+    S-->>F: valid status
+    F->>U: get_by_id(user_id)
+    U->>D: SELECT user
+    D-->>U: user data
+    F->>T: create_access_token()
+    T->>T: generate_new_jti()
+    F->>T: create_refresh_token()
+    T->>S: invalidate_token(old_jti)
+    S->>D: UPDATE tokens SET invalidated=true
+    T->>S: store_new_tokens()
+    S->>D: INSERT new tokens
+    F-->>C: {new_access_token, new_refresh_token}

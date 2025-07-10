@@ -1,6 +1,5 @@
 import pytest
-from psycopg import AsyncConnection
-from psycopg import AsyncTransaction
+from psycopg import AsyncConnection, AsyncTransaction
 from psycopg_pool import AsyncConnectionPool
 from psycopg_toolkit import TransactionManager
 from testcontainers.postgres import PostgresContainer

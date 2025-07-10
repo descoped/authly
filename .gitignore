@@ -172,5 +172,10 @@ output/*
 
 .python-version
 
+.claude/settings.local.json
+
 .authly/
 
+examples/bruno/
+
+remove-docs/

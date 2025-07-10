@@ -1,34 +1,42 @@
 import logging
-import secrets
 from datetime import datetime, timedelta, timezone
-from typing import Dict, Union, Optional, Annotated
-from uuid import UUID, uuid4
+from typing import Annotated, Dict, Optional, Union
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
-from jose import jwt
-from jose.exceptions import JWTError
-from psycopg_toolkit import RecordNotFoundError
-from pydantic import BaseModel
-from requests import Request
+from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel, Field
 from starlette import status
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from authly import get_config
-from authly.api.auth_dependencies import get_rate_limiter, oauth2_scheme
+from authly.api.auth_dependencies import get_authorization_service, get_rate_limiter, oauth2_scheme
 from authly.api.users_dependencies import get_current_user, get_user_repository
-from authly.auth import create_access_token, verify_password, create_refresh_token
-from authly.tokens import TokenModel, TokenType
+from authly.auth import verify_password
+from authly.oauth.authorization_service import AuthorizationService
 from authly.tokens import TokenService, get_token_service
-from authly.users import UserModel
-from authly.users import UserRepository
+from authly.users import UserModel, UserRepository
 
 logger = logging.getLogger(__name__)
 
 
 class TokenRequest(BaseModel):
-    username: str
-    password: str
     grant_type: str
+    
+    # Password grant fields
+    username: Optional[str] = None
+    password: Optional[str] = None
+    
+    # Authorization code grant fields  
+    code: Optional[str] = None
+    redirect_uri: Optional[str] = None
+    client_id: Optional[str] = None
+    code_verifier: Optional[str] = None  # PKCE
+    
+    # OAuth 2.1 scope field
+    scope: Optional[str] = None
+    
+    # Refresh token grant fields
+    refresh_token: Optional[str] = None
+    client_secret: Optional[str] = None
 
 
 class RefreshRequest(BaseModel):
@@ -36,17 +44,20 @@ class RefreshRequest(BaseModel):
     grant_type: str
 
 
+class TokenRevocationRequest(BaseModel):
+    token: str = Field(..., description="The token to revoke (access or refresh token)")
+    token_type_hint: Optional[str] = Field(None, description="Optional hint: 'access_token' or 'refresh_token'")
+
+
 class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str
     expires_in: int
+    id_token: Optional[str] = None  # ID token for OpenID Connect flows
 
 
-router = APIRouter(
-    prefix="/auth",
-    tags=["auth"]
-)
+router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 # Security Headers Middleware
@@ -88,26 +99,51 @@ login_tracker = LoginAttemptTracker()
 
 
 async def update_last_login(user_repo: UserRepository, user_id: UUID):
-    await user_repo.update(
-        user_id,
-        {"last_login": datetime.now(timezone.utc)}
-    )
+    await user_repo.update(user_id, {"last_login": datetime.now(timezone.utc)})
 
 
 @router.post("/token", response_model=TokenResponse)
-async def login_for_access_token(
-        request: TokenRequest,
-        user_repo: UserRepository = Depends(get_user_repository),
-        token_service: TokenService = Depends(get_token_service),
-        rate_limiter=Depends(get_rate_limiter),
+async def get_access_token(
+    request: TokenRequest,
+    user_repo: UserRepository = Depends(get_user_repository),
+    token_service: TokenService = Depends(get_token_service),
+    authorization_service: AuthorizationService = Depends(get_authorization_service),
+    rate_limiter=Depends(get_rate_limiter),
 ):
-    """Create and store new access and refresh tokens for user login"""
+    """
+    OAuth 2.1 Token Endpoint - supports multiple grant types.
+    
+    Supported grant types:
+    - password: Username/password authentication (existing)
+    - authorization_code: OAuth 2.1 authorization code flow with PKCE
+    """
+    
+    if request.grant_type == "password":
+        return await _handle_password_grant(request, user_repo, token_service, rate_limiter)
+    elif request.grant_type == "authorization_code":
+        return await _handle_authorization_code_grant(request, user_repo, token_service, authorization_service)
+    elif request.grant_type == "refresh_token":
+        return await _handle_refresh_token_grant(request, user_repo, token_service)
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail=f"Unsupported grant type: {request.grant_type}"
+        )
 
-    # Validate grant type
-    if request.grant_type != "password":
+
+async def _handle_password_grant(
+    request: TokenRequest,
+    user_repo: UserRepository,
+    token_service: TokenService,
+    rate_limiter,
+) -> TokenResponse:
+    """Handle password grant type (existing functionality)."""
+    
+    # Validate required fields for password grant
+    if not request.username or not request.password:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid grant type"
+            detail="Username and password are required for password grant"
         )
 
     # Rate limiting check
@@ -117,7 +153,7 @@ async def login_for_access_token(
     if not login_tracker.check_and_update(request.username):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Too many failed attempts. Account temporarily locked."
+            detail="Too many failed attempts. Account temporarily locked.",
         )
 
     # Validate user
@@ -130,85 +166,14 @@ async def login_for_access_token(
         )
 
     if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Account is deactivated"
-        )
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is deactivated")
 
     if not user.is_verified:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Account not verified"
-        )
-
-    config = get_config()
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account not verified")
 
     try:
-        # Generate unique JTIs for both tokens
-        access_jti = secrets.token_hex(32)
-        refresh_jti = secrets.token_hex(32)
-
-        # Create access token with its own JTI
-        access_token = create_access_token(
-            data={
-                "sub": str(user.id),
-                "jti": access_jti
-            },
-            secret_key=config.secret_key,
-            algorithm=config.algorithm,
-            expires_delta=config.access_token_expire_minutes
-        )
-
-        # Create refresh token with its own JTI
-        refresh_token = create_refresh_token(
-            user_id=str(user.id),
-            secret_key=config.refresh_secret_key,
-            jti=refresh_jti  # Pass the JTI to create_refresh_token
-        )
-
-        # Decode tokens to get expiry times
-        access_payload = jwt.decode(
-            access_token,
-            config.secret_key,
-            algorithms=[config.algorithm]
-        )
-        refresh_payload = jwt.decode(
-            refresh_token,
-            config.refresh_secret_key,
-            algorithms=[config.algorithm]
-        )
-
-        # Create access token model
-        access_token_model = TokenModel(
-            id=uuid4(),
-            user_id=user.id,
-            token_jti=access_jti,
-            token_type=TokenType.ACCESS,
-            token_value=access_token,
-            expires_at=datetime.fromtimestamp(
-                access_payload["exp"],
-                tz=timezone.utc
-            ),
-            created_at=datetime.now(timezone.utc)
-        )
-
-        # Create refresh token model
-        refresh_token_model = TokenModel(
-            id=uuid4(),
-            user_id=user.id,
-            token_jti=refresh_jti,
-            token_type=TokenType.REFRESH,
-            token_value=refresh_token,
-            expires_at=datetime.fromtimestamp(
-                refresh_payload["exp"],
-                tz=timezone.utc
-            ),
-            created_at=datetime.now(timezone.utc)
-        )
-
-        # Store both tokens
-        await token_service.create_token(access_token_model)
-        await token_service.create_token(refresh_token_model)
+        # Create token pair using TokenService
+        token_response = await token_service.create_token_pair(user, request.scope)
 
         # Clear failed attempts on successful login
         if request.username in login_tracker.attempts:
@@ -218,216 +183,259 @@ async def login_for_access_token(
         await user_repo.update_last_login(user.id)
 
         return TokenResponse(
-            access_token=access_token,
-            refresh_token=refresh_token,
-            token_type="Bearer",
-            expires_in=config.access_token_expire_minutes * 60
+            access_token=token_response.access_token,
+            refresh_token=token_response.refresh_token,
+            token_type=token_response.token_type,
+            expires_in=token_response.expires_in,
         )
 
+    except HTTPException:
+        # Let HTTPExceptions from TokenService pass through
+        raise
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail="Could not create authentication tokens"
+        )
+
+
+async def _handle_authorization_code_grant(
+    request: TokenRequest,
+    user_repo: UserRepository,
+    token_service: TokenService,
+    authorization_service: AuthorizationService,
+) -> TokenResponse:
+    """Handle authorization_code grant type with PKCE verification."""
+    
+    # Validate required fields for authorization code grant
+    if not request.code or not request.redirect_uri or not request.client_id or not request.code_verifier:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="code, redirect_uri, client_id, and code_verifier are required for authorization_code grant"
+        )
+
+    try:
+        # Exchange authorization code for token data
+        success, code_data, error_msg = await authorization_service.exchange_authorization_code(
+            code=request.code,
+            client_id=request.client_id,
+            redirect_uri=request.redirect_uri,
+            code_verifier=request.code_verifier
+        )
+        
+        if not success:
+            logger.warning(f"Authorization code exchange failed: {error_msg}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=error_msg or "Invalid authorization code"
+            )
+        
+        # Get user for token generation
+        user = await user_repo.get_by_id(code_data["user_id"])
+        if not user:
+            logger.error(f"User not found for authorization code: {code_data['user_id']}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid authorization code"
+            )
+        
+        if not user.is_active:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is deactivated")
+        
+        if not user.is_verified:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account not verified")
+        
+        # Extract OIDC parameters from authorization code data for ID token generation
+        oidc_params = None
+        if code_data.get("nonce") or code_data.get("max_age") or code_data.get("acr_values"):
+            oidc_params = {
+                "nonce": code_data.get("nonce"),
+                "max_age": code_data.get("max_age"),
+                "acr_values": code_data.get("acr_values")
+            }
+        
+        # Create token pair with scope information and OIDC parameters
+        token_response = await token_service.create_token_pair(
+            user, 
+            scope=code_data.get("scope"), 
+            client_id=code_data.get("client_id"),
+            oidc_params=oidc_params
+        )
+        
+        # Update last login
+        await user_repo.update_last_login(user.id)
+        
+        logger.info(f"Authorization code exchanged successfully for user {user.id}")
+        
+        return TokenResponse(
+            access_token=token_response.access_token,
+            refresh_token=token_response.refresh_token,
+            token_type=token_response.token_type,
+            expires_in=token_response.expires_in,
+            id_token=token_response.id_token,
+        )
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
     except Exception as e:
+        logger.error(f"Error handling authorization code grant: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Could not create authentication tokens"
+            detail="Could not process authorization code"
+        )
+
+
+async def _handle_refresh_token_grant(
+    request: TokenRequest,
+    user_repo: UserRepository,
+    token_service: TokenService,
+) -> TokenResponse:
+    """Handle refresh_token grant type with client authentication."""
+    
+    # Validate required fields for refresh token grant
+    if not request.refresh_token:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="refresh_token is required for refresh_token grant"
+        )
+    
+    try:
+        # Get client_id from request for ID token generation
+        client_id = None
+        if request.client_id:
+            # Convert client_id string to UUID for client lookup
+            from authly.oauth.client_repository import ClientRepository
+            from authly import authly_db_connection
+            
+            async for conn in authly_db_connection():
+                client_repo = ClientRepository(conn)
+                client = await client_repo.get_by_client_id(request.client_id)
+                if client:
+                    client_id = client.id
+                break
+        
+        # Refresh token pair with client_id for ID token generation
+        token_response = await token_service.refresh_token_pair(
+            request.refresh_token, 
+            user_repo, 
+            client_id=client_id
+        )
+        
+        logger.info(f"Refresh token exchanged successfully")
+        
+        return TokenResponse(
+            access_token=token_response.access_token,
+            token_type=token_response.token_type,
+            expires_in=token_response.expires_in,
+            refresh_token=token_response.refresh_token,
+            id_token=token_response.id_token,
+        )
+        
+    except HTTPException:
+        # Re-raise HTTPExceptions (like invalid refresh token) as-is
+        raise
+    except Exception as e:
+        logger.error(f"Error handling refresh token grant: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not process refresh token"
         )
 
 
 @router.post("/refresh", response_model=TokenResponse)
 async def refresh_access_token(
-        request: RefreshRequest,
-        user_repo: UserRepository = Depends(get_user_repository),
-        token_service: TokenService = Depends(get_token_service)
+    request: RefreshRequest,
+    user_repo: UserRepository = Depends(get_user_repository),
+    token_service: TokenService = Depends(get_token_service),
 ):
     """Create new token pair while invalidating old refresh token"""
 
     if request.grant_type != "refresh_token":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid grant type"
-        )
-
-    config = get_config()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid grant type")
 
     try:
-        # Decode the provided refresh token
-        payload = jwt.decode(
-            request.refresh_token,
-            config.refresh_secret_key,
-            algorithms=[config.algorithm]
-        )
-
-        # Validate token type and extract claims
-        if payload.get("type") != "refresh":
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid token type"
-            )
-
-        user_id = payload.get("sub")
-        token_jti = payload.get("jti")
-
-        if not user_id or not token_jti:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid token claims"
-            )
-
-        # Verify token is valid in store
-        if not await token_service.is_token_valid(token_jti):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Token is invalid or expired"
-            )
-
-        # Get the user
-        try:
-            user = await user_repo.get_by_id(UUID(user_id))
-        except (ValueError, RecordNotFoundError):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="User not found"
-            )
-
-        if not user.is_active:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="User is inactive"
-            )
-
-        # --- Create new tokens ---
-
-        # For the access token, explicitly include a new JTI in the payload.
-        new_access_jti = secrets.token_hex(32)
-        new_access_token = create_access_token(
-            data={"sub": user_id, "jti": new_access_jti},
-            secret_key=config.secret_key,
-            algorithm=config.algorithm,
-            expires_delta=config.access_token_expire_minutes
-        )
-        # Decode the access token to verify its payload
-        access_payload = jwt.decode(
-            new_access_token,
-            config.secret_key,
-            algorithms=[config.algorithm]
-        )
-        access_jti = access_payload.get("jti", new_access_jti)
-
-        # Create a new refresh token; it will generate its own unique JTI.
-        new_refresh_token = create_refresh_token(
-            user_id=user_id,
-            secret_key=config.refresh_secret_key
-        )
-        # Decode refresh token to extract its JTI.
-        refresh_payload = jwt.decode(
-            new_refresh_token,
-            config.refresh_secret_key,
-            algorithms=[config.algorithm]
-        )
-        refresh_jti = refresh_payload["jti"]
-
-        # Invalidate the old refresh token.
-        await token_service.invalidate_token(token_jti)
-
-        # Create token models with their respective JTIs.
-        new_access_model = TokenModel(
-            id=uuid4(),
-            user_id=UUID(user_id),
-            token_jti=access_jti,
-            token_type=TokenType.ACCESS,
-            token_value=new_access_token,
-            expires_at=datetime.fromtimestamp(
-                access_payload["exp"],
-                tz=timezone.utc
-            ),
-            created_at=datetime.now(timezone.utc)
-        )
-
-        new_refresh_model = TokenModel(
-            id=uuid4(),
-            user_id=UUID(user_id),
-            token_jti=refresh_jti,
-            token_type=TokenType.REFRESH,
-            token_value=new_refresh_token,
-            expires_at=datetime.fromtimestamp(
-                refresh_payload["exp"],
-                tz=timezone.utc
-            ),
-            created_at=datetime.now(timezone.utc)
-        )
-
-        # Store the new tokens.
-        await token_service.create_token(new_access_model)
-        await token_service.create_token(new_refresh_model)
+        # Refresh token pair using TokenService
+        token_response = await token_service.refresh_token_pair(request.refresh_token, user_repo)
 
         return TokenResponse(
-            access_token=new_access_token,
-            refresh_token=new_refresh_token,
-            token_type="Bearer",
-            expires_in=config.access_token_expire_minutes * 60
+            access_token=token_response.access_token,
+            refresh_token=token_response.refresh_token,
+            token_type=token_response.token_type,
+            expires_in=token_response.expires_in,
+            id_token=token_response.id_token,
         )
 
-    except HTTPException as exc:
-        # Let HTTPExceptions (such as 401 for invalid/expired tokens) pass through.
-        raise exc
-    except JWTError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid refresh token"
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Could not refresh tokens"
-        )
+    except HTTPException:
+        # Let HTTPExceptions from TokenService pass through
+        raise
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not refresh tokens")
 
 
 @router.post("/logout", status_code=status.HTTP_200_OK)
 async def logout(
-        token: Annotated[str, Depends(oauth2_scheme)],
-        current_user: UserModel = Depends(get_current_user),
-        token_service: TokenService = Depends(get_token_service)
+    token: Annotated[str, Depends(oauth2_scheme)],
+    current_user: UserModel = Depends(get_current_user),
+    token_service: TokenService = Depends(get_token_service),
 ):
     """Invalidate all active tokens for the current user"""
 
-    config = get_config()
-
     try:
-        # Decode current access token to get JTI
-        payload = jwt.decode(
-            token,
-            config.secret_key,
-            algorithms=[config.algorithm]
-        )
-        current_jti = payload.get("jti")
-
-        # Invalidate current token first if JTI exists
-        if current_jti:
-            await token_service.invalidate_token(current_jti)
-
-        # Invalidate all user tokens (both access and refresh)
-        invalidated_count = await token_service.invalidate_user_tokens(current_user.id)
+        # Logout user session using TokenService
+        invalidated_count = await token_service.logout_user_session(token, current_user.id)
 
         if invalidated_count > 0:
             logger.info(f"Invalidated {invalidated_count} tokens for user {current_user.id}")
-            return {
-                "message": "Successfully logged out",
-                "invalidated_tokens": invalidated_count
-            }
+            return {"message": "Successfully logged out", "invalidated_tokens": invalidated_count}
         else:
             logger.warning(f"No active tokens found to invalidate for user {current_user.id}")
-            return {
-                "message": "No active sessions found to logout",
-                "invalidated_tokens": 0
-            }
+            return {"message": "No active sessions found to logout", "invalidated_tokens": 0}
 
-    except JWTError as e:
-        logger.error(f"JWT validation failed during logout: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication credentials"
-        )
+    except HTTPException:
+        # Let HTTPExceptions from TokenService pass through
+        raise
     except Exception as e:
         logger.error(f"Logout failed: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Logout operation failed"
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Logout operation failed")
+
+
+@router.post("/revoke", status_code=status.HTTP_200_OK)
+async def revoke_token(
+    request: TokenRevocationRequest,
+    token_service: TokenService = Depends(get_token_service),
+):
+    """
+    OAuth 2.0 Token Revocation Endpoint (RFC 7009).
+    
+    Allows clients to notify the authorization server that a previously obtained
+    refresh or access token is no longer needed. This invalidates the token and,
+    if applicable, related tokens.
+    
+    **Request Parameters:**
+    - token: The token to revoke (access or refresh token)
+    - token_type_hint: Optional hint ("access_token" or "refresh_token")
+    
+    **Response:**
+    Always returns HTTP 200 OK per RFC 7009, even for invalid tokens.
+    This prevents token enumeration attacks.
+    """
+    try:
+        # Attempt to revoke the token using the token service
+        revoked = await token_service.revoke_token(request.token, request.token_type_hint)
+        
+        if revoked:
+            logger.info("Token revoked successfully")
+        else:
+            # Don't log details about invalid tokens to prevent information leakage
+            logger.debug("Token revocation request processed (token may have been invalid)")
+        
+        # Always return 200 OK per RFC 7009 Section 2.2:
+        # "The authorization server responds with HTTP status code 200 if the token
+        # has been revoked successfully or if the client submitted an invalid token"
+        return {"message": "Token revocation processed successfully"}
+        
+    except Exception as e:
+        # Even on errors, return 200 OK per RFC 7009 to prevent information disclosure
+        logger.error(f"Error during token revocation: {str(e)}")
+        return {"message": "Token revocation processed successfully"}

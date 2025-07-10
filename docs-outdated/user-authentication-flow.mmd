@@ -1,0 +1,165 @@
+sequenceDiagram
+    participant C as Client
+    participant F as FastAPI
+    participant R as RateLimiter
+    participant U as UserRepository
+    participant A as Auth
+    participant T as TokenService
+    participant S as TokenStore
+    participant CS as ClientService
+    participant AS as AuthorizationService
+    participant D as Database
+
+    Note over C,D: Multi-Grant Authentication Flow (Password + OAuth Authorization Code)
+
+    %% Password Grant Flow (existing)
+    rect rgb(240, 248, 255)
+        Note over C,D: Password Grant Flow (Direct Authentication)
+        
+        C->>F: POST /auth/token {username, password, grant_type: "password"}
+        F->>R: check_rate_limit(username)
+        alt Rate limit exceeded
+            R-->>F: 429 Too Many Requests
+            F-->>C: Rate limit error
+        end
+        
+        F->>U: get_by_username(username)
+        U->>D: SELECT user WHERE username=?
+        D-->>U: user data
+        U-->>F: user model
+        
+        alt User not found or inactive
+            F-->>C: 401 Invalid credentials
+        end
+        
+        F->>A: verify_password(password, user.password_hash)
+        A->>A: bcrypt.checkpw(password, hash)
+        alt Password verification failed
+            A-->>F: False
+            F-->>C: 401 Invalid credentials
+        end
+        A-->>F: True
+        
+        F->>T: create_token_pair(user_id, scopes=None)
+        T->>T: generate_access_token_jti()
+        T->>T: generate_refresh_token_jti()
+        T->>T: create_access_token(user_id, jti, expires_in=30min)
+        T->>T: create_refresh_token(user_id, jti, expires_in=7days)
+        T->>S: store_tokens(access_jti, refresh_jti, user_id)
+        S->>D: INSERT tokens (jti, user_id, token_type, expires_at)
+        
+        F->>U: update_last_login(user_id)
+        U->>D: UPDATE users SET last_login=NOW()
+        
+        F-->>C: {access_token, refresh_token, token_type: "Bearer", expires_in: 1800}
+    end
+
+    %% OAuth Authorization Code Grant Flow (new)
+    rect rgb(248, 255, 248)
+        Note over C,D: Authorization Code Grant Flow (OAuth 2.1 with PKCE)
+        
+        C->>F: POST /auth/token {code, grant_type: "authorization_code", client_id, code_verifier}
+        
+        F->>CS: authenticate_client(client_id, client_secret_or_auth_method)
+        CS->>D: SELECT client WHERE client_id=?
+        D-->>CS: client data
+        CS->>CS: verify_client_credentials()
+        alt Client authentication failed
+            CS-->>F: 401 Client authentication failed  
+            F-->>C: 401 Invalid client
+        end
+        CS-->>F: authenticated client
+        
+        F->>AS: validate_authorization_code(code, client_id, code_verifier)
+        AS->>D: SELECT authorization_codes WHERE code=? AND client_id=?
+        D-->>AS: authorization code data
+        
+        alt Authorization code not found/expired
+            AS-->>F: None
+            F-->>C: 400 Invalid grant
+        end
+        
+        AS->>AS: verify_pkce(code_verifier, stored_code_challenge)
+        AS->>AS: SHA256(code_verifier) == code_challenge?
+        alt PKCE verification failed
+            AS-->>F: False
+            F-->>C: 400 Invalid grant
+        end
+        
+        AS->>AS: check_expiration(code.expires_at)
+        alt Code expired (>10 minutes)
+            AS-->>F: False  
+            F-->>C: 400 Invalid grant
+        end
+        
+        AS->>D: DELETE authorization_codes WHERE code=? (single use)
+        AS-->>F: {user_id, granted_scopes}
+        
+        F->>U: get_by_id(user_id)
+        U->>D: SELECT user WHERE id=?
+        D-->>U: user data
+        U-->>F: user model
+        
+        alt User not found or inactive
+            F-->>C: 400 Invalid grant
+        end
+        
+        F->>T: create_token_pair(user_id, scopes=granted_scopes)
+        T->>T: generate_access_token_jti()
+        T->>T: generate_refresh_token_jti()
+        T->>T: create_access_token(user_id, jti, scopes, expires_in=30min)
+        T->>T: create_refresh_token(user_id, jti, scopes, expires_in=7days)
+        T->>S: store_tokens(access_jti, refresh_jti, user_id, scopes)
+        S->>D: INSERT tokens (jti, user_id, scopes, token_type, expires_at)
+        
+        F->>U: update_last_login(user_id)
+        U->>D: UPDATE users SET last_login=NOW()
+        
+        F-->>C: {access_token, refresh_token, token_type: "Bearer", expires_in: 1800, scope: granted_scopes}
+    end
+
+    %% Common token validation for API access
+    rect rgb(255, 248, 240)
+        Note over C,D: Protected Resource Access (Both Grant Types)
+        
+        C->>F: GET /protected/resource (Authorization: Bearer access_token)
+        F->>T: decode_and_validate_token(access_token)
+        T->>T: jwt.decode(token, secret_key, algorithms=["HS256"])
+        T->>S: is_token_valid(token_jti)
+        S->>D: SELECT token WHERE jti=? AND invalidated=false
+        D-->>S: token status
+        S-->>T: token valid
+        T-->>F: {user_id, scopes, expires_at}
+        
+        F->>U: get_by_id(user_id)
+        U->>D: SELECT user WHERE id=? AND is_active=true
+        D-->>U: user data
+        U-->>F: current user
+        
+        F->>F: check_scope_permissions(required_scope, token_scopes)
+        alt Insufficient scope
+            F-->>C: 403 Insufficient scope
+        end
+        
+        F-->>C: Protected resource data
+    end
+
+    %% Error handling summary
+    rect rgb(255, 240, 240)
+        Note over C,D: Error Scenarios:
+        Note over F: Password Grant: Rate limiting, invalid credentials, inactive user
+        Note over F: Authorization Code: Invalid client, PKCE failure, expired code
+        Note over F: Token Access: Invalid token, revoked token, insufficient scope
+        Note over F: All flows: Proper HTTP status codes and OAuth error responses
+    end
+
+    %% Security features summary  
+    rect rgb(240, 255, 240)
+        Note over C,D: Security Features:
+        Note over F: • Rate limiting and brute force protection
+        Note over F: • PKCE protection for authorization code flow  
+        Note over F: • JTI-based token revocation and replay prevention
+        Note over F: • Scope-based access control for OAuth flows
+        Note over F: • Secure client authentication (confidential clients)
+        Note over F: • Bcrypt password hashing with salt
+    end

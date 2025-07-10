@@ -1,0 +1,8 @@
+{
+  "memoryFiles": [
+    ".claude/CLAUDE.md"
+  ],
+  "autoLoadMemory": true,
+  "workingDirectory": ".",
+  "projectName": "authly"
+}

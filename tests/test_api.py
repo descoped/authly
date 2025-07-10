@@ -8,7 +8,6 @@ from psycopg import AsyncTransaction
 
 from authly import Authly, AuthlyConfig
 from authly.api import health_router
-from fixtures.testing import test_server
 
 logger = logging.getLogger(__name__)
 
@@ -35,10 +34,7 @@ async def test_ping(test_server: AsyncTestServer, transaction: AsyncTransaction)
 
     # Make your request
     response = await test_server.client.get("/ping")
-    _, response_json = await asyncio.gather(
-        response.expect_status(200),
-        response.json()
-    )
+    _, response_json = await asyncio.gather(response.expect_status(200), response.json())
     logger.info(f"Ping response: {response_json}")
     assert response_json == {"status": "ok"}
 

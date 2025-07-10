@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Authly{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1 class="logo">
+                {% block header %}
+                <span class="logo-text">Authly</span>
+                {% endblock %}
+            </h1>
+        </header>
+        
+        <main class="main-content">
+            {% block content %}{% endblock %}
+        </main>
+        
+        <footer class="footer">
+            <p>&copy; 2025 Authly. Secure OAuth 2.1 Authentication.</p>
+        </footer>
+    </div>
+    
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>

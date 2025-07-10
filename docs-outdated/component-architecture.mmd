@@ -1,0 +1,163 @@
+graph TB
+    subgraph "API Layer"
+        AR[auth_router]
+        UR[users_router]
+        OR[oauth_router]
+        RL[RateLimiter]
+        LAT[LoginAttemptTracker]
+        AD[auth_dependencies]
+        OD[oauth_dependencies]
+        CLI[authly-admin CLI]
+    end
+
+    subgraph "Service Layer"
+        US[UserService]
+        TS[TokenService]
+        CS[ClientService]
+        SS[ScopeService]
+        AS[AuthorizationService]
+        DS[DiscoveryService]
+        Auth[AuthCore]
+    end
+
+    subgraph "Repository Layer"
+        UR2[UserRepository]
+        TR[TokenRepository]
+        CR[ClientRepository]
+        SR[ScopeRepository]
+        ACR[AuthorizationCodeRepository]
+        BR[BaseRepository]
+    end
+
+    subgraph "OAuth Models"
+        CM[ClientModel]
+        SM[ScopeModel]
+        ACM[AuthorizationCodeModel]
+        OSM[OAuthServerMetadata]
+        ARM[AuthorizationRequest]
+        ARM2[AuthorizationResponse]
+    end
+
+    subgraph "Database"
+        DB[(PostgreSQL)]
+        UT[users table]
+        TT[tokens table]
+        CT[clients table]
+        ST[scopes table]
+        CST[client_scopes table]
+        ACT[authorization_codes table]
+    end
+
+    subgraph "Configuration"
+        AC[AuthlyConfig]
+        SS2[SecureSecrets]
+        SP[SecretProvider]
+        EnvSP[EnvSecretProvider]
+        FileSP[FileSecretProvider]
+        StaticSP[StaticSecretProvider]
+    end
+
+    subgraph "External Integrations"
+        PST[psycopg-toolkit]
+        FT[fastapi-testing]
+        TC[testcontainers]
+    end
+
+    subgraph "Frontend Templates"
+        AT[authorization.html]
+        ET[error.html]
+        CSS[styles.css]
+        JS[app.js]
+    end
+
+    %% API Layer connections
+    AR --> TS
+    AR --> Auth
+    AR --> RL
+    AR --> LAT
+    UR --> US
+    OR --> CS
+    OR --> AS
+    OR --> DS
+    CLI --> CS
+    CLI --> SS
+    AD --> TS
+    AD --> US
+    OD --> CS
+    OD --> AS
+
+    %% Service Layer connections
+    US --> UR2
+    TS --> TR
+    CS --> CR
+    CS --> SR
+    SS --> SR
+    AS --> ACR
+    AS --> CS
+    AS --> SS
+    DS --> SR
+    Auth --> AC
+
+    %% Repository connections
+    UR2 --> BR
+    TR --> BR
+    CR --> BR
+    SR --> BR
+    ACR --> BR
+    BR --> PST
+
+    %% Database connections
+    UR2 --> UT
+    TR --> TT
+    CR --> CT
+    SR --> ST
+    CR --> CST
+    ACR --> ACT
+    UT --> DB
+    TT --> DB
+    CT --> DB
+    ST --> DB
+    CST --> DB
+    ACT --> DB
+
+    %% Model connections
+    CS --> CM
+    SS --> SM
+    AS --> ACM
+    DS --> OSM
+    OR --> ARM
+    OR --> ARM2
+
+    %% Configuration connections
+    AC --> SS2
+    AC --> SP
+    SP --> EnvSP
+    SP --> FileSP
+    SP --> StaticSP
+
+    %% Template connections
+    OR --> AT
+    OR --> ET
+    AT --> CSS
+    AT --> JS
+
+    %% Testing connections
+    PST --> FT
+    FT --> TC
+
+    %% Styling
+    classDef apiLayer fill:#e1f5fe
+    classDef serviceLayer fill:#f3e5f5
+    classDef repoLayer fill:#e8f5e8
+    classDef dbLayer fill:#fff3e0
+    classDef configLayer fill:#fce4ec
+    classDef oauthLayer fill:#e0f2f1
+    classDef templateLayer fill:#f1f8e9
+
+    class AR,UR,OR,RL,LAT,AD,OD,CLI apiLayer
+    class US,TS,CS,SS,AS,DS,Auth serviceLayer
+    class UR2,TR,CR,SR,ACR,BR repoLayer
+    class DB,UT,TT,CT,ST,CST,ACT dbLayer
+    class AC,SS2,SP,EnvSP,FileSP,StaticSP configLayer
+    class CM,SM,ACM,OSM,ARM,ARM2 oauthLayer
+    class AT,ET,CSS,JS templateLayer

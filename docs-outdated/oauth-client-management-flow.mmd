@@ -1,0 +1,241 @@
+sequenceDiagram
+    participant Admin as Administrator
+    participant CLI as authly-admin CLI
+    participant AC as AdminContext
+    participant CS as ClientService
+    participant SS as ScopeService
+    participant CR as ClientRepository
+    participant SR as ScopeRepository
+    participant DB as PostgreSQL Database
+
+    Note over Admin,DB: OAuth 2.1 Client Management via CLI
+
+    %% CLI Initialization
+    Admin->>CLI: authly-admin [global-options] command
+    CLI->>AC: initialize()
+    AC->>AC: Load AuthlyConfig from env/file
+    AC->>AC: Create AsyncConnectionPool
+    AC->>AC: Initialize Authly singleton
+    AC-->>CLI: Admin context ready
+
+    %% Client Creation Flow
+    rect rgb(240, 248, 255)
+        Note over Admin,DB: Client Creation Flow
+        
+        Admin->>CLI: client create --name "App" --type confidential --redirect-uri "https://app.com/callback"
+        CLI->>AC: Get database connection
+        AC->>CLI: Async connection from pool
+        CLI->>CR: ClientRepository(connection)
+        CLI->>SR: ScopeRepository(connection)
+        CLI->>CS: ClientService(client_repo, scope_repo)
+        
+        CLI->>CS: create_client(OAuthClientCreateRequest)
+        CS->>CS: Generate client_id (UUID)
+        CS->>CS: Generate client_secret (confidential clients)
+        CS->>CS: Hash client_secret with bcrypt
+        CS->>CS: Validate redirect_uris format
+        CS->>CS: Parse and validate scopes
+        
+        CS->>CR: create_client(client_data)
+        CR->>DB: INSERT INTO clients (client_id, client_name, client_type, redirect_uris, client_secret_hash, require_pkce)
+        DB-->>CR: Created client record
+        CR-->>CS: OAuthClient model
+        
+        alt Scopes provided
+            CS->>SS: validate_scopes(requested_scopes)
+            SS->>SR: get_scopes_by_names(scope_names)
+            SR->>DB: SELECT FROM scopes WHERE scope_name IN (...)
+            DB-->>SR: Scope records
+            SR-->>SS: Valid scopes
+            SS-->>CS: Validated scope list
+            
+            CS->>CR: associate_client_scopes(client_id, scope_ids)
+            CR->>DB: INSERT INTO client_scopes (client_id, scope_id)
+            DB-->>CR: Associations created
+        end
+        
+        CS-->>CLI: Created OAuthClient with client_secret
+        CLI->>CLI: Format output (table/JSON)
+        CLI-->>Admin: Client created successfully with credentials
+    end
+
+    %% Client Listing Flow
+    rect rgb(248, 255, 248)
+        Note over Admin,DB: Client Listing Flow
+        
+        Admin->>CLI: client list --limit 10 --output json
+        CLI->>CS: list_clients(limit=10, offset=0, include_inactive=False)
+        CS->>CR: list_clients(limit, offset, include_inactive)
+        CR->>DB: SELECT FROM clients WHERE is_active=true LIMIT 10 OFFSET 0
+        DB-->>CR: Client records
+        CR-->>CS: List[OAuthClient]
+        
+        loop For each client
+            CS->>CR: get_client_scopes(client.client_id)
+            CR->>DB: SELECT scopes.scope_name FROM client_scopes JOIN scopes
+            DB-->>CR: Client scope names
+            CR-->>CS: Client scope list
+        end
+        
+        CS-->>CLI: List of clients with scopes
+        CLI->>CLI: Format as JSON output
+        CLI-->>Admin: JSON array of client objects
+    end
+
+    %% Client Details Flow
+    rect rgb(255, 248, 240)
+        Note over Admin,DB: Client Details Flow
+        
+        Admin->>CLI: client show "client-id-123" --output table
+        CLI->>CS: get_client_by_id("client-id-123")
+        CS->>CR: get_client_by_id("client-id-123")
+        CR->>DB: SELECT FROM clients WHERE client_id = 'client-id-123'
+        DB-->>CR: Client record or None
+        
+        alt Client found
+            CR-->>CS: OAuthClient model
+            CS->>CR: get_client_scopes("client-id-123")
+            CR->>DB: SELECT scope_name FROM client_scopes JOIN scopes
+            DB-->>CR: Associated scopes
+            CR-->>CS: Scope list
+            CS-->>CLI: Client with scope details
+            CLI->>CLI: Format as detailed table
+            CLI-->>Admin: Comprehensive client information
+        else Client not found
+            CR-->>CS: None
+            CS-->>CLI: None
+            CLI-->>Admin: Error: Client not found
+        end
+    end
+
+    %% Client Update Flow
+    rect rgb(255, 240, 248)
+        Note over Admin,DB: Client Update Flow
+        
+        Admin->>CLI: client update "client-id-123" --name "Updated App" --activate
+        CLI->>CS: update_client("client-id-123", update_data)
+        CS->>CR: get_client_by_id("client-id-123")
+        CR->>DB: SELECT FROM clients WHERE client_id = 'client-id-123'
+        DB-->>CR: Existing client
+        CR-->>CS: Current client data
+        
+        CS->>CS: Validate update fields
+        CS->>CS: Merge current data with updates
+        CS->>CR: update_client("client-id-123", merged_data)
+        CR->>DB: UPDATE clients SET client_name='Updated App', is_active=true WHERE client_id='client-id-123'
+        DB-->>CR: Updated client record
+        CR-->>CS: Updated OAuthClient
+        CS-->>CLI: Updated client
+        CLI-->>Admin: Client updated successfully
+    end
+
+    %% Secret Regeneration Flow
+    rect rgb(240, 255, 240)
+        Note over Admin,DB: Secret Regeneration Flow
+        
+        Admin->>CLI: client regenerate-secret "client-id-123" --confirm
+        CLI->>CS: regenerate_client_secret("client-id-123")
+        CS->>CR: get_client_by_id("client-id-123")
+        CR->>DB: SELECT FROM clients WHERE client_id = 'client-id-123'
+        DB-->>CR: Existing client
+        CR-->>CS: Client data
+        
+        alt Client is confidential
+            CS->>CS: Generate new client_secret (32 random chars)
+            CS->>CS: Hash new secret with bcrypt
+            CS->>CR: update_client_secret("client-id-123", new_hash)
+            CR->>DB: UPDATE clients SET client_secret_hash='new_hash' WHERE client_id='client-id-123'
+            DB-->>CR: Updated record
+            CR-->>CS: Success
+            CS-->>CLI: New plaintext secret (one-time display)
+            CLI-->>Admin: New client secret (store securely!)
+        else Client is public
+            CS-->>CLI: Error: Public clients don't have secrets
+            CLI-->>Admin: Error: Cannot regenerate secret for public client
+        end
+    end
+
+    %% Scope Management Integration
+    rect rgb(248, 240, 255)
+        Note over Admin,DB: Scope Management Integration
+        
+        Admin->>CLI: scope create --name "admin" --description "Admin access"
+        CLI->>SR: ScopeRepository(connection)
+        CLI->>SS: ScopeService(scope_repo)
+        CLI->>SS: create_scope("admin", "Admin access", is_default=False)
+        SS->>SR: create_scope(scope_data)
+        SR->>DB: INSERT INTO scopes (scope_name, description, is_default, is_active)
+        DB-->>SR: Created scope record
+        SR-->>SS: OAuthScope model
+        SS-->>CLI: Created scope
+        CLI-->>Admin: Scope 'admin' created successfully
+        
+        Admin->>CLI: scope defaults --output json
+        CLI->>SS: get_default_scopes()
+        SS->>SR: get_default_scopes()
+        SR->>DB: SELECT FROM scopes WHERE is_default=true AND is_active=true
+        DB-->>SR: Default scope records
+        SR-->>SS: List[OAuthScope]
+        SS-->>CLI: Default scopes
+        CLI->>CLI: Format as JSON
+        CLI-->>Admin: JSON array of default scopes
+    end
+
+    %% System Status Flow
+    rect rgb(255, 255, 240)
+        Note over Admin,DB: System Status Flow
+        
+        Admin->>CLI: status --verbose
+        CLI->>AC: Check database connectivity
+        AC->>DB: SELECT 1 (health check query)
+        DB-->>AC: Connection OK
+        AC-->>CLI: Database status: Connected
+        
+        CLI->>CS: Quick stats - client count
+        CS->>CR: count_clients()
+        CR->>DB: SELECT COUNT(*) FROM clients WHERE is_active=true
+        DB-->>CR: Active client count
+        CR-->>CS: Count
+        CS-->>CLI: Client statistics
+        
+        CLI->>SS: Quick stats - scope count  
+        SS->>SR: count_scopes()
+        SR->>DB: SELECT COUNT(*) FROM scopes WHERE is_active=true
+        DB-->>SR: Active scope count
+        SR-->>SS: Count
+        SS-->>CLI: Scope statistics
+        
+        CLI->>CLI: Format comprehensive status report
+        CLI-->>Admin: System status with DB connectivity, config, and stats
+    end
+
+    %% Error Handling and Cleanup
+    rect rgb(255, 240, 240)
+        Note over Admin,DB: Error Handling & Cleanup
+        
+        Note over CLI: Error Scenarios:
+        Note over CLI: • Database connection failed → Clear error message
+        Note over CLI: • Client not found → 404-style error with suggestions
+        Note over CLI: • Invalid parameters → Validation error with examples
+        Note over CLI: • Constraint violations → User-friendly constraint explanations
+        Note over CLI: • Permission errors → Clear authorization failure messages
+        
+        CLI->>AC: cleanup()
+        AC->>AC: Close database connection pool
+        AC->>AC: Clear Authly singleton
+        AC-->>CLI: Resources cleaned up
+        Note over CLI: Graceful exit with proper resource cleanup
+    end
+
+    %% CLI Features Summary
+    rect rgb(240, 240, 255)
+        Note over Admin,DB: CLI Advanced Features:
+        Note over CLI: • JSON output for automation and scripting
+        Note over CLI: • Dry-run mode for safe operation preview
+        Note over CLI: • Verbose logging for debugging and monitoring
+        Note over CLI: • Configuration file and environment variable support
+        Note over CLI: • Pagination for large result sets
+        Note over CLI: • Input validation with helpful error messages
+        Note over CLI: • Secure credential handling (no secrets in logs)
+        Note over CLI: • Transaction safety with rollback on errors
+    end

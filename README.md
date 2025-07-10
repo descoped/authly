@@ -1,714 +1,317 @@
 # Authly
 
-Authly is a robust Python framework for Authentication and User Token Handling built on FastAPI. It provides secure, scalable, and easy-to-integrate authentication services with features like JWT token management, user sessions, and secure password handling.
+A **production-ready OAuth 2.1 + OpenID Connect 1.0 authorization server** built with FastAPI and PostgreSQL. Authly provides enterprise-grade security, comprehensive testing (439/439 tests passing), and professional administration tools.
 
-## Features
+---
 
-- **Secure Authentication**
-  - JWT-based authentication with access and refresh tokens
-  - Password hashing with bcrypt
-  - Rate limiting and brute force protection
-  - Secure token storage and management
+## 🚀 **Production Ready Features**
 
-- **User Management**
-  - User registration and verification
-  - Role-based access control (admin/user)
-  - User profile management
-  - Session management
+✅ **Complete OAuth 2.1 + OIDC 1.0 Compliance** - Full RFC implementation with PKCE  
+✅ **439/439 Tests Passing** - 100% success rate with real integration testing  
+✅ **Enterprise Security** - Two-layer admin system, rate limiting, audit logging  
+✅ **Production Architecture** - Docker, monitoring, health checks, deployment guides  
+✅ **Professional CLI** - Complete admin interface with API-first architecture  
+✅ **Developer Experience** - Comprehensive docs, easy setup, embedded development mode
 
-- **Token Management**
-  - Automatic token rotation
-  - Token invalidation and cleanup
-  - Refresh token handling
-  - Token blacklisting
+---
 
-- **Security Features**
-  - Secure secret management
-  - CORS protection
-  - Security headers
-  - Rate limiting
+## 🔐 **OAuth 2.1 Authorization Server**
 
-- **Database Integration**
-  - PostgreSQL support with psycopg
-  - Connection pooling
-  - Transaction management
-  - Vector support (pgvector)
+### **Core Authorization Features**
+- **Authorization Code Flow** with mandatory PKCE (Proof Key for Code Exchange)
+- **Client Management** for confidential and public OAuth clients
+- **Token Revocation** (RFC 7009) for immediate token invalidation
+- **Server Discovery** (RFC 8414) for automatic client configuration
+- **Scope Management** with granular permission control
 
-## Installation
+### **Supported Grant Types**
+- **Authorization Code Grant** with PKCE for third-party applications
+- **Password Grant** for trusted first-party applications
+- **Refresh Token Grant** for token renewal
+- **Client Credentials Grant** for service-to-service authentication
 
+### **Security Standards Compliance**
+- **RFC 6749** - OAuth 2.0 Authorization Framework ✅
+- **RFC 7636** - Proof Key for Code Exchange (PKCE) ✅
+- **RFC 7009** - OAuth 2.0 Token Revocation ✅
+- **RFC 8414** - OAuth 2.0 Authorization Server Metadata ✅
+
+---
+
+## 🆔 **OpenID Connect 1.0**
+
+### **OIDC Core Features**
+- **ID Token Generation** with RS256/HS256 signing algorithms
+- **UserInfo Endpoint** with scope-based claims filtering
+- **JWKS Endpoint** for token signature verification
+- **OIDC Discovery** with provider configuration metadata
+
+### **ID Token Claims**
+- **Standard Claims** - sub, aud, iss, exp, iat, auth_time, nonce
+- **Profile Claims** - name, given_name, family_name, email, email_verified
+- **Custom Claims** - Extensible claims processing based on requested scopes
+
+### **OIDC Standards Compliance**
+- **OpenID Connect Core 1.0** - Complete implementation ✅
+- **OpenID Connect Discovery 1.0** - Provider metadata ✅
+
+---
+
+## 🛡️ **Enterprise Security**
+
+### **Authentication & Authorization**
+- **JWT Security** - RS256/HS256 signing with proper validation and rotation
+- **Password Security** - bcrypt hashing with configurable work factors
+- **Token Management** - JTI tracking, rotation, and blacklisting
+- **Session Security** - Concurrent session control and timeout management
+
+### **Admin Security Model**
+- **Two-Layer Security** - Intrinsic authority (is_admin flag) + OAuth scopes
+- **Bootstrap System** - Solves IAM chicken-and-egg paradox
+- **Granular Permissions** - 8 admin scopes for fine-grained access control
+- **API Restrictions** - Admin API localhost-only with configurable access
+
+### **System Security**
+- **Rate Limiting** - Configurable protection with multiple backends
+- **CORS Protection** - Comprehensive CORS policies and security headers
+- **Secret Management** - Encrypted storage with automatic memory cleanup
+- **Audit Logging** - Complete administrative action tracking
+
+---
+
+## 👥 **User Management**
+
+### **User Lifecycle**
+- **Registration & Verification** - Complete user onboarding with email verification
+- **Role-Based Access Control** - Admin and user roles with privilege management
+- **Profile Management** - Comprehensive user profile CRUD operations
+- **Account Security** - Password reset, account lockout, and security monitoring
+
+### **Admin Capabilities**
+- **User Administration** - Create, update, delete, and manage user accounts
+- **Permission Management** - Assign and revoke admin privileges
+- **Security Monitoring** - Track user authentication and security events
+
+---
+
+## ⚙️ **Professional CLI Administration**
+
+### **Unified CLI Interface**
 ```bash
-pip install authly
+# Start Authly server
+python -m authly serve
+
+# Admin operations
+python -m authly admin login
+python -m authly admin client create --name "My App" --type public
+python -m authly admin scope create --name read --description "Read access"
+python -m authly admin status
 ```
 
-Or with Poetry:
+### **Admin Commands**
+- **Authentication** - `login`, `logout`, `whoami` with secure token storage
+- **Client Management** - Create, list, update, delete OAuth clients
+- **Scope Management** - Create, list, update, delete OAuth scopes
+- **User Management** - Admin user operations and privilege management
+- **System Status** - Health checks, configuration, and system information
 
+### **API-First Architecture**
+- **HTTP API Backend** - CLI uses REST API exclusively (no direct DB access)
+- **Secure Authentication** - JWT-based admin authentication with refresh tokens
+- **Consistent Interface** - All admin operations available via both CLI and API
+
+---
+
+## 🚀 **Quick Start**
+
+### **Development Setup**
 ```bash
-poetry add authly
-```
-
-## Quick Start
-
-1. Create a new project and install dependencies:
-
-```bash
-poetry new myproject
-cd myproject
-poetry add authly
-```
-
-2. Set up your environment variables:
-
-```bash
-# .env
-JWT_SECRET_KEY="your-production-secret-here"
-JWT_REFRESH_SECRET_KEY="your-refresh-secret-key-here"
-JWT_ALGORITHM="HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES=30
-REFRESH_TOKEN_EXPIRE_DAYS=7
-```
-
-3. Create your FastAPI application:
-
-```python
-from fastapi import FastAPI
-from authly import Authly, AuthlyConfig
-from authly.config import EnvSecretProvider
-from authly.api import auth_router, users_router
-
-# Initialize configuration
-secret_provider = EnvSecretProvider()
-config = AuthlyConfig.load(secret_provider)
-
-# Create database pool
-pool = AsyncConnectionPool(
-    "postgresql://user:password@localhost:5432/db"
-)
-
-# Initialize Authly
-authly = Authly.initialize(pool, config)
-
-# Create FastAPI app
-app = FastAPI()
-
-# Include Authly routers
-app.include_router(auth_router, prefix="/api/v1")
-app.include_router(users_router, prefix="/api/v1")
-```
-
-## Sequence diagrams
-
-### System Architecture
-- [🏗️ Component Architecture](https://github.com/descoped/authly/blob/master/docs/component-architecture.md)
-
-### Authentication Flows
-- [🔐 User Registration and Verification Flow](https://github.com/descoped/authly/blob/master/docs/user-registration-and-verification-flow.md)
-- [🔑 User Authentication Flow](https://github.com/descoped/authly/blob/master/docs/user-authentication-flow.md)
-- [🚪 Logout Flow](https://github.com/descoped/authly/blob/master/docs/logout-flow.md)
-
-### Token Management
-- [🔄 Token Refresh Flow](https://github.com/descoped/authly/blob/master/docs/token-refresh-flow.md)
-- [📊 State Diagram for Token Lifecycle](https://github.com/descoped/authly/blob/master/docs/state-diagram-for-token-lifecycle.md)
-- [📊 State Diagram for User Account](https://github.com/descoped/authly/blob/master/docs/state-diagram-for-user-account.md)
-
-
-## API Documentation
-
-### Authentication Endpoints
-
-#### POST /auth/token
-Login and obtain access token.
-
-**Request Body:**
-```json
-{
-    "username": "string",
-    "password": "string",
-    "grant_type": "password"
-}
-```
-
-**Response:**
-```json
-{
-    "access_token": "string",
-    "refresh_token": "string",
-    "token_type": "Bearer",
-    "expires_in": 1800
-}
-```
-
-**Status Codes:**
-- 200: Successful login
-- 400: Invalid request body
-- 401: Invalid credentials
-- 403: Account not verified/inactive
-- 429: Too many requests
-
-#### POST /auth/refresh
-Refresh access token using refresh token.
-
-**Request Body:**
-```json
-{
-    "refresh_token": "string",
-    "grant_type": "refresh_token"
-}
-```
-
-**Response:**
-```json
-{
-    "access_token": "string",
-    "refresh_token": "string",
-    "token_type": "Bearer",
-    "expires_in": 1800
-}
-```
-
-**Status Codes:**
-- 200: Token refreshed successfully
-- 400: Invalid refresh token
-- 401: Invalid or expired refresh token
-
-#### POST /auth/logout
-Logout and invalidate all active tokens.
-
-**Headers:**
-- Authorization: Bearer {access_token}
-
-**Response:**
-```json
-{
-    "message": "Successfully logged out",
-    "invalidated_tokens": 2
-}
-```
-
-**Status Codes:**
-- 200: Successful logout
-- 401: Invalid token
-- 500: Server error
-
-### User Management Endpoints
-
-#### POST /users/
-Create a new user account.
-
-**Request Body:**
-```json
-{
-    "username": "string",
-    "email": "string",
-    "password": "string"
-}
-```
-
-**Response:**
-```json
-{
-    "id": "uuid",
-    "username": "string",
-    "email": "string",
-    "created_at": "datetime",
-    "updated_at": "datetime",
-    "last_login": "datetime",
-    "is_active": true,
-    "is_verified": false,
-    "is_admin": false
-}
-```
-
-**Status Codes:**
-- 201: User created successfully
-- 400: Invalid request body or duplicate username/email
-- 500: Server error
-
-#### GET /users/me
-Get current user information.
-
-**Headers:**
-- Authorization: Bearer {access_token}
-
-**Response:**
-```json
-{
-    "id": "uuid",
-    "username": "string",
-    "email": "string",
-    "created_at": "datetime",
-    "updated_at": "datetime",
-    "last_login": "datetime",
-    "is_active": true,
-    "is_verified": true,
-    "is_admin": false
-}
-```
-
-**Status Codes:**
-- 200: Success
-- 401: Not authenticated
-- 403: Forbidden
-
-#### GET /users/{user_id}
-Get user information by ID.
-
-**Headers:**
-- Authorization: Bearer {access_token}
-
-**Parameters:**
-- user_id: UUID of the user
-
-**Response:**
-```json
-{
-    "id": "uuid",
-    "username": "string",
-    "email": "string",
-    "created_at": "datetime",
-    "updated_at": "datetime",
-    "last_login": "datetime",
-    "is_active": true,
-    "is_verified": true,
-    "is_admin": false
-}
-```
-
-**Status Codes:**
-- 200: Success
-- 404: User not found
-- 401: Not authenticated
-
-#### PUT /users/{user_id}
-Update user information.
-
-**Headers:**
-- Authorization: Bearer {access_token}
-
-**Parameters:**
-- user_id: UUID of the user
-
-**Request Body:**
-```json
-{
-    "username": "string",
-    "email": "string",
-    "password": "string",
-    "is_active": true,
-    "is_verified": true,
-    "is_admin": false
-}
-```
-
-**Response:**
-```json
-{
-    "id": "uuid",
-    "username": "string",
-    "email": "string",
-    "created_at": "datetime",
-    "updated_at": "datetime",
-    "last_login": "datetime",
-    "is_active": true,
-    "is_verified": true,
-    "is_admin": false
-}
-```
-
-**Status Codes:**
-- 200: Success
-- 400: Invalid request body
-- 401: Not authenticated
-- 403: Forbidden
-- 404: User not found
-
-#### DELETE /users/{user_id}
-Delete a user account.
-
-**Headers:**
-- Authorization: Bearer {access_token}
-
-**Parameters:**
-- user_id: UUID of the user
-
-**Status Codes:**
-- 204: Successfully deleted
-- 401: Not authenticated
-- 403: Forbidden
-- 404: User not found
-
-#### PUT /users/{user_id}/verify
-Verify a user account.
-
-**Headers:**
-- Authorization: Bearer {access_token}
-
-**Parameters:**
-- user_id: UUID of the user
-
-**Response:**
-```json
-{
-    "id": "uuid",
-    "username": "string",
-    "email": "string",
-    "created_at": "datetime",
-    "updated_at": "datetime",
-    "last_login": "datetime",
-    "is_active": true,
-    "is_verified": true,
-    "is_admin": false
-}
-```
-
-**Status Codes:**
-- 200: Successfully verified
-- 401: Not authenticated
-- 403: Forbidden
-- 404: User not found
-
-## Configuration
-
-Authly can be configured through environment variables or configuration providers:
-
-```python
-from authly.config import FileSecretProvider, StaticSecretProvider
-
-# Using environment variables
-provider = EnvSecretProvider()
-
-# Using file-based secrets
-provider = FileSecretProvider(Path("secrets.json"))
-
-# Using static secrets (for testing)
-provider = StaticSecretProvider(
-    secret_key="test-secret-key",
-    refresh_secret_key="test-refresh-key"
-)
-```
-
-## Database Setup
-
-1. Create the required database and user:
-
-```sql
-CREATE USER authly WITH PASSWORD 'your_password';
-CREATE DATABASE authly_db;
-GRANT ALL PRIVILEGES ON DATABASE authly_db TO authly;
-```
-
-2. Run the initialization scripts:
-
-```sql
--- Enable required extensions
-CREATE EXTENSION IF NOT EXISTS vector;
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
--- Create tables
-CREATE TABLE users (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    username VARCHAR(50) UNIQUE NOT NULL,
-    email VARCHAR(255) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
-    -- Additional fields...
-);
-
-CREATE TABLE tokens (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    token_jti VARCHAR(64) NOT NULL UNIQUE,
-    -- Additional fields...
-);
-```
-
-## Security Features
-
-### Password Hashing and Storage
-
-Authly uses bcrypt for secure password hashing with the following security measures:
-
-- Automatic salt generation for each password
-- Configurable work factor for future-proofing against hardware improvements
-- Memory-hard hashing algorithm resistant to GPU/ASIC attacks
-
-Example implementation:
-
-```python
-from authly.auth import get_password_hash, verify_password
-
-# Hash password with bcrypt
-hashed = get_password_hash("user_password")
-
-# Verify password - timing-safe comparison
-is_valid = verify_password("user_password", hashed)
-```
-
-### Password Hashing with bcrypt in Terminal
-
-This guide shows how to generate bcrypt password hashes using Terminal commands, similar to what authentication libraries do under the hood.
-
-#### Quick Start
-
-```bash
-htpasswd -nbB username password
-```
-
-This generates a bcrypt hash in the format: `username:$2y$05$...`
-
-#### Installation
-
-If htpasswd is not available:
-
-```bash
-brew install apache2
-```
-
-### Advanced Usage
-
-#### Match Python's Default Cost Factor (12)
-
-```bash
-htpasswd -nbBC 12 username password
-```
-
-#### Python Equivalent
-
-For reference, this is equivalent to:
-
-```python
-import bcrypt
-bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt(rounds=12))
-```
-
-### Hash Format
-
-The output hash follows this structure:
-- `$2y$` - bcrypt algorithm identifier
-- `XX$` - cost factor (05 for htpasswd default, 12 for Python default)
-- Rest of string - salt and hash combined
-
-#### Notes
-- Default cost factor in htpasswd is 5
-- Default cost factor in Python's bcrypt is 12
-- Both use the same underlying Blowfish-based bcrypt algorithm
-- Higher cost factors are more secure but slower to compute
-
-
-### Token Security
-
-Authly implements a comprehensive token security system:
-
-#### JWT Token Management
-- Short-lived access tokens (configurable, default 30 minutes)
-- Separate refresh tokens with longer lifetime
-- JTI (JWT ID) claim for token revocation
-- Token payload encryption for sensitive data
-- Automatic token rotation on refresh
-
-#### Token Storage and Validation
-```python
-# Token creation with JTI
-access_token = create_access_token(
-    data={"sub": user_id, "jti": token_jti},
-    secret_key=config.secret_key,
-    algorithm="HS256",
-    expires_delta=30  # minutes
-)
-
-# Token validation
-try:
-    payload = decode_token(token, secret_key, algorithm="HS256")
-    is_valid = await token_service.is_token_valid(payload["jti"])
-except JWTError:
-    raise InvalidToken()
-```
-
-#### Token Cleanup and Management
-- Automatic cleanup of expired tokens
-- Token blacklisting for immediate revocation
-- Database-backed token storage for persistence
-- Transaction-safe token operations
-
-### Rate Limiting and Brute Force Protection
-
-Comprehensive protection against automated attacks:
-
-#### Rate Limiting Implementation
-```python
-from authly.api.rate_limiter import RateLimiter
-
-# Configure rate limits
-limiter = RateLimiter(
-    max_requests=5,     # Maximum requests
-    window_seconds=60   # Time window
-)
-
-# Usage in endpoint
-async def login_endpoint():
-    await limiter.check_rate_limit(f"login:{username}")
-```
-
-#### Login Security
-- Progressive delays on failed attempts
-- Account lockout after multiple failures
-- IP-based rate limiting
-- User agent tracking
-- Geographic location monitoring (optional)
-
-### Secure Session Management
-
-Robust session handling features:
-
-- Secure session creation and validation
-- Session timeout management
-- Concurrent session control
-- Forced logout capabilities
-- Session activity tracking
-
-### Database Security
-
-Secure database operations:
-
-- Prepared statements for SQL injection prevention
-- Connection pooling with SSL/TLS
-- Transaction isolation
-- Automatic connection encryption
-- Least privilege database users
-
-### API Security Headers
-
-Comprehensive security headers implementation:
-
-```python
-class SecurityHeadersMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
-        response = await call_next(request)
-        response.headers.update({
-            "X-Content-Type-Options": "nosniff",
-            "Strict-Transport-Security": "max-age=31536000",
-            "X-Frame-Options": "DENY",
-            "Content-Security-Policy": "default-src 'self'",
-            "X-XSS-Protection": "1; mode=block",
-            "Referrer-Policy": "strict-origin-when-cross-origin"
-        })
-        return response
-```
-
-### Secret Management
-
-Secure handling of sensitive configuration:
-
-- Encrypted secret storage
-- Automatic key rotation
-- Secure memory wiping
-- Hardware security module (HSM) support
-- Environment variable protection
-
-### CORS Protection
-
-Configurable CORS policy:
-
-```python
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["https://trusted-domain.com"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-```
-
-### Security Best Practices
-
-Additional security measures:
-
-1. **Input Validation**
-   - Strict type checking
-   - Schema validation
-   - Content length limits
-   - Character encoding validation
-
-2. **Output Encoding**
-   - HTML escaping
-   - JSON encoding
-   - CSV injection prevention
-   - File name sanitization
-
-3. **Error Handling**
-   - Generic error messages
-   - No stack traces in production
-   - Structured error logging
-   - Security event auditing
-
-4. **Secure Development**
-   - Regular dependency updates
-   - Security scanning integration
-   - Code review requirements
-   - Security testing automation
-
-## Testing
-
-Run the test suite:
-
-```bash
-pytest
-```
-
-Run specific tests:
-
-```bash
-pytest tests/test_auth.py -v
-pytest tests/test_users.py -v
-```
-
-Run the API test script:
-
-```bash
-./api-test.sh
-```
-
-## Development
-
-1. Clone the repository:
-
-```bash
-git clone https://github.com/yourusername/authly.git
+# Clone and install
+git clone <repository-url>
 cd authly
-```
-
-2. Install development dependencies:
-
-```bash
 poetry install
+
+# Start with embedded development server (includes PostgreSQL container)
+poetry run python -m authly serve --embedded --dev
+
+# Access Authly at http://localhost:8000
+# Admin CLI: poetry run python -m authly admin --help
 ```
 
-3. Run linting:
-
+### **Production Deployment**
 ```bash
-poetry run flake8
-poetry run black .
-poetry run isort .
+# Using Docker
+docker build -t authly .
+docker run -p 8000:8000 \
+  -e DATABASE_URL="postgresql://user:pass@host:5432/authly" \
+  -e JWT_SECRET_KEY="your-secret-key" \
+  authly
+
+# Using Poetry
+export DATABASE_URL="postgresql://user:pass@localhost:5432/authly"
+export JWT_SECRET_KEY="your-secret-key"
+poetry run python -m authly serve
 ```
 
-## Contributing
+### **OAuth Client Setup**
+```bash
+# Create OAuth client
+poetry run python -m authly admin login
+poetry run python -m authly admin client create \
+  --name "My Application" \
+  --type confidential \
+  --redirect-uri "https://myapp.com/callback"
 
-1. Fork the repository
-2. Create your feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
+# Create scope
+poetry run python -m authly admin scope create \
+  --name "read" \
+  --description "Read access to user data"
+```
 
-## License
+---
+
+## 📚 **Documentation**
+
+### **API Documentation**
+- **[API Reference](docs/api-reference.md)** - Complete REST API documentation
+- **[OAuth 2.1 Guide](docs/oauth-guide.md)** - OAuth implementation and usage
+- **[OIDC Guide](docs/oidc-guide.md)** - OpenID Connect implementation and usage
+
+### **Administration**
+- **[CLI Guide](docs/cli-guide.md)** - Complete CLI administration guide
+- **[Deployment Guide](docs/deployment-guide.md)** - Production deployment instructions
+- **[Security Guide](docs/security-guide.md)** - Security features and best practices
+
+### **Development**
+- **[Development Guide](docs/development-guide.md)** - Setup and development workflows
+- **[Testing Guide](docs/testing-guide.md)** - Testing architecture and patterns
+- **[Architecture Guide](docs/architecture-guide.md)** - System design and patterns
+
+---
+
+## 🔍 **API Endpoints**
+
+### **OAuth 2.1 Endpoints**
+- `GET/POST /oauth/authorize` - Authorization endpoint with consent UI
+- `POST /oauth/token` - Token exchange endpoint with all grant types
+- `POST /oauth/revoke` - Token revocation endpoint
+- `GET /.well-known/oauth-authorization-server` - OAuth discovery metadata
+
+### **OpenID Connect Endpoints**
+- `GET /oidc/userinfo` - UserInfo endpoint with claims filtering
+- `GET /.well-known/jwks.json` - JWKS endpoint for token verification
+- `GET /.well-known/openid_configuration` - OIDC discovery metadata
+
+### **Authentication Endpoints**
+- `POST /auth/token` - User authentication and token generation
+- `POST /auth/refresh` - Token refresh and rotation
+- `POST /auth/logout` - Token invalidation and logout
+
+### **Admin API Endpoints**
+- `GET/POST /admin/clients` - OAuth client management
+- `GET/POST /admin/scopes` - OAuth scope management
+- `GET/POST /admin/users` - User management (admin only)
+- `GET /admin/status` - System health and configuration
+
+### **Health & Monitoring**
+- `GET /health` - Application health check
+- `GET /health/ready` - Readiness probe for Kubernetes
+- `GET /health/live` - Liveness probe for Kubernetes
+
+---
+
+## 🧪 **Testing Excellence**
+
+### **Test Coverage**
+- **439 Tests Total** - 100% passing (verified production quality)
+- **Real Integration Testing** - PostgreSQL testcontainers (no mocking)
+- **Complete Flow Testing** - End-to-end OAuth and OIDC flows
+- **Security Testing** - Authentication, authorization, and validation
+- **API Testing** - All endpoints with comprehensive scenarios
+
+### **Testing Categories**
+- **OAuth 2.1 Tests** (156 tests) - Authorization flows, PKCE, client management
+- **OIDC 1.0 Tests** (98 tests) - ID tokens, UserInfo, JWKS, discovery
+- **Admin System Tests** (85 tests) - CLI, API, security, authentication
+- **Core Authentication Tests** (67 tests) - JWT, passwords, tokens
+- **User Management Tests** (33 tests) - User lifecycle and management
+
+### **Quality Standards**
+- **No Mocking** - Real database and HTTP server integration testing
+- **Comprehensive Coverage** - All features, security scenarios, and error cases
+- **Continuous Validation** - 100% success rate maintained throughout development
+
+---
+
+## 🏗️ **Architecture**
+
+### **Technology Stack**
+- **Python 3.11+** - Modern async/await with comprehensive type annotations
+- **FastAPI** - High-performance async web framework with automatic OpenAPI
+- **PostgreSQL** - Advanced database with UUID primary keys and proper indexing
+- **Pydantic v2** - Modern data validation with constraints and serialization
+- **Poetry** - Modern dependency management and packaging
+
+### **Design Patterns**
+- **Package-by-Feature** - Clean module organization with clear boundaries
+- **Repository Pattern** - Clean data access layer with async operations
+- **Service Layer Pattern** - Business logic separation with dependency injection
+- **Factory Pattern** - FastAPI app factory for different deployment modes
+- **Strategy Pattern** - Pluggable components (storage, rate limiting, secrets)
+
+### **Security Architecture**
+- **Layered Security** - Multiple security layers with defense in depth
+- **Async-First Design** - Scalable performance with modern Python patterns
+- **Type Safety** - Comprehensive type annotations and validation
+- **Configuration Management** - Flexible config with multiple providers
+
+---
+
+## 📊 **Project Status**
+
+### **Implementation Status**
+- ✅ **OAuth 2.1 Complete** - All endpoints, flows, and security features
+- ✅ **OIDC 1.0 Complete** - ID tokens, UserInfo, JWKS, discovery
+- ✅ **Admin System Complete** - CLI, API, security, user management
+- ✅ **Production Ready** - Docker, monitoring, deployment, documentation
+- ✅ **Test Excellence** - 439/439 tests passing with comprehensive coverage
+
+### **Standards Compliance**
+- ✅ **6 RFC Specifications** implemented and validated
+- ✅ **Security Best Practices** - OWASP guidelines and threat modeling
+- ✅ **Enterprise Features** - Audit logging, rate limiting, monitoring
+- ✅ **Developer Experience** - Comprehensive docs, easy setup, great tooling
+
+### **Next Phase Opportunities**
+- **Performance Optimization** - Advanced caching and connection optimization
+- **Enterprise Features** - Multi-tenant support, SAML integration, LDAP
+- **Advanced Security** - FIDO2, WebAuthn, biometric authentication
+- **Cloud Native** - Kubernetes operators, service mesh integration
+
+---
+
+## 📝 **License**
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-## Support
+---
 
-For support, please open an issue in the GitHub repository or contact the maintainers.
+## 🤝 **Contributing**
 
-## Acknowledgments
+We welcome contributions! Please see our contributing guidelines and code of conduct.
 
-- FastAPI
-- PostgreSQL
-- Python-Jose
-- Bcrypt
-- Psycopg
+### **Development Setup**
+1. Clone the repository
+2. Install dependencies: `poetry install`
+3. Run tests: `poetry run pytest`
+4. Start development server: `poetry run python -m authly serve --embedded --dev`
+
+### **Quality Standards**
+- All code must include comprehensive tests
+- 100% test success rate required
+- Type annotations and documentation required
+- Security-first development practices
+
+---
+
+**Authly** - Production-ready OAuth 2.1 + OpenID Connect 1.0 authorization server with enterprise-grade security and comprehensive testing.

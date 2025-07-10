@@ -1,0 +1,24 @@
+sequenceDiagram
+    participant C as Client
+    participant F as FastAPI
+    participant T as TokenService
+    participant S as TokenStore
+    participant U as UserRepository
+    participant D as Database
+
+    C->>F: POST /auth/logout
+    Note right of F: Bearer token in header
+    F->>T: decode_token(access_token)
+    F->>U: get_current_user(token)
+    U->>D: SELECT user
+    D-->>U: user data
+    F->>T: invalidate_token(current_jti)
+    T->>S: invalidate_token()
+    S->>D: UPDATE tokens SET invalidated = true
+    F->>T: invalidate_user_tokens(user_id)
+    T->>S: get_user_tokens()
+    S->>D: SELECT active tokens
+    D-->>S: tokens list
+    T->>S: invalidate_all()
+    S->>D: UPDATE all user tokens
+    F-->>C: 200 OK {invalidated_count}

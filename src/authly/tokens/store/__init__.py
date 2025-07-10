@@ -1,11 +1,8 @@
 from authly.tokens.store.base import TokenStore
 from authly.tokens.store.postgres import PostgresTokenStore
 
-__all__ = [
-    "TokenStore",
-    "PostgresTokenStore",
-    "get_token_store_class"
-]
+__all__ = ["TokenStore", "PostgresTokenStore", "get_token_store_class"]
+
 
 def get_token_store_class() -> type[TokenStore]:
     """
@@ -13,4 +10,3 @@ def get_token_store_class() -> type[TokenStore]:
     This allows for easy switching between different implementations.
     """
     return PostgresTokenStore
-
