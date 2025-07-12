@@ -1,0 +1,156 @@
+# Production Docker Compose - extends base docker-compose.yml
+services:
+  # PostgreSQL Database (Production)
+  postgres:
+    environment:
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql/data
+      - ./docker/init-db-and-user.sql:/docker-entrypoint-initdb.d/01-init-db.sql:ro
+    secrets:
+      - postgres_password
+    # Remove port exposure for security
+    ports: []
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+
+  # Redis Cache (Production)
+  redis:
+    environment:
+      REDIS_PASSWORD_FILE: /run/secrets/redis_password
+    command: >
+      sh -c '
+        REDIS_PASSWORD=$$(cat /run/secrets/redis_password)
+        redis-server --requirepass "$$REDIS_PASSWORD"
+      '
+    volumes:
+      - redis_prod_data:/data
+    secrets:
+      - redis_password
+    # Remove port exposure for security
+    ports: []
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+  # Authly Application (Production)
+  authly:
+    environment:
+      # Production Database (using secrets file references)
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      DATABASE_URL: "postgresql://authly:@postgres:5432/authly"
+      
+      # Production Redis (using secrets file references)
+      REDIS_PASSWORD_FILE: /run/secrets/redis_password
+      REDIS_URL: "redis://@redis:6379/0"
+      
+      # Production JWT Secrets (using secrets)
+      JWT_SECRET_KEY_FILE: /run/secrets/jwt_secret_key
+      JWT_REFRESH_SECRET_KEY_FILE: /run/secrets/jwt_refresh_secret_key
+      
+      # Production Mode
+      AUTHLY_BOOTSTRAP_DEV_MODE: "false"
+      AUTHLY_DEV_MODE: "false"
+      AUTHLY_LOG_LEVEL: "INFO"
+      
+      # Production URLs (override with actual domain)
+      DEFAULT_API_URL: "${AUTHLY_DOMAIN:-https://auth.example.com}"
+      DEFAULT_ISSUER_URL: "${AUTHLY_DOMAIN:-https://auth.example.com}"
+      
+      # Production rate limiting
+      RATE_LIMIT_MAX_REQUESTS: "100"
+      RATE_LIMIT_WINDOW_SECONDS: "60"
+      
+      # Admin API (consider disabling in production)
+      AUTHLY_ADMIN_API_ENABLED: "false"
+    secrets:
+      - postgres_password
+      - redis_password  
+      - jwt_secret_key
+      - jwt_refresh_secret_key
+    # Remove port exposure (handled by nginx)
+    ports: []
+    deploy:
+      # replicas: 2  # Comment out for testing - enable for production
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+    volumes:
+      - authly_prod_logs:/app/logs
+
+  # Nginx Reverse Proxy (Production)
+  nginx:
+    volumes:
+      - ./docker-compose/nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
+      - ./docker-compose/nginx/ssl:/etc/nginx/ssl:ro
+      - nginx_prod_logs:/var/log/nginx
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+  # Log Aggregation (Production)
+  fluentd:
+    image: fluent/fluentd:v1.16-debian-1
+    container_name: authly-fluentd
+    volumes:
+      - ./docker-compose/fluentd/fluent.conf:/fluentd/etc/fluent.conf:ro
+      - authly_prod_logs:/app/logs:ro
+      - nginx_prod_logs:/var/log/nginx:ro
+    networks:
+      - authly_network
+    depends_on:
+      - authly
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    profiles:
+      - monitoring
+
+# Production secrets
+secrets:
+  postgres_password:
+    external: true
+  redis_password:
+    external: true
+  jwt_secret_key:
+    external: true
+  jwt_refresh_secret_key:
+    external: true
+
+# Production-specific volumes
+volumes:
+  postgres_prod_data:
+    driver: local
+  redis_prod_data:  
+    driver: local
+  authly_prod_logs:
+    driver: local
+  nginx_prod_logs:
+    driver: local

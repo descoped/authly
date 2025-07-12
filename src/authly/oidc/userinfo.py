@@ -109,7 +109,7 @@ class UserInfoService:
         userinfo.family_name = getattr(user, "family_name", None)
         userinfo.middle_name = getattr(user, "middle_name", None)
         userinfo.nickname = getattr(user, "nickname", None)
-        userinfo.preferred_username = getattr(user, "preferred_username", user.username)
+        userinfo.preferred_username = getattr(user, "preferred_username", None) or user.username
         userinfo.profile = getattr(user, "profile", None)
         userinfo.picture = getattr(user, "picture", None)
         userinfo.website = getattr(user, "website", None)

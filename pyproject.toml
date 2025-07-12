@@ -1,55 +1,50 @@
-[tool.poetry]
+[project]
 name = "authly"
-version = "0.2.0"
-description = "Authentication and Authorization for Python FastAPI"
-authors = ["Ove Ranheim <oranheim@gmail.com>"]
+version = "0.5.0"
+description = "Authorization & User Token Handling Layer for You"
+authors = [
+    { name = "Ove Ranheim", email = "oranheim@gmail.com" }
+]
+requires-python = ">=3.11"
 readme = "README.md"
-packages = [
-    { include = "authly", from = "src" }
+keywords = ["oauth", "oauth2", "oidc", "iam", "security", "identity", "authentication", "authorization", "asyncio", "fastapi"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "fastapi>=0.115.0",
+    "starlette>=0.45.0",
+    "uvicorn>=0.34.0",
+    "python-dotenv>=1.0.1",
+    "psycopg>=3.2.3",
+    "psycopg-pool>=3.2.4",
+    "psycopg-toolkit>=0.1.5",
+    "tenacity>=9.0.0",
+    "pydantic>=2.10.5",
+    "pydantic-settings>=2.1.0",
+    "tomli>=2.2.1",
+    "python-jose[cryptography]>=3.3.0",
+    "cryptography>=44.0.1",
+    "bcrypt==4.2.1",
+    "python-multipart>=0.0.6",
+    "jinja2>=3.1.6",
+    "click>=8.1.7",
+    "httpx>=0.27.0",
 ]
 
-[tool.poetry.scripts]
-authly-admin = "authly.admin.cli:main"
-authly = "authly.__main__:cli"
-
-[tool.poetry.dependencies]
-python = "^3.11"
-fastapi = "^0.115.0"
-starlette = "^0.45.0"
-uvicorn = "^0.34.0"
-python-dotenv = "^1.0.1"
-psycopg = "^3.2.3"
-psycopg-pool = "^3.2.4"
-psycopg-toolkit = "^0.1.5"
-tenacity = "^9.0.0"
-pydantic = "^2.10.5"
-pydantic-settings = "^2.1.0"
-tomli = "^2.2.1"
-python-jose = { extras = ["cryptography"], version = "^3.3.0" }
-cryptography = "^44.0.1"
-bcrypt = "4.2.1"
-python-multipart = "^0.0.6"
-jinja2 = "^3.1.6"
-click = "^8.1.7"
-httpx = "^0.27.0"
-
-[tool.poetry.group.test.dependencies]
-pytest = "^8.3.4"
-pytest-order = "^1.3.0"
-pytest-asyncio = "^0.25.0"
-testcontainers = { extras = ["postgresql"], version = "^4.9.0" }
-fastapi-testing = "^0.2.0"
-
-[tool.poetry.group.dev.dependencies]
-flake8 = "^7.1.1"
-flake8-pyproject = "^1.2.3"
-black = "^25.1.0"
-isort = "^6.0.0"
-ruff = "^0.9.6"
-
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+[dependency-groups]
+dev = [
+]
+test = [
+    "pytest>=8.3.4",
+    "pytest-order>=1.3.0",
+    "pytest-asyncio>=0.25.0",
+    "testcontainers[postgresql]>=4.9.0",
+    "fastapi-testing>=0.2.0",
+]
 
 [tool.pytest.ini_options]
 pythonpath = ["src", "tests"]
@@ -59,62 +54,95 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 markers = [
     "asyncio: mark test as async",
+    "integration: mark test as integration test",
 ]
+addopts = "-m 'not integration'"
 
-[tool.flake8]
-max-line-length = 120
-extend-ignore = ["E203", "W503"]
+[build-system]
+requires = ["hatchling>=1.26.3"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/authly"]
+
+[tool.hatch.build]
 exclude = [
-    ".git",
-    ".venv",
-    "venv",
+    "ai_docs/*",
+    "docs/*",
+    "examples/*",
+    "tests/*",
+    ".github/*",
+    "*.gif",
+    "*.png",
+    "dist/*",
+    "build/*",
+    ".pytest_cache",
+    ".ruff_cache",
     "__pycache__",
-    "build",
-    "dist",
-    "*.egg-info",
-]
-per-file-ignores = [
-    "__init__.py:F401"
+    "*.pyc"
 ]
 
-[tool.black]
-line-length = 120  # Matching flake8 config
-target-version = ['py311']
-include = '\.pyi?$'
-extend-exclude = '''
-^/(
-  \.git
-  | \.venv
-  | venv
-  | __pycache__
-  | build
-  | dist
-  | .*\.egg-info
-)/
-'''
+[project.scripts]
+authly-admin = "authly.admin.cli:main"
+authly = "authly.__main__:cli"
 
-[tool.isort]
-profile = "black"
-line_length = 120
-multi_line_output = 3
-force_single_line = true
-lines_after_imports = 2
+[project.urls]
+Homepage = "https://github.com/descoped/authly"
+Repository = "https://github.com/descoped/authly"
+Issues = "https://github.com/descoped/authly/issues"
+
+[[tool.uv.index]]
+name = "pypi"
+url = "https://pypi.org/simple/"
+publish-url = "https://upload.pypi.org/legacy/"
+
+[[tool.uv.index]]
+name = "testpypi"
+url = "https://test.pypi.org/simple/"
+publish-url = "https://test.pypi.org/legacy/"
 
 [tool.ruff]
-line-length = 120
+# Target Python 3.11+
 target-version = "py311"
-lint.select = [
-    "E", # pycodestyle
-    "F", # pyflakes
-    "I", # isort
+# Line length 120 characters
+line-length = 120
+# Include all Python files
+include = ["*.py", "*.pyi", "**/pyproject.toml"]
+
+[tool.ruff.lint]
+# Enable key rule sets
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort (import sorting)
+    "UP",   # pyupgrade (modernize syntax)
+    "B",    # flake8-bugbear (common bugs)
+    "SIM",  # flake8-simplify (simplify code)
+    "RUF",  # Ruff-specific rules
 ]
-lint.ignore = ["E203"]
-exclude = [
-    ".git",
-    ".venv",
-    "venv",
-    "__pycache__",
-    "build",
-    "dist",
-    "*.egg-info",
-]
+# Ignore E203 (conflicts with Black-style formatting)
+ignore = ["E203"]
+# Allow autofix for all enabled rules
+fixable = ["ALL"]
+# Never autofix these (empty for now)
+unfixable = []
+
+[tool.ruff.lint.per-file-ignores]
+# Test files can have longer lines, unused imports
+"tests/*" = ["E501", "F401", "F841"]
+# Scripts can have print statements
+"scripts/*" = ["T201"]
+
+[tool.ruff.lint.isort]
+# Group imports like Black would
+combine-as-imports = true
+force-wrap-aliases = true
+
+[tool.ruff.format]
+# Use double quotes for strings
+quote-style = "double"
+# Indent with spaces
+indent-style = "space"
+# Unix line endings
+line-ending = "lf"

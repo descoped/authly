@@ -46,9 +46,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         
         # Parse database URL into settings
         url = urlparse(database_url)
+        
+        # Get default port from config
+        try:
+            config = authly.get_config()
+            default_port = config.postgres_port
+        except RuntimeError:
+            # Fallback for tests without full initialization
+            default_port = 5432
+            
         settings = DatabaseSettings(
             host=url.hostname,
-            port=url.port or 5432,
+            port=url.port or default_port,
             dbname=url.path.lstrip('/'),
             user=url.username,
             password=url.password,

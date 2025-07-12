@@ -184,8 +184,17 @@ class OIDCValidator:
         if requires_nonce and not nonce:
             errors.append("Nonce parameter is required for implicit and hybrid flows")
         
-        if nonce and len(nonce) > 255:
-            errors.append("Nonce parameter is too long (max 255 characters)")
+        # Get nonce max length from config
+        try:
+            from authly import get_config
+            config = get_config()
+            nonce_max_length = config.nonce_max_length
+        except RuntimeError:
+            # Fallback for tests
+            nonce_max_length = 255
+            
+        if nonce and len(nonce) > nonce_max_length:
+            errors.append(f"Nonce parameter is too long (max {nonce_max_length} characters)")
         
         return errors
     

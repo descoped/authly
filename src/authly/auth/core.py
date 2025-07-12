@@ -30,7 +30,14 @@ def create_access_token(
     if expires_delta:
         expire = datetime.now(timezone.utc) + timedelta(minutes=expires_delta)
     else:
-        expire = datetime.now(timezone.utc) + timedelta(minutes=15)
+        try:
+            from authly import get_config
+            config = get_config()
+            access_token_expire_minutes = config.access_token_expire_minutes
+        except RuntimeError:
+            # Fallback for tests without full Authly initialization  
+            access_token_expire_minutes = 60
+        expire = datetime.now(timezone.utc) + timedelta(minutes=access_token_expire_minutes)
     to_encode = data.copy()
     to_encode.update({"exp": int(expire.timestamp())})
     return jwt.encode(to_encode, secret_key, algorithm=algorithm)
@@ -49,10 +56,14 @@ def create_refresh_token(user_id: str, secret_key: str, jti: Optional[str] = Non
         str: A JWT refresh token.
     """
     # Generate a new JTI if one is not provided
-    token_jti = jti or secrets.token_hex(32)
-    expire = datetime.now(timezone.utc) + timedelta(days=7)
-    payload = {"sub": user_id, "type": "refresh", "jti": token_jti, "exp": int(expire.timestamp())}
+    if jti is None:
+        config = get_config()
+        token_jti = secrets.token_hex(config.token_hex_length)
+    else:
+        token_jti = jti
     config = get_config()
+    expire = datetime.now(timezone.utc) + timedelta(days=config.refresh_token_expire_days)
+    payload = {"sub": user_id, "type": "refresh", "jti": token_jti, "exp": int(expire.timestamp())}
 
     return jwt.encode(payload, secret_key, algorithm=config.algorithm)
 

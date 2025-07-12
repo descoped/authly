@@ -1,5 +1,5 @@
 # Multi-stage Dockerfile for Authly authentication service
-FROM python:3.13-slim as builder
+FROM python:3.13-slim AS builder
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
@@ -13,38 +13,34 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Poetry
-RUN pip install poetry
-
-# Configure Poetry
-ENV POETRY_NO_INTERACTION=1
-ENV POETRY_VENV_IN_PROJECT=1
-ENV POETRY_CACHE_DIR=/tmp/poetry_cache
+# Install UV
+RUN pip install uv
 
 # Set work directory
 WORKDIR /app
 
-# Copy Poetry files
-COPY pyproject.toml poetry.lock ./
+# Copy UV project files
+COPY pyproject.toml uv.lock README.md ./
 
-# Install dependencies
-RUN poetry install --only=main && rm -rf $POETRY_CACHE_DIR
+# Install dependencies using UV
+RUN uv sync --frozen --no-dev
 
 # Production stage
-FROM python:3.13-slim as production
+FROM python:3.13-slim AS production
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PATH="/app/.venv/bin:$PATH"
+ENV PYTHONPATH="/app/src"
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     libpq5 \
     && rm -rf /var/lib/apt/lists/*
 
-# Create non-root user
-RUN groupadd -r authly && useradd -r -g authly authly
+# Create non-root user with home directory
+RUN groupadd -r authly && useradd -r -g authly -m -d /home/authly authly
 
 # Set work directory
 WORKDIR /app
@@ -57,7 +53,7 @@ COPY src/ /app/src/
 COPY docker/ /app/docker/
 
 # Set ownership
-RUN chown -R authly:authly /app
+RUN chown -R authly:authly /app && chown -R authly:authly /home/authly
 
 # Switch to non-root user
 USER authly
@@ -70,4 +66,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
   CMD curl -f http://localhost:8000/health || exit 1
 
 # Default command
-CMD ["python", "-m", "authly.main"]
+CMD ["python", "-m", "authly", "serve"]

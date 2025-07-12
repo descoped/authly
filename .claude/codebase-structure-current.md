@@ -1,8 +1,8 @@
 # Authly Codebase Structure - Current State
 
-**Last Updated**: July 10, 2025  
-**Test Status**: 439/439 tests passing (100% success rate)  
-**Implementation**: Complete OAuth 2.1 + OpenID Connect 1.0 authorization server
+**Last Updated**: July 12, 2025  
+**Test Status**: 551 tests passing (100% success rate)  
+**Implementation**: Complete OAuth 2.1 + OpenID Connect Core 1.0 + Session Management 1.0 authorization server
 
 ---
 
@@ -14,14 +14,14 @@ authly/
 ├── .github/                    # GitHub workflows and templates
 ├── .pytest_cache/             # Pytest cache and configuration
 ├── .venv/                      # Python virtual environment
-├── docs/                       # Active documentation (25+ files)
-├── docs/historical/            # Archived planning documents (18+ files)
+├── docs/                       # Current documentation (6 files: API, CLI, Docker, OAuth, OIDC guides)
+├── docs-outdated/              # Outdated documentation (25+ files from previous development)
 ├── docker/                     # Database initialization scripts
+├── docker-compose/             # Docker compose services (Grafana, Nginx, Prometheus, etc.)
 ├── examples/                   # Usage examples and testing
 ├── report/                     # Analysis and audit reports
-├── remove-docs/                # Legacy documents to be cleaned
 ├── src/authly/                 # Main application source code
-├── tests/                      # Comprehensive test suite (439 tests)
+├── tests/                      # Comprehensive test suite (551 tests across 44 files)
 ├── .gitignore                  # Git ignore patterns
 ├── .python-version             # Python version specification
 ├── CHANGELOG.md                # Complete implementation changelog
@@ -319,8 +319,6 @@ docs/
 .claude/
 ├── CLAUDE.md                   # Primary comprehensive project memory
 ├── memory.md                   # Implementation status and context
-├── memory-comprehensive.md     # Detailed comprehensive memory (NEW)
-├── current-state-comprehensive.md # Current project analysis (NEW)
 ├── codebase-structure-current.md # This document (NEW)
 ├── architecture.md             # System architecture and design patterns
 ├── external-libraries.md       # Integration patterns and library usage

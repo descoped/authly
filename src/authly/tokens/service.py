@@ -98,8 +98,8 @@ class TokenService:
 
         try:
             # Generate unique JTIs for both tokens
-            access_jti = secrets.token_hex(32)
-            refresh_jti = secrets.token_hex(32)
+            access_jti = secrets.token_hex(config.token_hex_length)
+            refresh_jti = secrets.token_hex(config.token_hex_length)
 
             # Prepare token data
             access_data = {"sub": str(user.id), "jti": access_jti}
@@ -218,9 +218,10 @@ class TokenService:
             if not user.is_active:
                 raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User is inactive")
 
-            # Generate new JTIs for both tokens
-            new_access_jti = secrets.token_hex(32)
-            new_refresh_jti = secrets.token_hex(32)
+            # Generate new JTIs for both tokens  
+            config = get_config()
+            new_access_jti = secrets.token_hex(config.token_hex_length)
+            new_refresh_jti = secrets.token_hex(config.token_hex_length)
 
             # Prepare access token data with scope if available
             access_data = {"sub": user_id, "jti": new_access_jti}

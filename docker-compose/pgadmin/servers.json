@@ -1,0 +1,14 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "Authly PostgreSQL",
+      "Group": "Servers",
+      "Host": "postgres",
+      "Port": 5432,
+      "MaintenanceDB": "authly",
+      "Username": "authly",
+      "PassFile": "/tmp/pgpassfile",
+      "SSLMode": "prefer"
+    }
+  }
+}

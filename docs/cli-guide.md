@@ -12,35 +12,35 @@ Complete command-line interface guide for administering the Authly OAuth 2.1 + O
 
 ### **Installation & Setup**
 ```bash
-# Install Authly
-poetry install
+# Install Authly (all groups including test/dev with forced update)
+uv sync --all-groups -U
 
 # Start Authly server (embedded development mode)
-poetry run python -m authly serve --embedded --dev
+uv run python -m authly serve --embedded --dev
 
 # In another terminal, access admin CLI
-poetry run python -m authly admin --help
+uv run python -m authly admin --help
 ```
 
 ### **First-Time Setup**
 ```bash
 # Login to admin interface
-poetry run python -m authly admin login
+uv run python -m authly admin login
 # Enter admin credentials when prompted
 
 # Create your first OAuth client
-poetry run python -m authly admin client create \
+uv run python -m authly admin client create \
   --name "My Application" \
   --type confidential \
   --redirect-uri "https://myapp.com/callback"
 
 # Create a scope
-poetry run python -m authly admin scope create \
+uv run python -m authly admin scope create \
   --name "read" \
   --description "Read access to user data"
 
 # Check system status
-poetry run python -m authly admin status
+uv run python -m authly admin status
 ```
 
 ---

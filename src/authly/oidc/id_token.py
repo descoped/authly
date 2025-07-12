@@ -78,7 +78,11 @@ class IDTokenGenerator:
         self.config = config
         # For OIDC ID tokens, always use RS256 for interoperability
         self.algorithm = "RS256"
-        self.issuer = "https://authly.localhost"  # Default issuer for now
+        try:
+            self.issuer = config.default_issuer_url
+        except (AttributeError, RuntimeError):
+            # Fallback for tests or when config not fully initialized
+            self.issuer = "https://authly.localhost"
         self.id_token_expire_minutes = 15  # Default ID token expiration
     
     def generate_id_token(
@@ -209,13 +213,34 @@ class IDTokenGenerator:
         # Build user claims dictionary
         user_claims = {}
         
-        # Map user model fields to OIDC claims
+        # Map user model fields to OIDC claims using new OIDC claim fields
         claim_mappings = {
+            # Profile scope claims
             OIDCStandardClaims.NAME: self._get_user_name(user),
-            OIDCStandardClaims.PREFERRED_USERNAME: user.username,
+            OIDCStandardClaims.GIVEN_NAME: getattr(user, "given_name", None),
+            OIDCStandardClaims.FAMILY_NAME: getattr(user, "family_name", None),
+            OIDCStandardClaims.MIDDLE_NAME: getattr(user, "middle_name", None),
+            OIDCStandardClaims.NICKNAME: getattr(user, "nickname", None),
+            OIDCStandardClaims.PREFERRED_USERNAME: getattr(user, "preferred_username", None) or user.username,
+            OIDCStandardClaims.PROFILE: getattr(user, "profile", None),
+            OIDCStandardClaims.PICTURE: getattr(user, "picture", None),
+            OIDCStandardClaims.WEBSITE: getattr(user, "website", None),
+            OIDCStandardClaims.GENDER: getattr(user, "gender", None),
+            OIDCStandardClaims.BIRTHDATE: getattr(user, "birthdate", None),
+            OIDCStandardClaims.ZONEINFO: getattr(user, "zoneinfo", None),
+            OIDCStandardClaims.LOCALE: getattr(user, "locale", None),
+            OIDCStandardClaims.UPDATED_AT: int(user.updated_at.timestamp()) if user.updated_at else None,
+            
+            # Email scope claims
             OIDCStandardClaims.EMAIL: user.email,
             OIDCStandardClaims.EMAIL_VERIFIED: user.is_verified,
-            OIDCStandardClaims.UPDATED_AT: int(user.updated_at.timestamp()) if user.updated_at else None,
+            
+            # Phone scope claims
+            OIDCStandardClaims.PHONE_NUMBER: getattr(user, "phone_number", None),
+            OIDCStandardClaims.PHONE_NUMBER_VERIFIED: getattr(user, "phone_number_verified", None),
+            
+            # Address scope claims
+            OIDCStandardClaims.ADDRESS: getattr(user, "address", None),
         }
         
         # Add claims that are allowed by scopes and have values
@@ -235,9 +260,19 @@ class IDTokenGenerator:
         Returns:
             User's full name or username as fallback
         """
-        # For now, use username as the name
-        # In a full implementation, you might have separate first_name/last_name fields
-        return user.username
+        # Try to construct full name from OIDC claim fields
+        given_name = getattr(user, "given_name", None)
+        family_name = getattr(user, "family_name", None)
+        
+        if given_name and family_name:
+            return f"{given_name} {family_name}"
+        elif given_name:
+            return given_name
+        elif family_name:
+            return family_name
+        else:
+            # Fallback to username if no name components available
+            return user.username
     
     def validate_id_token(self, token: str, client_id: str) -> Dict[str, Any]:
         """

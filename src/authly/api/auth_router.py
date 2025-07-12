@@ -55,6 +55,7 @@ class TokenResponse(BaseModel):
     token_type: str
     expires_in: int
     id_token: Optional[str] = None  # ID token for OpenID Connect flows
+    requires_password_change: Optional[bool] = None  # Security flag for mandatory password change
 
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -65,7 +66,15 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["Strict-Transport-Security"] = "max-age=31536000"
+        # Get HSTS config
+        try:
+            from authly import get_config
+            config = get_config()
+            hsts_max_age = config.hsts_max_age_seconds
+        except RuntimeError:
+            # Fallback for tests
+            hsts_max_age = 31536000
+        response.headers["Strict-Transport-Security"] = f"max-age={hsts_max_age}"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Content-Security-Policy"] = "default-src 'self'"
         return response
@@ -182,12 +191,19 @@ async def _handle_password_grant(
         # Update last login
         await user_repo.update_last_login(user.id)
 
-        return TokenResponse(
+        # Check if password change is required
+        response = TokenResponse(
             access_token=token_response.access_token,
             refresh_token=token_response.refresh_token,
             token_type=token_response.token_type,
             expires_in=token_response.expires_in,
         )
+        
+        if user.requires_password_change:
+            logger.info(f"User {user.username} requires password change on login")
+            response.requires_password_change = True
+            
+        return response
 
     except HTTPException:
         # Let HTTPExceptions from TokenService pass through

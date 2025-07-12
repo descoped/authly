@@ -179,3 +179,8 @@ output/*
 examples/bruno/
 
 remove-docs/
+
+# Docker and SSL certificates
+docker-compose/nginx/ssl/*.pem
+docker-compose/nginx/ssl/*.key
+docker-compose/nginx/ssl/*.crt

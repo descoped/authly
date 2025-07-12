@@ -77,6 +77,22 @@ class OIDCServerMetadata(BaseModel):
         ...,
         description="URL of the OP's UserInfo endpoint"
     )
+    end_session_endpoint: Optional[str] = Field(
+        None,
+        description="URL at the OP to which a Relying Party can perform a redirect to request that the End-User be logged out"
+    )
+    check_session_iframe: Optional[str] = Field(
+        None,
+        description="URL of an OP iframe that supports cross-origin communications for session state information"
+    )
+    frontchannel_logout_supported: bool = Field(
+        default=True,
+        description="Whether the OP supports HTTP-based logout"
+    )
+    frontchannel_logout_session_supported: bool = Field(
+        default=True,
+        description="Whether the OP can pass iss and sid query parameters to identify the RP session"
+    )
     jwks_uri: Optional[str] = Field(
         None,
         description="URL of the OP's JSON Web Key Set document"
@@ -204,6 +220,10 @@ class OIDCDiscoveryService:
             
             # OIDC-specific fields
             userinfo_endpoint=urljoin(base_url, f"{api_prefix}/oidc/userinfo"),
+            end_session_endpoint=urljoin(base_url, f"{api_prefix}/oidc/logout"),
+            check_session_iframe=urljoin(base_url, f"{api_prefix}/oidc/session/iframe"),
+            frontchannel_logout_supported=True,
+            frontchannel_logout_session_supported=True,
             jwks_uri=urljoin(base_url, "/.well-known/jwks.json"),
             id_token_signing_alg_values_supported=["RS256", "HS256"],
             subject_types_supported=["public"],
@@ -246,6 +266,10 @@ class OIDCDiscoveryService:
             token_endpoint=urljoin(base_url, f"{api_prefix}/auth/token"),
             revocation_endpoint=urljoin(base_url, f"{api_prefix}/auth/revoke"),
             userinfo_endpoint=urljoin(base_url, f"{api_prefix}/oidc/userinfo"),
+            end_session_endpoint=urljoin(base_url, f"{api_prefix}/oidc/logout"),
+            check_session_iframe=urljoin(base_url, f"{api_prefix}/oidc/session/iframe"),
+            frontchannel_logout_supported=True,
+            frontchannel_logout_session_supported=True,
             jwks_uri=urljoin(base_url, "/.well-known/jwks.json"),
             response_types_supported=["code"],  # Only advertise supported flows
             grant_types_supported=["authorization_code", "refresh_token"],

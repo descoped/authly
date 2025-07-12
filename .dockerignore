@@ -1,0 +1,107 @@
+# Version control
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env
+pip-log.txt
+pip-delete-this-directory.txt
+.tox
+.coverage
+.coverage.*
+.pytest_cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.cache
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Documentation
+docs/
+ai_docs/
+# Keep README.md for package build
+# *.md - commented out to allow README.md
+# README* - commented out to allow README.md
+
+# Testing
+tests/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Development files
+.env.dev
+.env.example
+docker-compose*.yml
+Dockerfile
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+
+# Editor files
+*.vim
+*.swp
+*.swo
+
+# Package manager files (keep only what's needed)
+poetry.lock
+package-lock.json
+yarn.lock
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+.circleci/
+
+# Monitoring and config (exclude from build)
+docker/prometheus/
+docker/grafana/
+docker/nginx/
+docker/fluentd/
+
+# Sensitive files
+*.pem
+*.key
+*.crt
+secrets/

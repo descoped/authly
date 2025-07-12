@@ -8,6 +8,8 @@ intrinsic authority and registering admin scopes during system initialization.
 
 import logging
 import os
+import secrets
+import string
 from datetime import datetime, timezone
 from typing import Optional
 from uuid import uuid4
@@ -24,6 +26,45 @@ from authly.api.admin_dependencies import ADMIN_SCOPES
 from authly.oidc.scopes import get_oidc_scopes_with_descriptions
 
 logger = logging.getLogger(__name__)
+
+
+def generate_secure_password(length: int = 16) -> str:
+    """Generate a cryptographically secure random password.
+    
+    Creates a password with guaranteed complexity:
+    - At least one uppercase letter
+    - At least one lowercase letter
+    - At least one digit
+    - At least one special character
+    
+    Args:
+        length: Password length (minimum 16)
+        
+    Returns:
+        Secure random password string
+    """
+    if length < 16:
+        length = 16
+        
+    # Character sets
+    alphabet = string.ascii_letters + string.digits + "!@#$%^&*()-_=+"
+    
+    # Ensure at least one of each required type
+    password = [
+        secrets.choice(string.ascii_uppercase),
+        secrets.choice(string.ascii_lowercase),
+        secrets.choice(string.digits),
+        secrets.choice("!@#$%^&*()-_=+")
+    ]
+    
+    # Fill the rest with random characters
+    for _ in range(length - 4):
+        password.append(secrets.choice(alphabet))
+    
+    # Shuffle to avoid predictable positions
+    secrets.SystemRandom().shuffle(password)
+    
+    return ''.join(password)
 
 
 async def bootstrap_admin_user(
@@ -55,7 +96,39 @@ async def bootstrap_admin_user(
         # Get admin credentials from environment or use defaults
         admin_username = username or os.getenv("AUTHLY_ADMIN_USERNAME", "admin")
         admin_email = email or os.getenv("AUTHLY_ADMIN_EMAIL", "admin@localhost")
-        admin_password = password or os.getenv("AUTHLY_ADMIN_PASSWORD", "Admin123!")
+        admin_password = password or os.getenv("AUTHLY_ADMIN_PASSWORD")
+        
+        # Check for development mode override
+        dev_mode = os.getenv("AUTHLY_BOOTSTRAP_DEV_MODE", "false").lower() == "true"
+        
+        # Generate secure password if not provided
+        generated_password = False
+        if not admin_password:
+            admin_password = generate_secure_password()
+            generated_password = True
+            
+            # Log the generated password with high visibility
+            logger.warning("=" * 70)
+            logger.warning("ADMIN BOOTSTRAP - SECURE PASSWORD GENERATED")
+            logger.warning("=" * 70)
+            logger.warning(f"Username: {admin_username}")
+            logger.warning(f"Password: {admin_password}")
+            logger.warning("=" * 70)
+            logger.warning("SAVE THIS PASSWORD NOW - IT WILL NOT BE SHOWN AGAIN")
+            logger.warning("You will be required to change it on first login")
+            logger.warning("=" * 70)
+        elif dev_mode:
+            # Development mode with provided password
+            logger.warning("=" * 70)
+            logger.warning("DEVELOPMENT MODE BOOTSTRAP ACTIVE")
+            logger.warning("=" * 70)
+            logger.warning(f"Username: {admin_username}")
+            logger.warning("Password: [PROVIDED VIA AUTHLY_ADMIN_PASSWORD]")
+            logger.warning("Password change requirement: DISABLED")
+            logger.warning("=" * 70)
+            logger.warning("WARNING: This mode should NEVER be used in production!")
+            logger.warning("Set AUTHLY_BOOTSTRAP_DEV_MODE=false for production security")
+            logger.warning("=" * 70)
         
         logger.info(f"Bootstrap: Checking for existing admin user: {admin_username}")
         
@@ -74,6 +147,12 @@ async def bootstrap_admin_user(
                 return await user_repo.update(existing_admin.id, update_data)
         
         # Create new admin user with intrinsic authority
+        # Determine password change requirement based on mode
+        requires_password_change = True  # Default: always require change
+        if dev_mode and not generated_password:
+            # Only disable password change in dev mode with provided password
+            requires_password_change = False
+            
         admin_user = UserModel(
             id=uuid4(),
             username=admin_username,
@@ -83,7 +162,8 @@ async def bootstrap_admin_user(
             updated_at=datetime.now(timezone.utc),
             is_active=True,
             is_verified=True,
-            is_admin=True  # Intrinsic authority - not an OAuth scope
+            is_admin=True,  # Intrinsic authority - not an OAuth scope
+            requires_password_change=requires_password_change
         )
         
         created_user = await user_repo.create(admin_user)
@@ -93,12 +173,11 @@ async def bootstrap_admin_user(
             f"username: {admin_username}, user_id: {created_user.id}"
         )
         
-        # Log important security information
-        if password is None and os.getenv("AUTHLY_ADMIN_PASSWORD") is None:
-            logger.warning(
-                f"Admin user created with default password. "
-                f"Please change the password for user '{admin_username}' immediately!"
-            )
+        # Log bootstrap completion
+        logger.info(
+            f"Admin user created with requires_password_change=True. "
+            f"Password must be changed on first login."
+        )
         
         return created_user
         

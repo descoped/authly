@@ -1,27 +1,316 @@
- -- Enable required extensions
-CREATE EXTENSION IF NOT EXISTS vector;
+-- ===========================================================================================================
+-- AUTHLY DATABASE SCHEMA - DOMAIN ANNOTATED
+-- ===========================================================================================================
+-- Purpose: Production PostgreSQL schema for Authly OAuth 2.1 + OIDC 1.0 Authorization Server
+-- Version: Simplified (no ALTER statements, flattened structure)
+-- Domains: CORE (authentication), OAUTH (OAuth 2.1), OIDC (OpenID Connect 1.0), GDPR (compliance)
+-- ===========================================================================================================
+
+-- Enable required extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- ---------------------------------------------------------------------------------------------------------
--- BEGIN User Table
--- ---------------------------------------------------------------------------------------------------------
+-- ===========================================================================================================
+-- CORE AUTHENTICATION DOMAIN - User Table
+-- ===========================================================================================================
+-- Purpose: Core user authentication and basic profile management
+-- Domain: CORE + OIDC (some fields used for OIDC claims)
+-- Service Split: Will belong to Identity Service in future architecture
 
 CREATE TABLE IF NOT EXISTS users (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    username VARCHAR(50) UNIQUE NOT NULL,
-    email VARCHAR(255) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    last_login TIMESTAMP WITH TIME ZONE,
-    is_active BOOLEAN DEFAULT true,
-    is_verified BOOLEAN DEFAULT false,
-    is_admin BOOLEAN DEFAULT false
+    -- CORE: Primary user identity
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),                    -- CORE: Internal user identifier
+    username VARCHAR(50) UNIQUE NOT NULL,                             -- CORE: Login username
+    email VARCHAR(255) UNIQUE NOT NULL,                               -- CORE + OIDC: Email address (used in OIDC email claim)
+    password_hash VARCHAR(255) NOT NULL,                              -- CORE: Hashed password (bcrypt/argon2)
+    
+    -- CORE: Account management
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,    -- CORE: Account creation timestamp
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,    -- CORE: Last profile update
+    last_login TIMESTAMP WITH TIME ZONE,                              -- CORE: Last successful login
+    is_active BOOLEAN DEFAULT true,                                   -- CORE: Account active status
+    is_verified BOOLEAN DEFAULT false,                                -- CORE: Email verification status
+    is_admin BOOLEAN DEFAULT false,                                   -- CORE: Administrative privileges
+    requires_password_change BOOLEAN DEFAULT false,                   -- CORE: Security flag for mandatory password change
+    
+    -- OIDC: Standard Claims - Profile scope (OpenID Connect Core 1.0 Section 5.1)
+    given_name VARCHAR(255),                                          -- OIDC: Given name (first name) claim
+    family_name VARCHAR(255),                                         -- OIDC: Family name (last name) claim  
+    middle_name VARCHAR(255),                                         -- OIDC: Middle name claim
+    nickname VARCHAR(255),                                            -- OIDC: Casual name claim
+    preferred_username VARCHAR(255),                                  -- OIDC: Preferred username for display
+    profile TEXT,                                                     -- OIDC: Profile page URL claim
+    picture TEXT,                                                     -- OIDC: Profile picture URL claim
+    website TEXT,                                                     -- OIDC: Personal website URL claim
+    gender VARCHAR(50),                                               -- OIDC: Gender claim
+    birthdate DATE,                                                   -- OIDC: Birthdate claim (YYYY-MM-DD format)
+    zoneinfo VARCHAR(100),                                            -- OIDC: Time zone identifier claim
+    locale VARCHAR(10),                                               -- OIDC: Preferred locale claim (e.g., en-US)
+
+    -- OIDC: Standard Claims - Phone scope (OpenID Connect Core 1.0 Section 5.1.2)
+    phone_number VARCHAR(50),                                         -- OIDC: Phone number claim
+    phone_number_verified BOOLEAN,                                    -- OIDC: Phone number verification status
+
+    -- OIDC: Standard Claims - Address scope (OpenID Connect Core 1.0 Section 5.1.1)
+    address JSONB                                                     -- OIDC: Structured address claim
 );
 
--- Rest of the code remains unchanged
-CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
-CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+-- CORE: User lookup indexes
+CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);     -- CORE: Username lookup
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);           -- CORE: Email lookup
+CREATE INDEX IF NOT EXISTS idx_users_requires_password_change ON users(requires_password_change) WHERE requires_password_change = TRUE; -- CORE: Password change required filter
+
+-- OIDC: User OIDC claim indexes for performance optimization
+CREATE INDEX IF NOT EXISTS idx_users_given_name ON users(given_name) WHERE given_name IS NOT NULL;  -- OIDC: Profile lookup optimization
+CREATE INDEX IF NOT EXISTS idx_users_family_name ON users(family_name) WHERE family_name IS NOT NULL; -- OIDC: Profile lookup optimization
+CREATE INDEX IF NOT EXISTS idx_users_preferred_username ON users(preferred_username) WHERE preferred_username IS NOT NULL; -- OIDC: Preferred username lookup
+CREATE INDEX IF NOT EXISTS idx_users_phone_verified ON users(phone_number_verified) WHERE phone_number_verified IS NOT NULL; -- OIDC: Phone verification filtering
+CREATE INDEX IF NOT EXISTS idx_users_locale ON users(locale) WHERE locale IS NOT NULL; -- OIDC: Locale-based filtering
+CREATE INDEX IF NOT EXISTS idx_users_zoneinfo ON users(zoneinfo) WHERE zoneinfo IS NOT NULL; -- OIDC: Timezone-based filtering
+CREATE INDEX IF NOT EXISTS idx_users_address_gin ON users USING GIN (address) WHERE address IS NOT NULL; -- OIDC: Address search optimization
+
+-- ===========================================================================================================
+-- OAUTH 2.1 DOMAIN - OAuth Clients Table
+-- ===========================================================================================================
+-- Purpose: OAuth 2.1 client application registration and management
+-- Domain: OAUTH + OIDC (OIDC extends OAuth client metadata)
+-- Service Split: Will belong to Authorization Service in future architecture
+
+CREATE TABLE IF NOT EXISTS oauth_clients (
+    -- OAUTH: Core client identity
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),                    -- OAUTH: Internal client identifier
+    client_id VARCHAR(255) UNIQUE NOT NULL,                           -- OAUTH: Public client identifier
+    client_secret_hash VARCHAR(255),                                  -- OAUTH: Hashed client secret (NULL for public clients)
+    client_name VARCHAR(255) NOT NULL,                                -- OAUTH: Human-readable client name
+    client_type VARCHAR(20) NOT NULL CHECK (client_type IN ('confidential', 'public')), -- OAUTH: Client type
+    
+    -- OAUTH: Authorization flow configuration
+    redirect_uris TEXT[] NOT NULL,                                    -- OAUTH: Allowed redirect URIs
+    grant_types TEXT[] NOT NULL DEFAULT ARRAY['authorization_code', 'refresh_token'], -- OAUTH: Supported grant types
+    response_types TEXT[] NOT NULL DEFAULT ARRAY['code'],             -- OAUTH: Supported response types
+    scope TEXT,                                                       -- OAUTH: Default scopes (space-separated)
+    
+    -- OAUTH: Account management
+    is_active BOOLEAN DEFAULT true,                                   -- OAUTH: Client active status
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,    -- OAUTH: Client registration timestamp
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,    -- OAUTH: Last client update
+    
+    -- OAUTH 2.1: Security requirements
+    require_pkce BOOLEAN DEFAULT true,                                -- OAUTH 2.1: PKCE requirement (mandatory)
+    token_endpoint_auth_method VARCHAR(50) DEFAULT 'client_secret_basic', -- OAUTH: Token endpoint authentication
+    
+    -- OAUTH: Client metadata
+    client_uri TEXT,                                                  -- OAUTH: Client homepage URL
+    logo_uri TEXT,                                                    -- OAUTH: Client logo URL
+    tos_uri TEXT,                                                     -- OAUTH: Terms of service URL
+    policy_uri TEXT,                                                  -- OAUTH: Privacy policy URL
+    jwks_uri TEXT,                                                    -- OAUTH: JSON Web Key Set URI
+    software_id VARCHAR(255),                                         -- OAUTH: Software identifier
+    software_version VARCHAR(50),                                     -- OAUTH: Software version
+    
+    -- OIDC: OpenID Connect client configuration
+    id_token_signed_response_alg VARCHAR(10) DEFAULT 'RS256' CHECK (id_token_signed_response_alg IN ('RS256', 'HS256', 'ES256')), -- OIDC: ID token signing algorithm
+    subject_type VARCHAR(10) DEFAULT 'public' CHECK (subject_type IN ('public', 'pairwise')), -- OIDC: Subject identifier type
+    sector_identifier_uri TEXT,                                       -- OIDC: Sector identifier URI (pairwise subjects)
+    require_auth_time BOOLEAN DEFAULT false,                          -- OIDC: Require auth_time claim
+    default_max_age INTEGER CHECK (default_max_age >= 0),             -- OIDC: Default maximum authentication age
+    initiate_login_uri TEXT,                                          -- OIDC: Client-initiated login URI
+    request_uris TEXT[] DEFAULT ARRAY[]::TEXT[],                      -- OIDC: Request object URIs
+    application_type VARCHAR(10) DEFAULT 'web' CHECK (application_type IN ('web', 'native')), -- OIDC: Application type
+    contacts TEXT[] DEFAULT ARRAY[]::TEXT[],                          -- OIDC: Client contact information
+    
+    -- OIDC: Localized client metadata
+    client_name_localized JSONB,                                      -- OIDC: Localized client names
+    logo_uri_localized JSONB,                                         -- OIDC: Localized logo URIs
+    client_uri_localized JSONB,                                       -- OIDC: Localized client URIs
+    policy_uri_localized JSONB,                                       -- OIDC: Localized privacy policy URIs
+    tos_uri_localized JSONB                                           -- OIDC: Localized terms of service URIs
+);
+
+-- OAUTH: Client lookup indexes
+CREATE INDEX IF NOT EXISTS idx_oauth_clients_client_id ON oauth_clients(client_id); -- OAUTH: Client ID lookup
+CREATE INDEX IF NOT EXISTS idx_oauth_clients_active ON oauth_clients(is_active);    -- OAUTH: Active client filtering
+
+-- ===========================================================================================================
+-- OAUTH 2.1 DOMAIN - Token Table
+-- ===========================================================================================================
+-- Purpose: OAuth 2.1 access and refresh token management
+-- Domain: OAUTH (core token functionality)
+-- Service Split: Will belong to Authorization Service in future architecture
+
+CREATE TABLE IF NOT EXISTS tokens (
+    -- OAUTH: Token identity
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),                    -- OAUTH: Internal token identifier
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,    -- OAUTH: Token owner (user)
+    client_id UUID REFERENCES oauth_clients(id) ON DELETE SET NULL,  -- OAUTH: Issuing client (NULL for non-OAuth tokens)
+    token_jti VARCHAR(64) NOT NULL UNIQUE,                           -- OAUTH: JWT ID claim (unique identifier)
+    token_type VARCHAR(10) NOT NULL CHECK (token_type IN ('access', 'refresh')), -- OAUTH: Token type
+    token_value TEXT NOT NULL,                                       -- OAUTH: Token value (JWT or opaque)
+    scope TEXT,                                                      -- OAUTH: Granted scopes (space-separated)
+    
+    -- OAUTH: Token lifecycle management
+    invalidated BOOLEAN NOT NULL DEFAULT false,                       -- OAUTH: Token invalidation status
+    invalidated_at TIMESTAMP WITH TIME ZONE,                         -- OAUTH: Token invalidation timestamp
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,                    -- OAUTH: Token expiration timestamp
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP, -- OAUTH: Token creation timestamp
+    
+    -- OAUTH: Optional tracking fields (GDPR considerations)
+    created_by_ip VARCHAR(45),                                       -- OAUTH: Client IP address (optional, GDPR: personal data)
+    user_agent TEXT                                                  -- OAUTH: Client user agent (optional, GDPR: personal data)
+);
+
+-- OAUTH: Token lookup indexes
+CREATE INDEX IF NOT EXISTS idx_tokens_user_id ON tokens(user_id);     -- OAUTH: User token lookup
+CREATE INDEX IF NOT EXISTS idx_tokens_jti ON tokens(token_jti);       -- OAUTH: JTI lookup (token identification)
+CREATE INDEX IF NOT EXISTS idx_tokens_expires_at ON tokens(expires_at); -- OAUTH: Expiration-based cleanup
+CREATE INDEX IF NOT EXISTS idx_tokens_client_id ON tokens(client_id); -- OAUTH: Client token lookup
+CREATE INDEX IF NOT EXISTS idx_tokens_scope ON tokens(scope);         -- OAUTH: Scope-based filtering
+
+-- ===========================================================================================================
+-- OAUTH 2.1 DOMAIN - OAuth Scopes Table
+-- ===========================================================================================================
+-- Purpose: OAuth 2.1 scope definition and management
+-- Domain: OAUTH + OIDC (OIDC defines additional standard scopes)
+-- Service Split: Will belong to Authorization Service in future architecture
+
+CREATE TABLE IF NOT EXISTS oauth_scopes (
+    -- OAUTH: Scope identity
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),                    -- OAUTH: Internal scope identifier
+    scope_name VARCHAR(255) UNIQUE NOT NULL,                         -- OAUTH: Scope name (e.g., 'read', 'write')
+    description TEXT,                                                 -- OAUTH: Human-readable scope description
+    is_default BOOLEAN DEFAULT false,                                -- OAUTH: Default scope assignment
+    is_active BOOLEAN DEFAULT true,                                  -- OAUTH: Scope active status
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,   -- OAUTH: Scope creation timestamp
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP    -- OAUTH: Scope update timestamp
+);
+
+-- OAUTH: Scope lookup indexes
+CREATE INDEX IF NOT EXISTS idx_oauth_scopes_name ON oauth_scopes(scope_name);    -- OAUTH: Scope name lookup
+CREATE INDEX IF NOT EXISTS idx_oauth_scopes_active ON oauth_scopes(is_active);   -- OAUTH: Active scope filtering
+CREATE INDEX IF NOT EXISTS idx_oauth_scopes_default ON oauth_scopes(is_default); -- OAUTH: Default scope selection
+
+-- ===========================================================================================================
+-- OAUTH 2.1 DOMAIN - Client-Scope Associations
+-- ===========================================================================================================
+-- Purpose: OAuth 2.1 client-scope relationship management
+-- Domain: OAUTH (scope authorization)
+-- Service Split: Will belong to Authorization Service in future architecture
+
+CREATE TABLE IF NOT EXISTS oauth_client_scopes (
+    -- OAUTH: Association identity
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),                    -- OAUTH: Internal association identifier
+    client_id UUID NOT NULL REFERENCES oauth_clients(id) ON DELETE CASCADE, -- OAUTH: Client reference
+    scope_id UUID NOT NULL REFERENCES oauth_scopes(id) ON DELETE CASCADE,   -- OAUTH: Scope reference
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,   -- OAUTH: Association creation timestamp
+    UNIQUE(client_id, scope_id)                                      -- OAUTH: Prevent duplicate associations
+);
+
+-- OAUTH: Client-scope lookup indexes
+CREATE INDEX IF NOT EXISTS idx_oauth_client_scopes_client ON oauth_client_scopes(client_id); -- OAUTH: Client scope lookup
+CREATE INDEX IF NOT EXISTS idx_oauth_client_scopes_scope ON oauth_client_scopes(scope_id);   -- OAUTH: Scope client lookup
+
+-- ===========================================================================================================
+-- OAUTH 2.1 DOMAIN - Authorization Codes Table
+-- ===========================================================================================================
+-- Purpose: OAuth 2.1 authorization code flow with OIDC parameter support
+-- Domain: OAUTH + OIDC (OIDC extends authorization parameters)
+-- Service Split: Will belong to Authorization Service in future architecture
+
+CREATE TABLE IF NOT EXISTS oauth_authorization_codes (
+    -- OAUTH: Authorization code identity
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),                    -- OAUTH: Internal code identifier
+    code VARCHAR(255) UNIQUE NOT NULL,                               -- OAUTH: Authorization code value
+    client_id UUID NOT NULL REFERENCES oauth_clients(id) ON DELETE CASCADE, -- OAUTH: Requesting client
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,    -- OAUTH: Authorizing user
+    redirect_uri TEXT NOT NULL,                                      -- OAUTH: Redirect URI (must match client)
+    scope TEXT,                                                      -- OAUTH: Granted scopes (space-separated)
+    
+    -- OAUTH: Code lifecycle management
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,                    -- OAUTH: Code expiration (short-lived)
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,   -- OAUTH: Code creation timestamp
+    used_at TIMESTAMP WITH TIME ZONE,                                -- OAUTH: Code exchange timestamp
+    is_used BOOLEAN DEFAULT false,                                   -- OAUTH: Code usage status
+    
+    -- OAUTH 2.1: PKCE (Proof Key for Code Exchange) - MANDATORY
+    code_challenge VARCHAR(255) NOT NULL,                            -- OAUTH 2.1: PKCE code challenge
+    code_challenge_method VARCHAR(10) NOT NULL DEFAULT 'S256' CHECK (code_challenge_method IN ('S256')), -- OAUTH 2.1: PKCE method (S256 only)
+    
+    -- OIDC: OpenID Connect authorization parameters
+    nonce VARCHAR(255),                                              -- OIDC: Nonce for ID token binding
+    state VARCHAR(255),                                              -- OIDC: State parameter (CSRF protection)
+    response_mode VARCHAR(20) CHECK (response_mode IN ('query', 'fragment', 'form_post')), -- OIDC: Response mode
+    display VARCHAR(20) CHECK (display IN ('page', 'popup', 'touch', 'wap')), -- OIDC: Display preference
+    prompt VARCHAR(20) CHECK (prompt IN ('none', 'login', 'consent', 'select_account')), -- OIDC: Prompt behavior
+    max_age INTEGER CHECK (max_age >= 0),                            -- OIDC: Maximum authentication age
+    ui_locales VARCHAR(255),                                         -- OIDC: UI locale preferences
+    id_token_hint TEXT,                                              -- OIDC: ID token hint
+    login_hint VARCHAR(255),                                         -- OIDC: Login hint
+    acr_values VARCHAR(255)                                          -- OIDC: Authentication Context Class Reference
+);
+
+-- OAUTH: Authorization code lookup indexes
+CREATE INDEX IF NOT EXISTS idx_oauth_authz_codes_code ON oauth_authorization_codes(code);       -- OAUTH: Code lookup
+CREATE INDEX IF NOT EXISTS idx_oauth_authz_codes_client ON oauth_authorization_codes(client_id); -- OAUTH: Client code lookup
+CREATE INDEX IF NOT EXISTS idx_oauth_authz_codes_user ON oauth_authorization_codes(user_id);     -- OAUTH: User code lookup
+CREATE INDEX IF NOT EXISTS idx_oauth_authz_codes_expires ON oauth_authorization_codes(expires_at); -- OAUTH: Expiration cleanup
+CREATE INDEX IF NOT EXISTS idx_oauth_authz_codes_used ON oauth_authorization_codes(is_used);     -- OAUTH: Usage status filtering
+
+-- ===========================================================================================================
+-- OAUTH 2.1 DOMAIN - Token-Scope Associations
+-- ===========================================================================================================
+-- Purpose: OAuth 2.1 token-scope relationship management
+-- Domain: OAUTH (token scope tracking)
+-- Service Split: Will belong to Authorization Service in future architecture
+
+CREATE TABLE IF NOT EXISTS oauth_token_scopes (
+    -- OAUTH: Association identity
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),                    -- OAUTH: Internal association identifier
+    token_id UUID NOT NULL REFERENCES tokens(id) ON DELETE CASCADE,  -- OAUTH: Token reference
+    scope_id UUID NOT NULL REFERENCES oauth_scopes(id) ON DELETE CASCADE, -- OAUTH: Scope reference
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,   -- OAUTH: Association creation timestamp
+    UNIQUE(token_id, scope_id)                                       -- OAUTH: Prevent duplicate associations
+);
+
+-- OAUTH: Token-scope lookup indexes
+CREATE INDEX IF NOT EXISTS idx_oauth_token_scopes_token ON oauth_token_scopes(token_id); -- OAUTH: Token scope lookup
+CREATE INDEX IF NOT EXISTS idx_oauth_token_scopes_scope ON oauth_token_scopes(scope_id); -- OAUTH: Scope token lookup
+
+-- ===========================================================================================================
+-- OIDC DOMAIN - JWKS (JSON Web Key Set) Table
+-- ===========================================================================================================
+-- Purpose: OpenID Connect cryptographic key management
+-- Domain: OIDC (ID token signing and verification)
+-- Service Split: Will belong to Identity Service in future architecture
+
+CREATE TABLE IF NOT EXISTS oidc_jwks_keys (
+    -- OIDC: Key identity
+    kid VARCHAR(255) PRIMARY KEY,                                     -- OIDC: Key ID (unique identifier)
+    key_data JSONB NOT NULL,                                         -- OIDC: JWK data in JSON format
+    key_type VARCHAR(10) NOT NULL CHECK (key_type IN ('RSA', 'EC', 'oct')), -- OIDC: Key type
+    algorithm VARCHAR(10) NOT NULL CHECK (algorithm IN ('RS256', 'ES256', 'HS256')), -- OIDC: Signing algorithm
+    key_use VARCHAR(10) NOT NULL DEFAULT 'sig' CHECK (key_use IN ('sig', 'enc')), -- OIDC: Key usage
+    
+    -- OIDC: Key lifecycle management
+    is_active BOOLEAN DEFAULT true,                                   -- OIDC: Key active status
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,   -- OIDC: Key creation timestamp
+    expires_at TIMESTAMP WITH TIME ZONE,                             -- OIDC: Key expiration (for rotation)
+    
+    -- OIDC: Key metadata
+    key_size INTEGER,                                                 -- OIDC: Key size in bits
+    curve VARCHAR(20)                                                -- OIDC: Elliptic curve name (for EC keys)
+);
+
+-- OIDC: JWKS lookup indexes
+CREATE INDEX IF NOT EXISTS idx_oidc_jwks_kid ON oidc_jwks_keys(kid);           -- OIDC: Key ID lookup
+CREATE INDEX IF NOT EXISTS idx_oidc_jwks_active ON oidc_jwks_keys(is_active);  -- OIDC: Active key filtering
+CREATE INDEX IF NOT EXISTS idx_oidc_jwks_expires ON oidc_jwks_keys(expires_at); -- OIDC: Key expiration management
+CREATE INDEX IF NOT EXISTS idx_oidc_jwks_algorithm ON oidc_jwks_keys(algorithm); -- OIDC: Algorithm-based selection
+
+-- ===========================================================================================================
+-- TRIGGER FUNCTIONS - Cross-Domain Utilities
+-- ===========================================================================================================
+-- Purpose: Automatic timestamp management for all domains
+-- Domain: CORE (utility functions)
+-- Service Split: Will be replicated across services
 
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
@@ -31,444 +320,114 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
+-- CORE: User timestamp management
 CREATE TRIGGER update_users_updated_at
     BEFORE UPDATE ON users
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
--- ---------------------------------------------------------------------------------------------------------
--- END User Table
--- ---------------------------------------------------------------------------------------------------------
-
--- ---------------------------------------------------------------------------------------------------------
--- BEGIN Token Table
--- ---------------------------------------------------------------------------------------------------------
-
-CREATE TABLE IF NOT EXISTS tokens (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    token_jti VARCHAR(64) NOT NULL UNIQUE,
-    token_type VARCHAR(10) NOT NULL CHECK (token_type IN ('access', 'refresh')),
-    token_value TEXT NOT NULL,  -- Added this column
-    invalidated BOOLEAN NOT NULL DEFAULT false,
-    invalidated_at TIMESTAMP WITH TIME ZONE,
-    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    created_by_ip VARCHAR(45),  -- Optional fields
-    user_agent TEXT
-);
-
-CREATE INDEX IF NOT EXISTS idx_tokens_user_id ON tokens(user_id);
-CREATE INDEX IF NOT EXISTS idx_tokens_jti ON tokens(token_jti);
-CREATE INDEX IF NOT EXISTS idx_tokens_expires_at ON tokens(expires_at);
-
--- ---------------------------------------------------------------------------------------------------------
--- END Token Table
--- ---------------------------------------------------------------------------------------------------------
-
--- ---------------------------------------------------------------------------------------------------------
--- BEGIN OAuth 2.1 Schema
--- ---------------------------------------------------------------------------------------------------------
-
--- OAuth clients table - stores registered client applications
-CREATE TABLE IF NOT EXISTS oauth_clients (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    client_id VARCHAR(255) UNIQUE NOT NULL,
-    client_secret_hash VARCHAR(255), -- NULL for public clients (PKCE only)
-    client_name VARCHAR(255) NOT NULL,
-    client_type VARCHAR(20) NOT NULL CHECK (client_type IN ('confidential', 'public')),
-    redirect_uris TEXT[] NOT NULL, -- Array of allowed redirect URIs
-    grant_types TEXT[] NOT NULL DEFAULT ARRAY['authorization_code', 'refresh_token'], -- Supported grant types
-    response_types TEXT[] NOT NULL DEFAULT ARRAY['code'], -- Supported response types
-    scope TEXT, -- Default scopes for this client (space-separated)
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    is_active BOOLEAN DEFAULT true,
-    -- OAuth 2.1 specific fields
-    require_pkce BOOLEAN DEFAULT true, -- OAuth 2.1 recommends PKCE for all clients
-    token_endpoint_auth_method VARCHAR(50) DEFAULT 'client_secret_basic', -- or 'none' for public clients
-    -- Additional metadata
-    client_uri TEXT, -- Homepage of the client
-    logo_uri TEXT, -- Logo for consent screen
-    tos_uri TEXT, -- Terms of service
-    policy_uri TEXT, -- Privacy policy
-    jwks_uri TEXT, -- JSON Web Key Set URI for JWT validation
-    software_id VARCHAR(255), -- Software identifier
-    software_version VARCHAR(50) -- Software version
-);
-
--- OAuth scopes table - defines available permission scopes
-CREATE TABLE IF NOT EXISTS oauth_scopes (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    scope_name VARCHAR(255) UNIQUE NOT NULL, -- e.g., 'read', 'write', 'profile'
-    description TEXT, -- Human-readable description
-    is_default BOOLEAN DEFAULT false, -- Whether this scope is granted by default
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    is_active BOOLEAN DEFAULT true
-);
-
--- Client-scope associations - which scopes each client can request
-CREATE TABLE IF NOT EXISTS oauth_client_scopes (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    client_id UUID NOT NULL REFERENCES oauth_clients(id) ON DELETE CASCADE,
-    scope_id UUID NOT NULL REFERENCES oauth_scopes(id) ON DELETE CASCADE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(client_id, scope_id)
-);
-
--- Authorization codes table - temporary codes for OAuth 2.1 authorization flow with OpenID Connect support
-CREATE TABLE IF NOT EXISTS oauth_authorization_codes (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    code VARCHAR(255) UNIQUE NOT NULL, -- The authorization code
-    client_id UUID NOT NULL REFERENCES oauth_clients(id) ON DELETE CASCADE,
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    redirect_uri TEXT NOT NULL, -- Must match one from client's redirect_uris
-    scope TEXT, -- Granted scopes (space-separated)
-    expires_at TIMESTAMP WITH TIME ZONE NOT NULL, -- Codes expire quickly (10 minutes max)
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    used_at TIMESTAMP WITH TIME ZONE, -- When the code was exchanged for tokens
-    is_used BOOLEAN DEFAULT false,
-    -- PKCE fields (OAuth 2.1 requirement)
-    code_challenge VARCHAR(255) NOT NULL, -- Base64url-encoded SHA256 hash
-    code_challenge_method VARCHAR(10) NOT NULL DEFAULT 'S256' CHECK (code_challenge_method IN ('S256')), -- OAuth 2.1 only allows S256
-    -- OpenID Connect parameters
-    nonce VARCHAR(255), -- OpenID Connect nonce for ID token binding
-    state VARCHAR(255), -- CSRF protection state parameter
-    response_mode VARCHAR(20) CHECK (response_mode IN ('query', 'fragment', 'form_post')), -- Response mode
-    display VARCHAR(20) CHECK (display IN ('page', 'popup', 'touch', 'wap')), -- Display preference
-    prompt VARCHAR(20) CHECK (prompt IN ('none', 'login', 'consent', 'select_account')), -- Prompt parameter
-    max_age INTEGER CHECK (max_age >= 0), -- Maximum authentication age in seconds
-    ui_locales VARCHAR(255), -- UI locales preference (space-separated)
-    id_token_hint TEXT, -- ID token hint for logout or re-authentication
-    login_hint VARCHAR(255), -- Login hint to identify the user
-    acr_values VARCHAR(255) -- Authentication Context Class Reference values (space-separated)
-);
-
--- Token scopes table - tracks which scopes are associated with each token
-CREATE TABLE IF NOT EXISTS oauth_token_scopes (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    token_id UUID NOT NULL REFERENCES tokens(id) ON DELETE CASCADE,
-    scope_id UUID NOT NULL REFERENCES oauth_scopes(id) ON DELETE CASCADE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(token_id, scope_id)
-);
-
--- OAuth refresh token tracking - enhanced token management for OAuth flows
--- Note: We extend the existing tokens table rather than create a new one
--- Add OAuth-specific columns to tokens table
-DO $$
-BEGIN
-    -- Add client_id column to tokens table for OAuth flows
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns 
-        WHERE table_name = 'tokens' AND column_name = 'client_id'
-    ) THEN
-        ALTER TABLE tokens ADD COLUMN client_id UUID REFERENCES oauth_clients(id) ON DELETE SET NULL;
-    END IF;
-    
-    -- Add scope column to tokens table
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns 
-        WHERE table_name = 'tokens' AND column_name = 'scope'
-    ) THEN
-        ALTER TABLE tokens ADD COLUMN scope TEXT; -- Space-separated list of granted scopes
-    END IF;
-END $$;
-
--- ---------------------------------------------------------------------------------------------------------
--- BEGIN OAuth 2.1 Indexes
--- ---------------------------------------------------------------------------------------------------------
-
--- OAuth clients indexes
-CREATE INDEX IF NOT EXISTS idx_oauth_clients_client_id ON oauth_clients(client_id);
-CREATE INDEX IF NOT EXISTS idx_oauth_clients_active ON oauth_clients(is_active);
-
--- OAuth scopes indexes  
-CREATE INDEX IF NOT EXISTS idx_oauth_scopes_name ON oauth_scopes(scope_name);
-CREATE INDEX IF NOT EXISTS idx_oauth_scopes_active ON oauth_scopes(is_active);
-CREATE INDEX IF NOT EXISTS idx_oauth_scopes_default ON oauth_scopes(is_default);
-
--- Client-scope indexes
-CREATE INDEX IF NOT EXISTS idx_oauth_client_scopes_client ON oauth_client_scopes(client_id);
-CREATE INDEX IF NOT EXISTS idx_oauth_client_scopes_scope ON oauth_client_scopes(scope_id);
-
--- Authorization codes indexes
-CREATE INDEX IF NOT EXISTS idx_oauth_authz_codes_code ON oauth_authorization_codes(code);
-CREATE INDEX IF NOT EXISTS idx_oauth_authz_codes_client ON oauth_authorization_codes(client_id);
-CREATE INDEX IF NOT EXISTS idx_oauth_authz_codes_user ON oauth_authorization_codes(user_id);
-CREATE INDEX IF NOT EXISTS idx_oauth_authz_codes_expires ON oauth_authorization_codes(expires_at);
-CREATE INDEX IF NOT EXISTS idx_oauth_authz_codes_used ON oauth_authorization_codes(is_used);
-
--- Token scopes indexes
-CREATE INDEX IF NOT EXISTS idx_oauth_token_scopes_token ON oauth_token_scopes(token_id);
-CREATE INDEX IF NOT EXISTS idx_oauth_token_scopes_scope ON oauth_token_scopes(scope_id);
-
--- Enhanced token indexes for OAuth
-CREATE INDEX IF NOT EXISTS idx_tokens_client_id ON tokens(client_id);
-CREATE INDEX IF NOT EXISTS idx_tokens_scope ON tokens(scope);
-
--- ---------------------------------------------------------------------------------------------------------
--- BEGIN OAuth 2.1 Triggers
--- ---------------------------------------------------------------------------------------------------------
-
--- Update triggers for timestamp columns
+-- OAUTH: Client timestamp management
 CREATE TRIGGER update_oauth_clients_updated_at
     BEFORE UPDATE ON oauth_clients
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
+-- OAUTH: Scope timestamp management
 CREATE TRIGGER update_oauth_scopes_updated_at
     BEFORE UPDATE ON oauth_scopes
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
--- ---------------------------------------------------------------------------------------------------------
--- BEGIN OpenID Connect Schema Migration
--- ---------------------------------------------------------------------------------------------------------
+-- ===========================================================================================================
+-- DEFAULT DATA - Domain-Specific Seed Data
+-- ===========================================================================================================
+-- Purpose: Initialize OAuth 2.1 and OIDC standard scopes
+-- Domain: OAUTH + OIDC (standard scope definitions)
 
--- Add OpenID Connect columns to oauth_authorization_codes table if they don't exist
-DO $$
-BEGIN
-    -- Add response_mode column
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns 
-        WHERE table_name = 'oauth_authorization_codes' AND column_name = 'response_mode'
-    ) THEN
-        ALTER TABLE oauth_authorization_codes ADD COLUMN response_mode VARCHAR(20) CHECK (response_mode IN ('query', 'fragment', 'form_post'));
-    END IF;
-    
-    -- Add display column
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns 
-        WHERE table_name = 'oauth_authorization_codes' AND column_name = 'display'
-    ) THEN
-        ALTER TABLE oauth_authorization_codes ADD COLUMN display VARCHAR(20) CHECK (display IN ('page', 'popup', 'touch', 'wap'));
-    END IF;
-    
-    -- Add prompt column
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns 
-        WHERE table_name = 'oauth_authorization_codes' AND column_name = 'prompt'
-    ) THEN
-        ALTER TABLE oauth_authorization_codes ADD COLUMN prompt VARCHAR(20) CHECK (prompt IN ('none', 'login', 'consent', 'select_account'));
-    END IF;
-    
-    -- Add max_age column
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns 
-        WHERE table_name = 'oauth_authorization_codes' AND column_name = 'max_age'
-    ) THEN
-        ALTER TABLE oauth_authorization_codes ADD COLUMN max_age INTEGER CHECK (max_age >= 0);
-    END IF;
-    
-    -- Add ui_locales column
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns 
-        WHERE table_name = 'oauth_authorization_codes' AND column_name = 'ui_locales'
-    ) THEN
-        ALTER TABLE oauth_authorization_codes ADD COLUMN ui_locales VARCHAR(255);
-    END IF;
-    
-    -- Add id_token_hint column
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns 
-        WHERE table_name = 'oauth_authorization_codes' AND column_name = 'id_token_hint'
-    ) THEN
-        ALTER TABLE oauth_authorization_codes ADD COLUMN id_token_hint TEXT;
-    END IF;
-    
-    -- Add login_hint column
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns 
-        WHERE table_name = 'oauth_authorization_codes' AND column_name = 'login_hint'
-    ) THEN
-        ALTER TABLE oauth_authorization_codes ADD COLUMN login_hint VARCHAR(255);
-    END IF;
-    
-    -- Add acr_values column
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns 
-        WHERE table_name = 'oauth_authorization_codes' AND column_name = 'acr_values'
-    ) THEN
-        ALTER TABLE oauth_authorization_codes ADD COLUMN acr_values VARCHAR(255);
-    END IF;
-END $$;
-
--- ---------------------------------------------------------------------------------------------------------
--- END OpenID Connect Schema Migration
--- ---------------------------------------------------------------------------------------------------------
-
--- ---------------------------------------------------------------------------------------------------------
--- BEGIN OIDC Client Management Schema Migration
--- ---------------------------------------------------------------------------------------------------------
-
--- Add OpenID Connect client fields to oauth_clients table if they don't exist
-DO $$
-BEGIN
-    -- Add id_token_signed_response_alg column
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns 
-        WHERE table_name = 'oauth_clients' AND column_name = 'id_token_signed_response_alg'
-    ) THEN
-        ALTER TABLE oauth_clients ADD COLUMN id_token_signed_response_alg VARCHAR(10) DEFAULT 'RS256' CHECK (id_token_signed_response_alg IN ('RS256', 'HS256', 'ES256'));
-    END IF;
-    
-    -- Add subject_type column
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns 
-        WHERE table_name = 'oauth_clients' AND column_name = 'subject_type'
-    ) THEN
-        ALTER TABLE oauth_clients ADD COLUMN subject_type VARCHAR(10) DEFAULT 'public' CHECK (subject_type IN ('public', 'pairwise'));
-    END IF;
-    
-    -- Add sector_identifier_uri column
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns 
-        WHERE table_name = 'oauth_clients' AND column_name = 'sector_identifier_uri'
-    ) THEN
-        ALTER TABLE oauth_clients ADD COLUMN sector_identifier_uri TEXT;
-    END IF;
-    
-    -- Add require_auth_time column
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns 
-        WHERE table_name = 'oauth_clients' AND column_name = 'require_auth_time'
-    ) THEN
-        ALTER TABLE oauth_clients ADD COLUMN require_auth_time BOOLEAN DEFAULT false;
-    END IF;
-    
-    -- Add default_max_age column
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns 
-        WHERE table_name = 'oauth_clients' AND column_name = 'default_max_age'
-    ) THEN
-        ALTER TABLE oauth_clients ADD COLUMN default_max_age INTEGER CHECK (default_max_age >= 0);
-    END IF;
-    
-    -- Add initiate_login_uri column
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns 
-        WHERE table_name = 'oauth_clients' AND column_name = 'initiate_login_uri'
-    ) THEN
-        ALTER TABLE oauth_clients ADD COLUMN initiate_login_uri TEXT;
-    END IF;
-    
-    -- Add request_uris column
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns 
-        WHERE table_name = 'oauth_clients' AND column_name = 'request_uris'
-    ) THEN
-        ALTER TABLE oauth_clients ADD COLUMN request_uris TEXT[] DEFAULT ARRAY[]::TEXT[];
-    END IF;
-    
-    -- Add application_type column
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns 
-        WHERE table_name = 'oauth_clients' AND column_name = 'application_type'
-    ) THEN
-        ALTER TABLE oauth_clients ADD COLUMN application_type VARCHAR(10) DEFAULT 'web' CHECK (application_type IN ('web', 'native'));
-    END IF;
-    
-    -- Add contacts column
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns 
-        WHERE table_name = 'oauth_clients' AND column_name = 'contacts'
-    ) THEN
-        ALTER TABLE oauth_clients ADD COLUMN contacts TEXT[] DEFAULT ARRAY[]::TEXT[];
-    END IF;
-    
-    -- Add client_name_localized column
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns 
-        WHERE table_name = 'oauth_clients' AND column_name = 'client_name_localized'
-    ) THEN
-        ALTER TABLE oauth_clients ADD COLUMN client_name_localized JSONB;
-    END IF;
-    
-    -- Add logo_uri_localized column
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns 
-        WHERE table_name = 'oauth_clients' AND column_name = 'logo_uri_localized'
-    ) THEN
-        ALTER TABLE oauth_clients ADD COLUMN logo_uri_localized JSONB;
-    END IF;
-    
-    -- Add client_uri_localized column
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns 
-        WHERE table_name = 'oauth_clients' AND column_name = 'client_uri_localized'
-    ) THEN
-        ALTER TABLE oauth_clients ADD COLUMN client_uri_localized JSONB;
-    END IF;
-    
-    -- Add policy_uri_localized column
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns 
-        WHERE table_name = 'oauth_clients' AND column_name = 'policy_uri_localized'
-    ) THEN
-        ALTER TABLE oauth_clients ADD COLUMN policy_uri_localized JSONB;
-    END IF;
-    
-    -- Add tos_uri_localized column
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns 
-        WHERE table_name = 'oauth_clients' AND column_name = 'tos_uri_localized'
-    ) THEN
-        ALTER TABLE oauth_clients ADD COLUMN tos_uri_localized JSONB;
-    END IF;
-END $$;
-
--- ---------------------------------------------------------------------------------------------------------
--- END OIDC Client Management Schema Migration
--- ---------------------------------------------------------------------------------------------------------
-
--- ---------------------------------------------------------------------------------------------------------
--- BEGIN Default OAuth 2.1 Data
--- ---------------------------------------------------------------------------------------------------------
-
--- Insert default scopes including OpenID Connect scopes
 INSERT INTO oauth_scopes (scope_name, description, is_default, is_active) VALUES
-    ('read', 'Read access to user data', false, true),
-    ('write', 'Write access to user data', false, true),
-    ('profile', 'Access to basic profile information', true, true),
-    ('email', 'Access to email address', false, true),
-    ('admin', 'Administrative access', false, true),
-    -- OpenID Connect scopes
-    ('openid', 'OpenID Connect authentication scope (required for OIDC flows)', false, true),
-    ('address', 'Access to user physical mailing address', false, true),
-    ('phone', 'Access to user phone number and verification status', false, true)
+    -- OAUTH: Standard OAuth 2.1 scopes
+    ('read', 'Read access to user data', false, true),               -- OAUTH: Read permission
+    ('write', 'Write access to user data', false, true),             -- OAUTH: Write permission
+    ('profile', 'Access to basic profile information', true, true),   -- OAUTH + OIDC: Profile access
+    ('email', 'Access to email address', false, true),               -- OAUTH + OIDC: Email access
+    ('admin', 'Administrative access', false, true),                 -- OAUTH: Admin permission
+    
+    -- OIDC: OpenID Connect standard scopes
+    ('openid', 'OpenID Connect authentication scope', false, true),  -- OIDC: Required for OIDC flows
+    ('address', 'Access to user physical mailing address', false, true), -- OIDC: Address claims
+    ('phone', 'Access to user phone number and verification status', false, true) -- OIDC: Phone claims
 ON CONFLICT (scope_name) DO NOTHING;
 
--- ---------------------------------------------------------------------------------------------------------
--- BEGIN OIDC JWKS Schema
--- ---------------------------------------------------------------------------------------------------------
+-- ===========================================================================================================
+-- FUTURE GDPR COMPLIANCE TABLES (Not Yet Implemented)
+-- ===========================================================================================================
+-- Purpose: GDPR Article compliance tracking
+-- Domain: GDPR (data protection and privacy)
+-- Service Split: Will belong to dedicated Compliance Service
 
--- OIDC JSON Web Key Set persistence table
-CREATE TABLE IF NOT EXISTS oidc_jwks_keys (
-    kid VARCHAR(255) PRIMARY KEY, -- Key ID (unique identifier)
-    key_data JSONB NOT NULL, -- JWK data in JSON format
-    key_type VARCHAR(10) NOT NULL CHECK (key_type IN ('RSA', 'EC', 'oct')), -- Key type
-    algorithm VARCHAR(10) NOT NULL CHECK (algorithm IN ('RS256', 'ES256', 'HS256')), -- Signing algorithm
-    key_use VARCHAR(10) NOT NULL DEFAULT 'sig' CHECK (key_use IN ('sig', 'enc')), -- Key usage
-    is_active BOOLEAN DEFAULT true, -- Whether this key is currently active
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    expires_at TIMESTAMP WITH TIME ZONE, -- Optional expiration for key rotation
-    -- Additional metadata
-    key_size INTEGER, -- Key size in bits (e.g., 2048 for RSA)
-    curve VARCHAR(20) -- EC curve name (for elliptic curve keys)
-);
+-- GDPR: User consent tracking (Article 7)
+-- CREATE TABLE IF NOT EXISTS gdpr_user_consents (
+--     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+--     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+--     consent_type VARCHAR(50) NOT NULL,                           -- GDPR: Type of consent
+--     consent_version VARCHAR(20) NOT NULL,                        -- GDPR: Consent version
+--     granted_at TIMESTAMP WITH TIME ZONE NOT NULL,                -- GDPR: Consent timestamp
+--     withdrawn_at TIMESTAMP WITH TIME ZONE,                       -- GDPR: Withdrawal timestamp
+--     is_active BOOLEAN DEFAULT true,                              -- GDPR: Current consent status
+--     consent_data JSONB,                                          -- GDPR: Detailed consent information
+--     ip_address VARCHAR(45),                                      -- GDPR: Consent origin IP
+--     user_agent TEXT                                              -- GDPR: Consent origin user agent
+-- );
 
--- OIDC JWKS indexes
-CREATE INDEX IF NOT EXISTS idx_oidc_jwks_kid ON oidc_jwks_keys(kid);
-CREATE INDEX IF NOT EXISTS idx_oidc_jwks_active ON oidc_jwks_keys(is_active);
-CREATE INDEX IF NOT EXISTS idx_oidc_jwks_expires ON oidc_jwks_keys(expires_at);
-CREATE INDEX IF NOT EXISTS idx_oidc_jwks_algorithm ON oidc_jwks_keys(algorithm);
+-- GDPR: Audit logging (Article 30)
+-- CREATE TABLE IF NOT EXISTS gdpr_audit_logs (
+--     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+--     user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+--     action VARCHAR(100) NOT NULL,                                -- GDPR: Action performed
+--     resource_type VARCHAR(50) NOT NULL,                          -- GDPR: Resource type affected
+--     resource_id VARCHAR(255),                                    -- GDPR: Resource identifier
+--     timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, -- GDPR: Action timestamp
+--     ip_address VARCHAR(45),                                      -- GDPR: Source IP address
+--     user_agent TEXT,                                             -- GDPR: Source user agent
+--     details JSONB                                                -- GDPR: Additional audit details
+-- );
 
--- ---------------------------------------------------------------------------------------------------------
--- END OIDC JWKS Schema
--- ---------------------------------------------------------------------------------------------------------
+-- GDPR: Data retention policies (Article 5)
+-- CREATE TABLE IF NOT EXISTS gdpr_retention_policies (
+--     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+--     data_type VARCHAR(50) NOT NULL,                              -- GDPR: Type of data
+--     retention_period_days INTEGER NOT NULL,                      -- GDPR: Retention period
+--     description TEXT,                                            -- GDPR: Policy description
+--     is_active BOOLEAN DEFAULT true,                              -- GDPR: Policy active status
+--     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP -- GDPR: Policy creation
+-- );
 
--- ---------------------------------------------------------------------------------------------------------
--- END OAuth 2.1 Schema
--- ---------------------------------------------------------------------------------------------------------
+-- ===========================================================================================================
+-- SCHEMA SUMMARY - Service Split Preparation
+-- ===========================================================================================================
+-- Future Service Architecture Mapping:
+--
+-- IDENTITY SERVICE (Core Authentication + OIDC):
+-- - users table (with OIDC claims)
+-- - oidc_jwks_keys table
+-- - OIDC-specific endpoints and ID token generation
+--
+-- AUTHORIZATION SERVICE (OAuth 2.1):
+-- - oauth_clients table
+-- - oauth_scopes table
+-- - oauth_client_scopes table
+-- - oauth_authorization_codes table
+-- - tokens table
+-- - oauth_token_scopes table
+--
+-- COMPLIANCE SERVICE (GDPR):
+-- - gdpr_user_consents table (future)
+-- - gdpr_audit_logs table (future)
+-- - gdpr_retention_policies table (future)
+--
+-- SHARED UTILITIES:
+-- - update_updated_at_column() function
+-- - Common trigger patterns
+-- - UUID generation patterns
+--
+-- ===========================================================================================================

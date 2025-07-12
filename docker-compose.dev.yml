@@ -1,0 +1,122 @@
+# Development Docker Compose - extends base docker-compose.yml
+services:
+  # PostgreSQL Database (Development)
+  postgres:
+    environment:
+      POSTGRES_PASSWORD: authly_dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      - ./docker/init-db-and-user.sql:/docker-entrypoint-initdb.d/01-init-db.sql:ro
+      # Mount development SQL scripts
+      - ./docker/dev-data:/docker-entrypoint-initdb.d/dev:ro
+
+  # Redis Cache (Development)
+  redis:
+    environment:
+      REDIS_PASSWORD: redis_dev_password
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_dev_data:/data
+
+  # Authly Application (Development)
+  authly:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    environment:
+      # Development Database
+      DATABASE_URL: "postgresql://authly:authly_dev_password@postgres:5432/authly"
+      
+      # Development Redis
+      REDIS_URL: "redis://:redis_dev_password@redis:6379/0"
+      
+      # Development JWT Secrets (INSECURE - for development only)
+      JWT_SECRET_KEY: "dev-secret-key-do-not-use-in-production"
+      JWT_REFRESH_SECRET_KEY: "dev-refresh-secret-key-do-not-use-in-production"
+      
+      # Development Mode
+      AUTHLY_BOOTSTRAP_DEV_MODE: "true"
+      AUTHLY_DEV_MODE: "true"
+      AUTHLY_LOG_LEVEL: "DEBUG"
+      
+      # Development URLs
+      DEFAULT_API_URL: "http://localhost:8000"
+      DEFAULT_ISSUER_URL: "http://localhost:8000"
+      
+      # Relaxed rate limiting for development
+      RATE_LIMIT_MAX_REQUESTS: "1000"
+      RATE_LIMIT_WINDOW_SECONDS: "60"
+      
+      # Enable admin API
+      AUTHLY_ADMIN_API_ENABLED: "true"
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount source code for hot reloading (development only)
+      - ./src:/app/src:ro
+      - ./docker:/app/docker:ro
+      # Development logs
+      - authly_dev_logs:/app/logs
+    command: ["python", "-m", "authly", "serve"]
+
+  # Development Database Admin (pgAdmin)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: authly-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@authly.dev
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_dev_data:/var/lib/pgadmin
+      - ./docker-compose/pgadmin/servers.json:/pgadmin4/servers.json:ro
+    networks:
+      - authly_network
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+  # Redis Commander (Redis Web UI)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: authly-redis-commander
+    environment:
+      REDIS_HOSTS: "authly:redis://:redis_dev_password@redis:6379/0"
+      HTTP_USER: admin
+      HTTP_PASSWORD: admin
+    ports:
+      - "8081:8081"
+    networks:
+      - authly_network
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  # Mailhog (Email testing)
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: authly-mailhog
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # Web UI
+    networks:
+      - authly_network
+    restart: unless-stopped
+
+# Development-specific volumes
+volumes:
+  postgres_dev_data:
+    driver: local
+  redis_dev_data:
+    driver: local
+  authly_dev_logs:
+    driver: local
+  pgadmin_dev_data:
+    driver: local

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Authly is a production-ready OAuth 2.1 + OpenID Connect 1.0 authorization server built with modern Python patterns and enterprise-grade security. This document provides comprehensive architectural guidance for understanding, maintaining, and extending the system.
+Authly is a production-ready OAuth 2.1 + OpenID Connect Core 1.0 + Session Management 1.0 authorization server built with modern Python patterns and enterprise-grade security. This document provides comprehensive architectural guidance for understanding, maintaining, and extending the system.
 
 ## Architectural Principles
 
@@ -26,7 +26,7 @@ Authly is a production-ready OAuth 2.1 + OpenID Connect 1.0 authorization server
 
 ### 4. Standards Compliance
 - **OAuth 2.1**: Full RFC compliance with mandatory PKCE support
-- **OpenID Connect 1.0**: Complete OIDC implementation with proper discovery
+- **OpenID Connect Core 1.0**: Complete OIDC implementation with Session Management 1.0 and proper discovery
 - **JWT Best Practices**: Secure token handling with proper validation
 - **OWASP Security**: Following OWASP guidelines for authentication systems
 
@@ -496,9 +496,9 @@ class SecureSecrets:
 ```dockerfile
 # Stage 1: Dependencies
 FROM python:3.13-slim as dependencies
-RUN pip install poetry
-COPY pyproject.toml poetry.lock ./
-RUN poetry export -f requirements.txt --output requirements.txt
+RUN pip install uv
+COPY pyproject.toml uv.lock ./
+RUN uv export --no-hashes > requirements.txt
 
 # Stage 2: Application
 FROM python:3.13-slim as application

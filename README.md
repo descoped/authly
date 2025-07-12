@@ -129,13 +129,13 @@ python -m authly admin status
 # Clone and install
 git clone <repository-url>
 cd authly
-poetry install
+uv sync --all-groups -U
 
 # Start with embedded development server (includes PostgreSQL container)
-poetry run python -m authly serve --embedded --dev
+uv run python -m authly serve --embedded --dev
 
 # Access Authly at http://localhost:8000
-# Admin CLI: poetry run python -m authly admin --help
+# Admin CLI: uv run python -m authly admin --help
 ```
 
 ### **Production Deployment**
@@ -147,23 +147,23 @@ docker run -p 8000:8000 \
   -e JWT_SECRET_KEY="your-secret-key" \
   authly
 
-# Using Poetry
+# Using UV
 export DATABASE_URL="postgresql://user:pass@localhost:5432/authly"
 export JWT_SECRET_KEY="your-secret-key"
-poetry run python -m authly serve
+uv run python -m authly serve
 ```
 
 ### **OAuth Client Setup**
 ```bash
 # Create OAuth client
-poetry run python -m authly admin login
-poetry run python -m authly admin client create \
+uv run python -m authly admin login
+uv run python -m authly admin client create \
   --name "My Application" \
   --type confidential \
   --redirect-uri "https://myapp.com/callback"
 
 # Create scope
-poetry run python -m authly admin scope create \
+uv run python -m authly admin scope create \
   --name "read" \
   --description "Read access to user data"
 ```
@@ -250,7 +250,7 @@ poetry run python -m authly admin scope create \
 - **FastAPI** - High-performance async web framework with automatic OpenAPI
 - **PostgreSQL** - Advanced database with UUID primary keys and proper indexing
 - **Pydantic v2** - Modern data validation with constraints and serialization
-- **Poetry** - Modern dependency management and packaging
+- **UV** - Modern, fast Python package manager and dependency resolver
 
 ### **Design Patterns**
 - **Package-by-Feature** - Clean module organization with clear boundaries
@@ -302,9 +302,9 @@ We welcome contributions! Please see our contributing guidelines and code of con
 
 ### **Development Setup**
 1. Clone the repository
-2. Install dependencies: `poetry install`
-3. Run tests: `poetry run pytest`
-4. Start development server: `poetry run python -m authly serve --embedded --dev`
+2. Install dependencies: `uv sync --all-groups -U`
+3. Run tests: `pytest`
+4. Start development server: `uv run python -m authly serve --embedded --dev`
 
 ### **Quality Standards**
 - All code must include comprehensive tests

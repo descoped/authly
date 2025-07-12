@@ -119,17 +119,27 @@ class JWKSService:
         except Exception as e:
             logger.error(f"Failed to load keys from database: {e}")
 
-    async def generate_rsa_key_pair(self, key_size: int = 2048, algorithm: str = "RS256") -> RSAKeyPair:
+    async def generate_rsa_key_pair(self, key_size: Optional[int] = None, algorithm: str = "RS256") -> RSAKeyPair:
         """
         Generate a new RSA key pair for JWT signing.
 
         Args:
-            key_size: RSA key size in bits (default 2048)
+            key_size: RSA key size in bits (uses config default if None)
             algorithm: JWT algorithm (RS256, RS384, RS512)
 
         Returns:
             RSAKeyPair: New key pair with unique key ID
         """
+        # Use config default if key_size not provided
+        if key_size is None:
+            try:
+                from authly import get_config
+                config = get_config()
+                key_size = config.rsa_key_size
+            except RuntimeError:
+                # Fallback for tests without full Authly initialization
+                key_size = 2048
+            
         logger.info(f"Generating new RSA key pair (size: {key_size}, algorithm: {algorithm})")
 
         # Generate private key

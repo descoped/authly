@@ -13,20 +13,12 @@ from authly.users.service import UserService
 logger = logging.getLogger(__name__)
 
 
-# Request/Response Models
-class UserCreate(BaseModel):
-    username: constr(min_length=1, max_length=50)
-    email: str
-    password: constr(min_length=8)
+# Import dynamic validation models
+from authly.api.validation_models import create_user_create_model, create_user_update_model
 
-
-class UserUpdate(BaseModel):
-    username: Optional[constr(min_length=1, max_length=50)] = None
-    email: Optional[str] = None
-    password: Optional[constr(min_length=8)] = None
-    is_active: Optional[bool] = None
-    is_verified: Optional[bool] = None
-    is_admin: Optional[bool] = None
+# Create models with config-based validation
+UserCreate = create_user_create_model()
+UserUpdate = create_user_update_model()
 
 
 class UserResponse(BaseModel):

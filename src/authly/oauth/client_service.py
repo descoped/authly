@@ -64,7 +64,14 @@ class ClientService:
             client_secret_hash = None
 
             if request.client_type == ClientType.CONFIDENTIAL:
-                client_secret = secrets.token_urlsafe(32)  # 256-bit entropy
+                try:
+                    from authly import get_config
+                    config = get_config()
+                    client_secret_length = config.client_secret_length
+                except RuntimeError:
+                    # Fallback for tests without full Authly initialization
+                    client_secret_length = 32
+                client_secret = secrets.token_urlsafe(client_secret_length)
                 client_secret_hash = get_password_hash(client_secret)
 
             # Set default values based on client type
@@ -443,7 +450,15 @@ class ClientService:
 
         for uri in redirect_uris:
             # Basic URI validation
-            if not uri or len(uri) > 2000:  # Reasonable length limit
+            try:
+                from authly import get_config
+                config = get_config()
+                redirect_uri_max_length = config.redirect_uri_max_length
+            except RuntimeError:
+                # Fallback for tests
+                redirect_uri_max_length = 2000
+                
+            if not uri or len(uri) > redirect_uri_max_length:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid redirect URI: {uri}")
 
             # Basic scheme validation for all clients

@@ -116,8 +116,16 @@ async def run_embedded_server(host: str = "0.0.0.0", port: int = 8000, seed: boo
     
     try:
         # Get dynamic port assignment from container
+        try:
+            from authly import get_config
+            config = get_config()
+            postgres_port = config.postgres_port
+        except RuntimeError:
+            # Fallback for tests without full Authly initialization
+            postgres_port = 5432
+            
         container_host = postgres.get_container_host_ip()
-        container_port = postgres.get_exposed_port(5432)
+        container_port = postgres.get_exposed_port(postgres_port)
         
         # Build connection settings using dynamic port
         settings = DatabaseSettings(
@@ -165,7 +173,15 @@ async def run_embedded_server(host: str = "0.0.0.0", port: int = 8000, seed: boo
             # Close database connections
             logger.info("Closing database connections...")
             try:
-                await asyncio.wait_for(db.cleanup(), timeout=10.0)
+                # Get cleanup timeout from config
+                try:
+                    from authly import get_config
+                    config = get_config()
+                    cleanup_timeout = config.db_cleanup_timeout_seconds
+                except RuntimeError:
+                    # Fallback for tests
+                    cleanup_timeout = 10.0
+                await asyncio.wait_for(db.cleanup(), timeout=cleanup_timeout)
             except asyncio.TimeoutError:
                 logger.warning("Database cleanup timed out")
             except Exception as e:

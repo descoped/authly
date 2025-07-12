@@ -14,7 +14,7 @@
 All tasks are integrated with the .claude/ memory system to ensure:
 - **Persistent Context**: Tasks maintain context across sessions
 - **Architectural Alignment**: Implementation aligns with documented architecture
-- **Quality Standards**: All work maintains 439/439 test success rate
+- **Quality Standards**: All work maintains 470+ test success rate
 - **Documentation Continuity**: Tasks automatically update project memory
 
 ### **Hierarchical Task Structure**
@@ -308,7 +308,7 @@ Edit .claude/architecture.md: "Document structural changes"
 #### **Quality Validation**
 ```bash
 # Verify quality standards
-Run: poetry run pytest  # Ensure 439/439 passing
+Run: pytest  # Ensure 439/439 passing
 Check: OAuth 2.1 compliance validation
 Check: OIDC 1.0 compliance validation
 Update: .claude/capabilities.md with quality metrics

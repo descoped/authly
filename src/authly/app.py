@@ -15,6 +15,7 @@ from fastapi.openapi.utils import get_openapi
 
 from authly.api import auth_router, health_router, users_router, oauth_router, oidc_router
 from authly.api.admin_router import admin_router
+from authly.api.password_change import router as password_change_router
 from authly.api.admin_middleware import setup_admin_middleware
 from authly.config import AuthlyConfig
 
@@ -73,6 +74,7 @@ def create_app(
     
     # Include versioned API routers
     app.include_router(auth_router, prefix=api_prefix)
+    app.include_router(password_change_router, prefix=api_prefix)
     app.include_router(users_router, prefix=api_prefix)
     app.include_router(oauth_router, prefix=api_prefix)
     
