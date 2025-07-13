@@ -1,6 +1,7 @@
 # Authly
 
 [![Build Status](https://github.com/descoped/authly/actions/workflows/build-test-native.yml/badge.svg)](https://github.com/descoped/authly/actions/workflows/build-test-native.yml)
+[![Test Status](https://github.com/descoped/authly/actions/workflows/full-stack-test-with-docker.yml/badge.svg)](https://github.com/descoped/authly/actions/workflows/full-stack-test-with-docker.yml)
 [![Coverage](https://codecov.io/gh/descoped/authly/branch/master/graph/badge.svg)](https://codecov.io/gh/descoped/authly)
 [![Python Version](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
