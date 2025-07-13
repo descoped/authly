@@ -1,0 +1,93 @@
+name: Build and Test (Native)
+
+on:
+  push:
+    branches:
+      - master
+    tags-ignore:
+      - '**'
+    paths-ignore:
+      - '**.md'
+
+env:
+  PYTHON_VERSION: '3.13'
+  UV_VERSION: '0.5.11'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.11', '3.12', '3.13']
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v5
+      with:
+        version: ${{ env.UV_VERSION }}
+    
+    - name: Install dependencies
+      run: |
+        uv sync --all-groups
+    
+    - name: Run linting
+      run: |
+        uv run ruff check .
+        uv run ruff format --check .
+    
+    - name: Run tests
+      env:
+        AUTHLY_SECRET_KEY: test-secret-key-for-ci-only
+        AUTHLY_ADMIN_USERNAME: admin
+        AUTHLY_ADMIN_PASSWORD: admin123
+        AUTHLY_ADMIN_EMAIL: admin@example.com
+        AUTHLY_ADMIN_ALLOW_LOCALHOST: true
+      run: |
+        uv run pytest -v --tb=short
+    
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-results-py${{ matrix.python-version }}
+        path: |
+          .coverage
+          htmlcov/
+        retention-days: 7
+
+  build:
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v5
+      with:
+        version: ${{ env.UV_VERSION }}
+    
+    - name: Build package
+      run: |
+        uv build
+    
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: dist
+        path: dist/
+        retention-days: 7

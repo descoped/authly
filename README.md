@@ -306,6 +306,11 @@ We welcome contributions! Please see our contributing guidelines and code of con
 3. Run tests: `pytest`
 4. Start development server: `uv run python -m authly serve --embedded --dev`
 
+### **Development Commands**
+- **Linting**: `uv run ruff check .`
+- **Formatting**: `uv run ruff format .`
+- **Validate Renovate config**: `npx --yes --package renovate -- renovate-config-validator .github/renovate.json`
+
 ### **Quality Standards**
 - All code must include comprehensive tests
 - 100% test success rate required
