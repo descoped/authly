@@ -1,5 +1,11 @@
 # Authly
 
+[![Build Status](https://github.com/oranheim/authly/actions/workflows/build-test-native.yml/badge.svg)](https://github.com/oranheim/authly/actions/workflows/build-test-native.yml)
+[![Coverage](https://codecov.io/gh/oranheim/authly/branch/master/graph/badge.svg)](https://codecov.io/gh/oranheim/authly)
+[![Python Version](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Release](https://img.shields.io/github/v/release/oranheim/authly)](https://github.com/oranheim/authly/releases)
+
 A **production-ready OAuth 2.1 + OpenID Connect 1.0 authorization server** built with FastAPI and PostgreSQL. Authly provides enterprise-grade security, comprehensive testing (439/439 tests passing), and professional administration tools.
 
 ---

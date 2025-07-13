@@ -40,7 +40,7 @@ jobs:
         uv run ruff check .
         uv run ruff format --check .
     
-    - name: Run tests
+    - name: Run tests with coverage
       env:
         AUTHLY_SECRET_KEY: test-secret-key-for-ci-only
         AUTHLY_ADMIN_USERNAME: admin
@@ -48,7 +48,15 @@ jobs:
         AUTHLY_ADMIN_EMAIL: admin@localhost
         AUTHLY_ADMIN_ALLOW_LOCALHOST: true
       run: |
-        uv run pytest -v --tb=short
+        uv run pytest -v --tb=short --cov=src/authly --cov-report=xml --cov-report=term
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v5
+      with:
+        files: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
 
   build:
     runs-on: ubuntu-latest
