@@ -22,7 +22,7 @@ from authly import Authly
 from authly.app import create_embedded_app
 from authly.auth import get_password_hash
 from authly.bootstrap import bootstrap_admin_system
-from authly.config import AuthlyConfig, StaticSecretProvider, StaticDatabaseProvider, find_root_folder
+from authly.config import AuthlyConfig, StaticDatabaseProvider, StaticSecretProvider, find_root_folder
 from authly.users import UserModel, UserRepository
 
 logger = logging.getLogger("authly.embedded")

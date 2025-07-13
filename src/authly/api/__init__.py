@@ -11,20 +11,24 @@ from authly.api.auth_router import (
     logout,
     refresh_access_token,
     revoke_token,
+    router as auth_router,
     update_last_login,
 )
-from authly.api.auth_router import router as auth_router
-from authly.api.health_router import health_check
-from authly.api.health_router import router as health_router
+from authly.api.health_router import (
+    health_check,
+    router as health_router,
+)
+from authly.api.oauth_router import oauth_router
+from authly.api.oidc_router import oidc_router
 from authly.api.users_dependencies import (
     get_current_active_user,
     get_current_admin_user,
     get_current_user,
     get_current_user_no_update,
     get_current_verified_user,
+    get_token_scopes,
     get_user_repository,
     get_user_service,
-    get_token_scopes,
     get_userinfo_service,
 )
 from authly.api.users_router import (
@@ -36,12 +40,10 @@ from authly.api.users_router import (
     get_current_user_info,
     get_user,
     get_users,
+    router as users_router,
     update_user,
     verify_user,
 )
-from authly.api.users_router import router as users_router
-from authly.api.oauth_router import oauth_router
-from authly.api.oidc_router import oidc_router
 
 __all__ = [
     "auth_router",

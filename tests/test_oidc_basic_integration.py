@@ -6,9 +6,10 @@ focusing on the core functionality without complex setup.
 """
 import pytest
 from fastapi_testing import AsyncTestServer
-from authly.api import auth_router, oauth_router, users_router, oidc_router
-from authly.api.admin_router import admin_router
+
+from authly.api import auth_router, oauth_router, oidc_router, users_router
 from authly.api.admin_middleware import setup_admin_middleware
+from authly.api.admin_router import admin_router
 
 
 class TestOIDCBasicIntegration:

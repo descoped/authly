@@ -1,26 +1,19 @@
 import logging
-from typing import Annotated
-from typing import List
+from typing import Annotated, List
 from uuid import UUID
 
-from fastapi import Depends
-from fastapi import HTTPException
-from fastapi import status
+from fastapi import Depends, HTTPException, status
 from jose import JWTError
-from psycopg_toolkit import OperationError
-from psycopg_toolkit import RecordNotFoundError
+from psycopg_toolkit import OperationError, RecordNotFoundError
 
-from authly import authly_db_connection
-from authly import get_config
+from authly import authly_db_connection, get_config
 from authly.api.auth_dependencies import oauth2_scheme
 from authly.auth import decode_token
 from authly.oidc.userinfo import UserInfoService
-from authly.tokens import TokenService
-from authly.tokens import get_token_service
+from authly.tokens import TokenService, get_token_service
 from authly.users.models import UserModel
 from authly.users.repository import UserRepository
 from authly.users.service import UserService
-
 
 logger = logging.getLogger(__name__)
 

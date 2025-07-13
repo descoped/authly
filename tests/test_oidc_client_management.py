@@ -8,21 +8,22 @@ This module tests the OIDC-specific client management features including:
 - OIDC scope assignment and validation
 """
 
-import pytest
 from typing import Dict, List
 from uuid import uuid4
 
-from authly.oauth.models import (
-    OAuthClientCreateRequest,
-    ClientType,
-    IDTokenSigningAlgorithm,
-    SubjectType,
-)
-from authly.oauth.client_service import ClientService
-from authly.oauth.client_repository import ClientRepository
-from authly.oauth.scope_repository import ScopeRepository
+import pytest
 from fastapi_testing import AsyncTestServer
 from psycopg_toolkit import TransactionManager
+
+from authly.oauth.client_repository import ClientRepository
+from authly.oauth.client_service import ClientService
+from authly.oauth.models import (
+    ClientType,
+    IDTokenSigningAlgorithm,
+    OAuthClientCreateRequest,
+    SubjectType,
+)
+from authly.oauth.scope_repository import ScopeRepository
 
 
 class TestOIDCClientCreation:

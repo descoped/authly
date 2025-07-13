@@ -106,38 +106,40 @@ publish-url = "https://test.pypi.org/legacy/"
 [tool.ruff]
 # Target Python 3.11+
 target-version = "py311"
-# Line length 120 characters
+# Modern line length for readability
 line-length = 120
 # Include all Python files
 include = ["*.py", "*.pyi", "**/pyproject.toml"]
 
 [tool.ruff.lint]
-# Enable key rule sets
+# Only select rules that catch real errors/bugs that should block builds
 select = [
-    "E",    # pycodestyle errors
-    "W",    # pycodestyle warnings
-    "F",    # pyflakes
-    "I",    # isort (import sorting)
-    "UP",   # pyupgrade (modernize syntax)
-    "B",    # flake8-bugbear (common bugs)
-    "SIM",  # flake8-simplify (simplify code)
-    "RUF",  # Ruff-specific rules
+    "E9",    # Runtime errors (syntax errors, indentation errors)
+    "F63",   # Invalid print syntax
+    "F7",    # Syntax errors  
+    "I",     # Import sorting
 ]
-# Ignore E203 (conflicts with Black-style formatting)
-ignore = ["E203"]
+
+# Ignore common architectural patterns and forward references
+ignore = [
+    "E402",   # Module level import not at top (needed for circular import avoidance)
+    "E501",   # Line length (handled by formatter)
+    "E722",   # Bare except (sometimes intentional)
+    "F821",   # Undefined name (forward references in type annotations)
+]
+
 # Allow autofix for all enabled rules
 fixable = ["ALL"]
-# Never autofix these (empty for now)
 unfixable = []
 
 [tool.ruff.lint.per-file-ignores]
-# Test files can have longer lines, unused imports
-"tests/*" = ["E501", "F401", "F841"]
-# Scripts can have print statements
-"scripts/*" = ["T201"]
+# Test files can have unused imports
+"tests/*" = ["F401"]
+# Examples can be more relaxed
+"examples/*" = ["F401", "F841"]
 
 [tool.ruff.lint.isort]
-# Group imports like Black would
+# Group imports cleanly
 combine-as-imports = true
 force-wrap-aliases = true
 

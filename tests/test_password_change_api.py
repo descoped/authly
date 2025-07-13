@@ -4,6 +4,7 @@ Integration tests for password change functionality.
 
 import pytest
 from fastapi import status
+
 from authly.api.password_change import PasswordChangeRequest, PasswordChangeResponse
 
 

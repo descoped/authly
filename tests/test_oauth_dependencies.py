@@ -11,16 +11,16 @@ from fastapi.testclient import TestClient
 from psycopg_toolkit import TransactionManager
 
 from authly import Authly
-from authly.api.auth_dependencies import get_current_client, _parse_basic_auth_header
+from authly.api.auth_dependencies import _parse_basic_auth_header, get_current_client
 from authly.oauth.client_repository import ClientRepository
-from authly.oauth.scope_repository import ScopeRepository
 from authly.oauth.client_service import ClientService
 from authly.oauth.models import (
     ClientType,
     GrantType,
-    TokenEndpointAuthMethod,
     OAuthClientCreateRequest,
+    TokenEndpointAuthMethod,
 )
+from authly.oauth.scope_repository import ScopeRepository
 
 logger = logging.getLogger(__name__)
 

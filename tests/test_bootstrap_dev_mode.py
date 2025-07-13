@@ -7,8 +7,9 @@ without requiring password changes.
 """
 
 import os
-import pytest
 from unittest.mock import patch
+
+import pytest
 
 from authly.bootstrap.admin_seeding import bootstrap_admin_user
 

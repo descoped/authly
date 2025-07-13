@@ -321,8 +321,8 @@ async def _handle_refresh_token_grant(
         client_id = None
         if request.client_id:
             # Convert client_id string to UUID for client lookup
-            from authly.oauth.client_repository import ClientRepository
             from authly import authly_db_connection
+            from authly.oauth.client_repository import ClientRepository
             
             async for conn in authly_db_connection():
                 client_repo = ClientRepository(conn)

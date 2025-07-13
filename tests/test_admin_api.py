@@ -18,14 +18,14 @@ from fastapi_testing import AsyncTestServer
 from psycopg_toolkit import TransactionManager
 
 from authly import Authly
-from authly.api.admin_router import admin_router
 from authly.api.admin_middleware import setup_admin_middleware
+from authly.api.admin_router import admin_router
 from authly.auth.core import get_password_hash
 from authly.bootstrap.admin_seeding import bootstrap_admin_system
 from authly.oauth.client_repository import ClientRepository
 from authly.oauth.models import ClientType, OAuthClientCreateRequest, TokenEndpointAuthMethod
 from authly.oauth.scope_repository import ScopeRepository
-from authly.tokens import TokenService, TokenRepository
+from authly.tokens import TokenRepository, TokenService
 from authly.users.models import UserModel
 from authly.users.repository import UserRepository
 
@@ -203,8 +203,8 @@ async def test_oauth_scope(transaction_manager: TransactionManager) -> Dict:
     async with transaction_manager.transaction() as conn:
         scope_repo = ScopeRepository(conn)
         
-        from authly.oauth.scope_service import ScopeService
         from authly.oauth.models import OAuthScopeModel
+        from authly.oauth.scope_service import ScopeService
         
         scope_service = ScopeService(scope_repo)
         

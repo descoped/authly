@@ -24,8 +24,8 @@ class Authly:
                 self._config = configuration
             else:
                 # Default configuration using environment providers
-                from authly.config.secret_providers import EnvSecretProvider
                 from authly.config.database_providers import EnvDatabaseProvider
+                from authly.config.secret_providers import EnvSecretProvider
                 secret_provider = EnvSecretProvider()
                 database_provider = EnvDatabaseProvider()
                 self._config = AuthlyConfig.load(secret_provider, database_provider)

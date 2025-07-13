@@ -10,13 +10,13 @@ import pytest
 from fastapi import HTTPException
 
 from authly.oidc.jwks import (
-    JWKSService,
-    JWKSManager,
     JWKModel,
+    JWKSManager,
     JWKSModel,
+    JWKSService,
+    get_current_signing_key,
     get_jwks_manager,
     get_jwks_response,
-    get_current_signing_key,
     get_key_for_verification,
 )
 

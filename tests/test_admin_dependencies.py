@@ -20,11 +20,11 @@ from psycopg_toolkit import TransactionManager
 
 from authly import Authly
 from authly.api.admin_dependencies import (
-    require_admin_user,
-    require_admin_scope,
+    ADMIN_SCOPES,
     get_admin_scopes,
+    require_admin_scope,
+    require_admin_user,
     validate_admin_scopes,
-    ADMIN_SCOPES
 )
 from authly.auth.core import get_password_hash
 from authly.bootstrap.admin_seeding import bootstrap_admin_system
@@ -406,10 +406,10 @@ class TestConvenienceDependencies:
             require_admin_client_write,
             require_admin_scope_read,
             require_admin_scope_write,
+            require_admin_system_read,
+            require_admin_system_write,
             require_admin_user_read,
             require_admin_user_write,
-            require_admin_system_read,
-            require_admin_system_write
         )
         
         # Verify they are callable (dependency functions)

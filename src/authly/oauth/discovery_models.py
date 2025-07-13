@@ -5,6 +5,7 @@ and OAuth 2.1 specifications.
 """
 
 from typing import List, Optional
+
 from pydantic import BaseModel, Field
 
 

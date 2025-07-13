@@ -10,13 +10,13 @@ from contextlib import asynccontextmanager
 from typing import AsyncGenerator, Optional
 
 from fastapi import FastAPI
-from fastapi.staticfiles import StaticFiles
 from fastapi.openapi.utils import get_openapi
+from fastapi.staticfiles import StaticFiles
 
-from authly.api import auth_router, health_router, users_router, oauth_router, oidc_router
+from authly.api import auth_router, health_router, oauth_router, oidc_router, users_router
+from authly.api.admin_middleware import setup_admin_middleware
 from authly.api.admin_router import admin_router
 from authly.api.password_change import router as password_change_router
-from authly.api.admin_middleware import setup_admin_middleware
 from authly.config import AuthlyConfig
 
 

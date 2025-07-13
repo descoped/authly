@@ -16,10 +16,16 @@ from psycopg import AsyncConnection
 from authly import Authly
 from authly.oauth.client_repository import ClientRepository
 from authly.oauth.client_service import ClientService
-from authly.oauth.models import ClientType, OAuthClientCreateRequest, OAuthClientModel, OAuthClientCredentialsResponse, TokenEndpointAuthMethod
-from authly.oauth.scope_repository import ScopeRepository  
+from authly.oauth.models import (
+    ClientType,
+    OAuthClientCreateRequest,
+    OAuthClientCredentialsResponse,
+    OAuthClientModel,
+    OAuthScopeModel,
+    TokenEndpointAuthMethod,
+)
+from authly.oauth.scope_repository import ScopeRepository
 from authly.oauth.scope_service import ScopeService
-from authly.oauth.models import OAuthScopeModel
 from authly.users.models import UserModel
 from authly.users.repository import UserRepository
 
@@ -52,16 +58,15 @@ async def get_db_connection() -> AsyncConnection:
 
 # Import admin authentication dependencies
 from authly.api.admin_dependencies import (
-    require_admin_user,
-    require_admin_scope,
     require_admin_client_read,
     require_admin_client_write,
+    require_admin_scope,
     require_admin_scope_read,
     require_admin_scope_write,
     require_admin_system_read,
-    require_admin_user_read
+    require_admin_user,
+    require_admin_user_read,
 )
-
 
 # ============================================================================
 # SYSTEM MANAGEMENT ENDPOINTS

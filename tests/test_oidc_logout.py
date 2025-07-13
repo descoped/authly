@@ -5,14 +5,14 @@ This module tests the OpenID Connect logout endpoint implementation,
 including parameter validation, session termination, and redirect handling.
 """
 
-import pytest
-from uuid import uuid4
 from unittest.mock import AsyncMock, Mock
+from uuid import uuid4
 
+import pytest
 from fastapi import status
 from fastapi_testing import AsyncTestServer
 
-from authly.oauth.models import OAuthClientModel, ClientType
+from authly.oauth.models import ClientType, OAuthClientModel
 from authly.tokens.service import TokenService
 
 

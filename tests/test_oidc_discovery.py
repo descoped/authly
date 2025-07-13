@@ -2,11 +2,12 @@
 Tests for OIDC Discovery endpoint and service.
 """
 
+from unittest.mock import AsyncMock, Mock
+
 import pytest
 from fastapi import Request
 from fastapi.testclient import TestClient
 from psycopg_toolkit import TransactionManager
-from unittest.mock import Mock, AsyncMock
 
 from authly.api.oidc_router import get_base_url, oidc_discovery
 from authly.oauth.discovery_service import DiscoveryService

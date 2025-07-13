@@ -6,6 +6,7 @@ basic endpoint behavior without complex end-to-end flows.
 """
 import pytest
 from fastapi_testing import AsyncTestServer
+
 from authly.oauth.models import OAuthClientModel
 from authly.users.models import UserModel
 
@@ -16,7 +17,7 @@ class TestOIDCIntegrationFlowsSimple:
     @pytest.fixture
     async def oidc_server(self, test_server) -> AsyncTestServer:
         """Configure test server with OIDC routers."""
-        from authly.api import auth_router, oauth_router, users_router, oidc_router
+        from authly.api import auth_router, oauth_router, oidc_router, users_router
         
         test_server.app.include_router(auth_router, prefix="/api/v1")
         test_server.app.include_router(users_router, prefix="/api/v1") 

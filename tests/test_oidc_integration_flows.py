@@ -4,20 +4,22 @@ OIDC Integration Tests for Authorization Code Flow
 This module contains integration tests for the OpenID Connect Authorization Code Flow,
 testing the complete flow from authorization request to token exchange to UserInfo.
 """
+from datetime import datetime, timezone
+from unittest.mock import patch
+from urllib.parse import parse_qs, urlparse
+from uuid import uuid4
+
 import pytest
 from fastapi_testing import AsyncTestServer
-from authly.api import auth_router, oauth_router, users_router, oidc_router
-from authly.auth.core import get_password_hash
-from authly.users import UserModel, UserRepository
-from authly.oauth.models import OAuthClientModel, ClientType, TokenEndpointAuthMethod
-from authly.oauth.client_repository import ClientRepository
-from authly.oauth.scope_repository import ScopeRepository
-from uuid import uuid4
-from datetime import datetime, timezone
-from psycopg_toolkit import TransactionManager
 from jose import jwt
-from urllib.parse import urlparse, parse_qs
-from unittest.mock import patch
+from psycopg_toolkit import TransactionManager
+
+from authly.api import auth_router, oauth_router, oidc_router, users_router
+from authly.auth.core import get_password_hash
+from authly.oauth.client_repository import ClientRepository
+from authly.oauth.models import ClientType, OAuthClientModel, TokenEndpointAuthMethod
+from authly.oauth.scope_repository import ScopeRepository
+from authly.users import UserModel, UserRepository
 
 
 class TestOIDCIntegrationFlows:

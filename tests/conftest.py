@@ -6,7 +6,7 @@ import pytest
 from psycopg_pool import AsyncConnectionPool
 
 from authly import Authly
-from authly.config import AuthlyConfig, StaticSecretProvider, StaticDatabaseProvider, find_root_folder
+from authly.config import AuthlyConfig, StaticDatabaseProvider, StaticSecretProvider, find_root_folder
 
 pytest_plugins = [
     "fixtures.testing",

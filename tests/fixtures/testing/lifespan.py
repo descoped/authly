@@ -23,9 +23,10 @@ async def custom_test_server(
     """Custom test server creation with full control over lifecycle"""
     # Create FastAPI app with all routes but without lifespan
     from fastapi import FastAPI
-    from authly.api import health_router, auth_router, users_router, oauth_router, oidc_router
-    from authly.api.admin_router import admin_router
+
+    from authly.api import auth_router, health_router, oauth_router, oidc_router, users_router
     from authly.api.admin_middleware import setup_admin_middleware
+    from authly.api.admin_router import admin_router
     
     app = FastAPI(title="Authly Test Server")
     

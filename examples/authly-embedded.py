@@ -1,26 +1,26 @@
 import asyncio
 import logging
+import os
 import signal
 from datetime import datetime, timezone
 from uuid import uuid4
 
 import uvicorn
 from fastapi import FastAPI
-from fastapi.staticfiles import StaticFiles
 from fastapi.openapi.utils import get_openapi
-import os
+from fastapi.staticfiles import StaticFiles
 from psycopg_pool import AsyncConnectionPool
 from psycopg_toolkit import Database, DatabaseSettings
 from setup_logging import setup_logging
 from testcontainers.postgres import PostgresContainer
 
 from authly import Authly
-from authly.api import auth_router, health_router, users_router, oauth_router
-from authly.api.admin_router import admin_router
+from authly.api import auth_router, health_router, oauth_router, users_router
 from authly.api.admin_middleware import setup_admin_middleware
+from authly.api.admin_router import admin_router
 from authly.auth import get_password_hash
 from authly.bootstrap import bootstrap_admin_system
-from authly.config import AuthlyConfig, StaticSecretProvider, StaticDatabaseProvider, find_root_folder
+from authly.config import AuthlyConfig, StaticDatabaseProvider, StaticSecretProvider, find_root_folder
 from authly.users import UserModel, UserRepository
 
 logger = logging.getLogger("authly-embedded")

@@ -1,11 +1,11 @@
-import logging
 import base64
+import logging
 from asyncio import Lock
 from dataclasses import dataclass
 from typing import Final, Optional, Tuple
 
 from fastapi import Depends, HTTPException, Request, status
-from fastapi.security import OAuth2PasswordBearer, HTTPBasic, HTTPBasicCredentials
+from fastapi.security import HTTPBasic, HTTPBasicCredentials, OAuth2PasswordBearer
 
 from authly.api.rate_limiter import RateLimiter
 

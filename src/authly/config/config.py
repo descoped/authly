@@ -3,8 +3,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-from authly.config.secret_providers import SecretProvider
 from authly.config.database_providers import DatabaseProvider, EnvDatabaseProvider
+from authly.config.secret_providers import SecretProvider
 from authly.config.secure import SecureSecrets
 
 

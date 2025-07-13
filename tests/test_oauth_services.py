@@ -1,7 +1,7 @@
 """Integration tests for OAuth 2.1 service layers with real database connections."""
 
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 import pytest
@@ -9,17 +9,17 @@ from fastapi import HTTPException
 from psycopg_toolkit import TransactionManager
 
 from authly import Authly
-from authly.oauth.client_repository import ClientRepository
-from authly.oauth.scope_repository import ScopeRepository
 from authly.oauth.authorization_code_repository import AuthorizationCodeRepository
+from authly.oauth.client_repository import ClientRepository
 from authly.oauth.client_service import ClientService
-from authly.oauth.scope_service import ScopeService
 from authly.oauth.models import (
     ClientType,
     GrantType,
-    TokenEndpointAuthMethod,
     OAuthClientCreateRequest,
+    TokenEndpointAuthMethod,
 )
+from authly.oauth.scope_repository import ScopeRepository
+from authly.oauth.scope_service import ScopeService
 
 logger = logging.getLogger(__name__)
 
@@ -550,8 +550,8 @@ class TestScopeService:
             write_scope = await scope_service.create_scope(f"write_{unique_suffix}", "Write access")
             
             # Create a real user first (required for foreign key constraint)
-            from authly.users import UserRepository, UserModel
-            from authly.tokens import TokenRepository, TokenType, TokenModel
+            from authly.tokens import TokenModel, TokenRepository, TokenType
+            from authly.users import UserModel, UserRepository
             
             user_repo = UserRepository(conn)
             user_model = UserModel(
@@ -605,8 +605,8 @@ class TestScopeService:
             read_scope = await scope_service.create_scope(read_scope_name, "Read access")
             
             # Create a real user and token in the database
-            from authly.users import UserRepository, UserModel
-            from authly.tokens import TokenRepository, TokenType, TokenModel
+            from authly.tokens import TokenModel, TokenRepository, TokenType
+            from authly.users import UserModel, UserRepository
             
             user_repo = UserRepository(conn)
             user_model = UserModel(
@@ -661,8 +661,8 @@ class TestScopeService:
             write_scope = await scope_service.create_scope(write_scope_name, "Write access")
             
             # Create a real user and token in the database
-            from authly.users import UserRepository, UserModel
-            from authly.tokens import TokenRepository, TokenType, TokenModel
+            from authly.tokens import TokenModel, TokenRepository, TokenType
+            from authly.users import UserModel, UserRepository
             
             user_repo = UserRepository(conn)
             user_model = UserModel(
@@ -722,8 +722,8 @@ class TestScopeService:
             admin_scope = await scope_service.create_scope(admin_scope_name, "Admin access")
             
             # Create a real user and token in the database
-            from authly.users import UserRepository, UserModel
-            from authly.tokens import TokenRepository, TokenType, TokenModel
+            from authly.tokens import TokenModel, TokenRepository, TokenType
+            from authly.users import UserModel, UserRepository
             
             user_repo = UserRepository(conn)
             user_model = UserModel(

@@ -10,7 +10,7 @@ import logging
 from pathlib import Path
 
 from authly.admin.api_client import AdminAPIClient
-from authly.oauth.models import OAuthClientCreateRequest, ClientType
+from authly.oauth.models import ClientType, OAuthClientCreateRequest
 
 # Configure logging
 logging.basicConfig(
@@ -138,4 +138,4 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main()
+    asyncio.run(main())

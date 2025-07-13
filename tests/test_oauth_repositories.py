@@ -1,7 +1,7 @@
 """Integration tests for OAuth 2.1 repository layers using real database connections."""
 
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 import pytest
@@ -9,17 +9,17 @@ from psycopg_toolkit import TransactionManager
 
 from authly import Authly
 from authly.auth import get_password_hash
-from authly.oauth.client_repository import ClientRepository
-from authly.oauth.scope_repository import ScopeRepository
 from authly.oauth.authorization_code_repository import AuthorizationCodeRepository
+from authly.oauth.client_repository import ClientRepository
 from authly.oauth.models import (
     ClientType,
     GrantType,
-    TokenEndpointAuthMethod,
+    OAuthAuthorizationCodeModel,
     OAuthClientModel,
     OAuthScopeModel,
-    OAuthAuthorizationCodeModel,
+    TokenEndpointAuthMethod,
 )
+from authly.oauth.scope_repository import ScopeRepository
 from authly.users import UserModel, UserRepository
 
 logger = logging.getLogger(__name__)
@@ -370,8 +370,8 @@ class TestScopeRepository:
             created_scope = await scope_repo.create_scope(test_scope_data)
             
             # Create a real user and token in the database
-            from authly.users import UserRepository, UserModel
-            from authly.tokens import TokenRepository, TokenType, TokenModel
+            from authly.tokens import TokenModel, TokenRepository, TokenType
+            from authly.users import UserModel, UserRepository
             
             user_repo = UserRepository(conn)
             user_model = UserModel(

@@ -5,19 +5,16 @@ This module tests the OpenID Connect scopes and claims mapping functionality.
 """
 
 import pytest
+
 from authly.oidc.scopes import (
     OIDC_SCOPES,
     OIDCClaimsMapping,
     OIDCStandardClaims,
-    get_oidc_scopes_with_descriptions,
     get_all_oidc_scope_names,
-    get_oidc_claims_reference
+    get_oidc_claims_reference,
+    get_oidc_scopes_with_descriptions,
 )
-from authly.oidc.validation import (
-    OIDCValidator,
-    OIDCScopeProcessor,
-    validate_mixed_scopes
-)
+from authly.oidc.validation import OIDCScopeProcessor, OIDCValidator, validate_mixed_scopes
 
 
 class TestOIDCScopes:

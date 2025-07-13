@@ -3,21 +3,22 @@
 Tests authorization endpoints, service layer, and complete OAuth 2.1 authorization code flow.
 """
 
-import hashlib
 import base64
+import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
-from typing import Dict, Any
+from typing import Any, Dict
 from urllib.parse import parse_qs, urlparse
 from uuid import uuid4
 
 import pytest
 from fastapi import status
 from fastapi_testing import AsyncTestServer
+from psycopg_toolkit import TransactionManager
 
 from authly import Authly
-from authly.oauth.authorization_service import AuthorizationService
 from authly.oauth.authorization_code_repository import AuthorizationCodeRepository
+from authly.oauth.authorization_service import AuthorizationService
 from authly.oauth.client_repository import ClientRepository
 from authly.oauth.models import (
     AuthorizationError,
@@ -30,7 +31,6 @@ from authly.oauth.models import (
 )
 from authly.oauth.scope_repository import ScopeRepository
 from authly.users import UserModel, UserRepository
-from psycopg_toolkit import TransactionManager
 
 
 def generate_pkce_pair():

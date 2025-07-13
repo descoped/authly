@@ -11,7 +11,7 @@ import logging
 import os
 from typing import Callable
 
-from fastapi import Request, Response, HTTPException, status
+from fastapi import HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse
 
 logger = logging.getLogger(__name__)

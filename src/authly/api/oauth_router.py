@@ -4,14 +4,14 @@ Provides OAuth 2.1 endpoints including discovery, authorization, and token opera
 """
 
 import logging
+import os
 from typing import Optional
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request, status
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
-import os
+from fastapi.templating import Jinja2Templates
 
 from authly import get_config
 from authly.api.auth_dependencies import get_authorization_service, get_scope_repository
@@ -22,12 +22,12 @@ from authly.oauth.discovery_service import DiscoveryService
 from authly.oauth.models import (
     AuthorizationError,
     CodeChallengeMethod,
+    Display,
     OAuthAuthorizationRequest,
+    Prompt,
+    ResponseMode,
     ResponseType,
     UserConsentRequest,
-    ResponseMode,
-    Display,
-    Prompt,
 )
 from authly.oauth.scope_repository import ScopeRepository
 from authly.users import UserModel

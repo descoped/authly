@@ -8,7 +8,7 @@ middleware setup, and production-ready configuration.
 import logging
 import os
 from datetime import datetime, timezone
-from unittest.mock import patch, AsyncMock
+from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
 import pytest
@@ -17,9 +17,9 @@ from fastapi_testing import AsyncTestServer
 from psycopg_toolkit import TransactionManager
 
 from authly import Authly
-from authly.main import create_app, setup_logging
 from authly.auth.core import get_password_hash
 from authly.bootstrap.admin_seeding import bootstrap_admin_system
+from authly.main import create_app, setup_logging
 from authly.tokens import TokenRepository, TokenService
 from authly.users.models import UserModel
 from authly.users.repository import UserRepository

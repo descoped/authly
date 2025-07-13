@@ -9,22 +9,27 @@ This module implements the missing comprehensive OIDC tests identified in OIDC_B
 - Complete end-to-end flow testing with various scope combinations
 """
 
-import pytest
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
+from unittest.mock import patch
 from urllib.parse import parse_qs, urlparse
 from uuid import uuid4
-from unittest.mock import patch
 
+import pytest
 from fastapi_testing import AsyncTestServer
 from jose import jwt
 from psycopg_toolkit import TransactionManager
 
 from authly.auth.core import get_password_hash
-from authly.oauth.client_repository import ClientRepository
-from authly.oauth.models import ClientType, OAuthClientModel, TokenEndpointAuthMethod
-from authly.oauth.scope_repository import ScopeRepository
 from authly.oauth.authorization_code_repository import AuthorizationCodeRepository
-from authly.oauth.models import OAuthAuthorizationCodeModel, OAuthScopeModel
+from authly.oauth.client_repository import ClientRepository
+from authly.oauth.models import (
+    ClientType,
+    OAuthAuthorizationCodeModel,
+    OAuthClientModel,
+    OAuthScopeModel,
+    TokenEndpointAuthMethod,
+)
+from authly.oauth.scope_repository import ScopeRepository
 from authly.users import UserModel, UserRepository
 
 
@@ -707,8 +712,8 @@ class TestOIDCJWKSKeyRotation:
         available_kids = [key["kid"] for key in jwks_json["keys"]]
         
         # Create a test client and user (simplified for key rotation test)
+        from authly.oauth.models import ClientType, OAuthClientModel, TokenEndpointAuthMethod
         from authly.users import UserModel
-        from authly.oauth.models import OAuthClientModel, ClientType, TokenEndpointAuthMethod
         
         client_data = OAuthClientModel(
             id=uuid4(),

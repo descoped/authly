@@ -13,7 +13,7 @@ from psycopg_toolkit import TransactionManager
 
 from authly.admin.api_client import AdminAPIClient
 from authly.auth.core import get_password_hash
-from authly.oauth.models import OAuthClientCreateRequest, ClientType
+from authly.oauth.models import ClientType, OAuthClientCreateRequest
 from authly.users.models import UserModel
 from authly.users.repository import UserRepository
 
@@ -57,8 +57,8 @@ async def admin_scopes_setup(transaction_manager: TransactionManager):
 @pytest.fixture(autouse=True)
 async def cleanup_tokens():
     """Clean up tokens between tests."""
-    from pathlib import Path
     import os
+    from pathlib import Path
     
     # Clean up before test
     token_file = Path.home() / ".authly" / "tokens.json"

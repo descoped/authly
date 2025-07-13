@@ -19,8 +19,8 @@ from pydantic import BaseModel
 from authly.oauth.models import (
     ClientType,
     OAuthClientCreateRequest,
-    OAuthClientModel,
     OAuthClientCredentialsResponse,
+    OAuthClientModel,
     OAuthScopeModel,
     TokenEndpointAuthMethod,
 )

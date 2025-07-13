@@ -18,7 +18,7 @@ from fastapi import FastAPI
 from authly import Authly
 from authly.app import create_production_app
 from authly.bootstrap import bootstrap_admin_system
-from authly.config import AuthlyConfig, EnvSecretProvider, EnvDatabaseProvider
+from authly.config import AuthlyConfig, EnvDatabaseProvider, EnvSecretProvider
 
 logger = logging.getLogger(__name__)
 
@@ -39,8 +39,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         config = AuthlyConfig.load(secret_provider, database_provider)
         
         # Create database connection pool using psycopg-toolkit Database class
-        from psycopg_toolkit import Database, DatabaseSettings
         from urllib.parse import urlparse
+
+        from psycopg_toolkit import Database, DatabaseSettings
         
         database_url = database_provider.get_database_config().database_url
         

@@ -5,14 +5,15 @@ Tests the secure password generation and requires_password_change functionality
 without requiring database connections.
 """
 
-import pytest
-import string
 import re
+import string
+from datetime import datetime, timezone
+from uuid import uuid4
+
+import pytest
 
 from authly.bootstrap.admin_seeding import generate_secure_password
 from authly.users.models import UserModel
-from uuid import uuid4
-from datetime import datetime, timezone
 
 
 class TestSecurePasswordGeneration:

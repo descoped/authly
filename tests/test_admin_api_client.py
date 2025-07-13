@@ -11,7 +11,7 @@ import httpx
 import pytest
 
 from authly.admin.api_client import AdminAPIClient, TokenInfo
-from authly.oauth.models import OAuthClientCreateRequest, OAuthClientModel, ClientType
+from authly.oauth.models import ClientType, OAuthClientCreateRequest, OAuthClientModel
 
 
 @pytest.fixture

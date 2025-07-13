@@ -23,8 +23,8 @@ class TestSharedDatabaseVisibility:
     @pytest.fixture
     async def test_user(self, db_pool):
         """Create a test user using shared database pool."""
-        from authly.users import UserModel, UserRepository
         from authly.auth.core import get_password_hash
+        from authly.users import UserModel, UserRepository
         
         user_data = UserModel(
             id=uuid4(),
@@ -45,8 +45,8 @@ class TestSharedDatabaseVisibility:
     @pytest.fixture
     async def test_client(self, db_pool):
         """Create a test OAuth client using shared database pool."""
-        from authly.oauth.models import OAuthClientModel
         from authly.auth.core import get_password_hash
+        from authly.oauth.models import OAuthClientModel
         
         client_data = OAuthClientModel(
             id=uuid4(),

@@ -7,6 +7,7 @@ admin API enable/disable functionality, and security event logging.
 
 import os
 from unittest.mock import patch
+
 import pytest
 from fastapi import FastAPI, status
 from fastapi.responses import JSONResponse
@@ -444,6 +445,7 @@ class TestMiddlewareEdgeCases:
         # WebSocket connections to admin paths should be blocked if API is disabled
         with patch.dict(os.environ, {"AUTHLY_ADMIN_API_ENABLED": "false"}):
             import importlib
+
             from authly.api import admin_middleware
             importlib.reload(admin_middleware)
             

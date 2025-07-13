@@ -9,20 +9,25 @@ This module tests advanced OIDC compliance features identified in OIDC_BACKLOG.m
 - OIDC request object support
 """
 
-import pytest
-from datetime import datetime, timezone, timedelta
-from uuid import uuid4
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
+from uuid import uuid4
 
+import pytest
 from fastapi_testing import AsyncTestServer
 from jose import jwt
 
 from authly.auth.core import get_password_hash
-from authly.oauth.client_repository import ClientRepository
-from authly.oauth.models import ClientType, OAuthClientModel, TokenEndpointAuthMethod
-from authly.oauth.scope_repository import ScopeRepository
 from authly.oauth.authorization_code_repository import AuthorizationCodeRepository
-from authly.oauth.models import OAuthAuthorizationCodeModel, OAuthScopeModel
+from authly.oauth.client_repository import ClientRepository
+from authly.oauth.models import (
+    ClientType,
+    OAuthAuthorizationCodeModel,
+    OAuthClientModel,
+    OAuthScopeModel,
+    TokenEndpointAuthMethod,
+)
+from authly.oauth.scope_repository import ScopeRepository
 from authly.users import UserModel, UserRepository
 
 

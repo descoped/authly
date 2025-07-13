@@ -3,13 +3,14 @@ Test bootstrap password functionality without database dependency.
 """
 
 import os
+from datetime import datetime, timezone
+from unittest.mock import AsyncMock, Mock, patch
+from uuid import uuid4
+
 import pytest
-from unittest.mock import Mock, AsyncMock, patch
 
 from authly.bootstrap.admin_seeding import bootstrap_admin_user, generate_secure_password
 from authly.users.models import UserModel
-from uuid import uuid4
-from datetime import datetime, timezone
 
 
 class TestBootstrapPasswordSecurity:
@@ -84,8 +85,9 @@ class TestBootstrapPasswordSecurity:
     def test_no_hardcoded_admin_password(self):
         """Verify no hardcoded Admin123! password exists."""
         # Read the admin_seeding.py file
-        import authly.bootstrap.admin_seeding
         import inspect
+
+        import authly.bootstrap.admin_seeding
         
         source = inspect.getsource(authly.bootstrap.admin_seeding)
         

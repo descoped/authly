@@ -19,10 +19,10 @@ from psycopg_toolkit import TransactionManager
 from authly.api.admin_dependencies import ADMIN_SCOPES
 from authly.auth.core import get_password_hash
 from authly.bootstrap.admin_seeding import (
-    bootstrap_admin_user,
-    register_admin_scopes,
     bootstrap_admin_system,
-    get_bootstrap_status
+    bootstrap_admin_user,
+    get_bootstrap_status,
+    register_admin_scopes,
 )
 from authly.oauth.scope_repository import ScopeRepository
 from authly.users.models import UserModel

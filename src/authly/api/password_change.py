@@ -11,8 +11,8 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
-from authly.auth import get_password_hash, verify_password
 from authly.api.users_dependencies import get_current_user, get_user_repository
+from authly.auth import get_password_hash, verify_password
 from authly.users.models import UserModel
 from authly.users.repository import UserRepository
 

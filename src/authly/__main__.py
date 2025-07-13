@@ -26,7 +26,7 @@ import uvicorn
 from fastapi import FastAPI
 
 from authly.app import create_production_app
-from authly.main import setup_logging, lifespan
+from authly.main import lifespan, setup_logging
 
 logger = logging.getLogger(__name__)
 
@@ -92,10 +92,10 @@ def admin() -> None:
 def status(output_format: str) -> None:
     """Show system status and configuration."""
     # Import here to avoid circular imports
-    from authly.admin.cli import status as admin_status
-    
     # Create a mock context for the admin command
     import click
+
+    from authly.admin.cli import status as admin_status
     ctx = click.Context(admin_status)
     ctx.params = {'format': output_format}
     
@@ -113,10 +113,10 @@ def client() -> None:
 @click.option('--format', 'output_format', default='table', type=click.Choice(['table', 'json']), help='Output format')
 def list_clients(output_format: str) -> None:
     """List all OAuth clients."""
-    from authly.admin.client_commands import list_clients as admin_list_clients
-    
     # Create a mock context for the admin command
     import click
+
+    from authly.admin.client_commands import list_clients as admin_list_clients
     ctx = click.Context(admin_list_clients)
     ctx.params = {'format': output_format}
     
@@ -132,10 +132,10 @@ def list_clients(output_format: str) -> None:
 @click.option('--description', help='Client description')
 def create_client(name: str, client_type: str, redirect_uri: tuple, scope: tuple, description: Optional[str]) -> None:
     """Create a new OAuth client."""
-    from authly.admin.client_commands import create_client as admin_create_client
-    
     # Create a mock context for the admin command
     import click
+
+    from authly.admin.client_commands import create_client as admin_create_client
     ctx = click.Context(admin_create_client)
     ctx.params = {
         'name': name,
@@ -164,10 +164,10 @@ def auth() -> None:
 @click.option('--api-url', help='API URL (default: http://localhost:8000 or AUTHLY_API_URL env var)')
 def login(username: str, password: Optional[str], scope: str, api_url: Optional[str]) -> None:
     """Login to the Authly Admin API."""
-    from authly.admin.auth_commands import login as admin_login
-    
     # Create a mock context for the admin command
     import click
+
+    from authly.admin.auth_commands import login as admin_login
     ctx = click.Context(admin_login)
     ctx.params = {
         'username': username,
@@ -183,10 +183,10 @@ def login(username: str, password: Optional[str], scope: str, api_url: Optional[
 @auth.command()
 def logout() -> None:
     """Logout from the Authly Admin API."""
-    from authly.admin.auth_commands import logout as admin_logout
-    
     # Create a mock context for the admin command
     import click
+
+    from authly.admin.auth_commands import logout as admin_logout
     ctx = click.Context(admin_logout)
     
     # Run the admin command
@@ -197,10 +197,10 @@ def logout() -> None:
 @click.option('--verbose', '-v', is_flag=True, help='Show detailed token information')
 def whoami(verbose: bool) -> None:
     """Show current authentication status."""
-    from authly.admin.auth_commands import whoami as admin_whoami
-    
     # Create a mock context for the admin command
     import click
+
+    from authly.admin.auth_commands import whoami as admin_whoami
     ctx = click.Context(admin_whoami)
     ctx.params = {'verbose': verbose}
     
@@ -212,10 +212,10 @@ def whoami(verbose: bool) -> None:
 @click.option('--verbose', '-v', is_flag=True, help='Show detailed token information')
 def status(verbose: bool) -> None:
     """Show authentication and API status."""
-    from authly.admin.auth_commands import status as admin_auth_status
-    
     # Create a mock context for the admin command
     import click
+
+    from authly.admin.auth_commands import status as admin_auth_status
     ctx = click.Context(admin_auth_status)
     ctx.params = {'verbose': verbose}
     
@@ -226,10 +226,10 @@ def status(verbose: bool) -> None:
 @auth.command()
 def refresh() -> None:
     """Refresh authentication tokens."""
-    from authly.admin.auth_commands import refresh as admin_refresh
-    
     # Create a mock context for the admin command
     import click
+
+    from authly.admin.auth_commands import refresh as admin_refresh
     ctx = click.Context(admin_refresh)
     
     # Run the admin command
@@ -246,10 +246,10 @@ def refresh() -> None:
 @click.option('--api-url', help='API URL (default: http://localhost:8000 or AUTHLY_API_URL env var)')
 def login(username: str, password: Optional[str], scope: str, api_url: Optional[str]) -> None:
     """Login to the Authly Admin API (alias for 'auth login')."""
-    from authly.admin.auth_commands import login as admin_login
-    
     # Create a mock context for the admin command
     import click
+
+    from authly.admin.auth_commands import login as admin_login
     ctx = click.Context(admin_login)
     ctx.params = {
         'username': username,
@@ -265,10 +265,10 @@ def login(username: str, password: Optional[str], scope: str, api_url: Optional[
 @admin.command()
 def logout() -> None:
     """Logout from the Authly Admin API (alias for 'auth logout')."""
-    from authly.admin.auth_commands import logout as admin_logout
-    
     # Create a mock context for the admin command
     import click
+
+    from authly.admin.auth_commands import logout as admin_logout
     ctx = click.Context(admin_logout)
     
     # Run the admin command
@@ -279,10 +279,10 @@ def logout() -> None:
 @click.option('--verbose', '-v', is_flag=True, help='Show detailed token information')
 def whoami(verbose: bool) -> None:
     """Show current authentication status (alias for 'auth whoami')."""
-    from authly.admin.auth_commands import whoami as admin_whoami
-    
     # Create a mock context for the admin command
     import click
+
+    from authly.admin.auth_commands import whoami as admin_whoami
     ctx = click.Context(admin_whoami)
     ctx.params = {'verbose': verbose}
     
@@ -300,10 +300,10 @@ def scope() -> None:
 @click.option('--format', 'output_format', default='table', type=click.Choice(['table', 'json']), help='Output format')
 def list_scopes(output_format: str) -> None:
     """List all OAuth scopes."""
-    from authly.admin.scope_commands import list_scopes as admin_list_scopes
-    
     # Create a mock context for the admin command
     import click
+
+    from authly.admin.scope_commands import list_scopes as admin_list_scopes
     ctx = click.Context(admin_list_scopes)
     ctx.params = {'format': output_format}
     
@@ -316,10 +316,10 @@ def list_scopes(output_format: str) -> None:
 @click.option('--description', required=True, help='Scope description')
 def create_scope(name: str, description: str) -> None:
     """Create a new OAuth scope."""
-    from authly.admin.scope_commands import create_scope as admin_create_scope
-    
     # Create a mock context for the admin command
     import click
+
+    from authly.admin.scope_commands import create_scope as admin_create_scope
     ctx = click.Context(admin_create_scope)
     ctx.params = {
         'name': name,

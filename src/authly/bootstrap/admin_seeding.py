@@ -14,16 +14,16 @@ from datetime import datetime, timezone
 from typing import Optional
 from uuid import uuid4
 
-from psycopg import AsyncConnection
 from fastapi import HTTPException
+from psycopg import AsyncConnection
 
+from authly.api.admin_dependencies import ADMIN_SCOPES
 from authly.auth import get_password_hash
-from authly.users.models import UserModel
-from authly.users.repository import UserRepository
 from authly.oauth.models import OAuthScopeModel
 from authly.oauth.scope_repository import ScopeRepository
-from authly.api.admin_dependencies import ADMIN_SCOPES
 from authly.oidc.scopes import get_oidc_scopes_with_descriptions
+from authly.users.models import UserModel
+from authly.users.repository import UserRepository
 
 logger = logging.getLogger(__name__)
 

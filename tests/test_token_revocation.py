@@ -8,15 +8,17 @@ Comprehensive tests for the /auth/revoke endpoint including:
 - Security considerations
 """
 
+from datetime import datetime, timezone
+from uuid import uuid4
+
 import pytest
 from fastapi_testing import AsyncTestServer
+from psycopg_toolkit import TransactionManager
+
 from authly.api import auth_router, users_router
 from authly.auth.core import get_password_hash
-from authly.users import UserModel, UserRepository
 from authly.tokens import TokenService
-from uuid import uuid4
-from datetime import datetime, timezone
-from psycopg_toolkit import TransactionManager
+from authly.users import UserModel, UserRepository
 
 
 class TestTokenRevocation:

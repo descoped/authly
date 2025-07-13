@@ -5,22 +5,23 @@ This module tests the enhanced OAuth 2.1 authorization endpoint with OpenID Conn
 including OIDC-specific parameters and validation.
 """
 
+from unittest.mock import AsyncMock, Mock
+from urllib.parse import parse_qs, urlencode, urlparse
+
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import Mock, AsyncMock
-from urllib.parse import urlencode, parse_qs, urlparse
 
-from authly.oauth.models import (
-    OAuthAuthorizationRequest, 
-    UserConsentRequest, 
-    ResponseMode, 
-    Display, 
-    Prompt,
-    CodeChallengeMethod
-)
 from authly.oauth.authorization_service import AuthorizationService
-from authly.users.models import UserModel
+from authly.oauth.models import (
+    CodeChallengeMethod,
+    Display,
+    OAuthAuthorizationRequest,
+    Prompt,
+    ResponseMode,
+    UserConsentRequest,
+)
 from authly.oidc.scopes import OIDCClaimsMapping
+from authly.users.models import UserModel
 
 
 class TestOIDCAuthorizationRequest:

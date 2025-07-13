@@ -12,10 +12,10 @@ from starlette import status
 
 from authly import get_config
 from authly.auth import create_access_token, create_refresh_token, decode_token
+from authly.oidc.scopes import OIDCClaimsMapping
 from authly.tokens.models import TokenModel, TokenPairResponse, TokenType
 from authly.tokens.repository import TokenRepository
 from authly.users import UserModel, UserRepository
-from authly.oidc.scopes import OIDCClaimsMapping
 
 logger = logging.getLogger(__name__)
 
@@ -456,9 +456,9 @@ class TokenService:
             JWT ID token string
         """
         # Import here to avoid circular imports
-        from authly.oidc.id_token import create_id_token_service
+        from authly import authly_db_connection, get_config
         from authly.oauth.client_repository import ClientRepository
-        from authly import get_config, authly_db_connection
+        from authly.oidc.id_token import create_id_token_service
         
         try:
             # Get configuration

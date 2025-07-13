@@ -8,29 +8,19 @@ import logging
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from fastapi import APIRouter
-from fastapi import Depends
-from fastapi import HTTPException
-from fastapi import Query
-from fastapi import Request
-from fastapi import status
-from fastapi.responses import RedirectResponse, HTMLResponse
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.responses import HTMLResponse, RedirectResponse
 
 from authly.api.auth_dependencies import get_client_repository
 from authly.api.oauth_router import get_discovery_service
-from authly.api.users_dependencies import get_current_user
-from authly.api.users_dependencies import get_token_scopes
-from authly.api.users_dependencies import get_userinfo_service
+from authly.api.users_dependencies import get_current_user, get_token_scopes, get_userinfo_service
 from authly.oauth.client_repository import ClientRepository
 from authly.oauth.discovery_service import DiscoveryService
-from authly.oidc.discovery import OIDCDiscoveryService
-from authly.oidc.discovery import OIDCServerMetadata
+from authly.oidc.discovery import OIDCDiscoveryService, OIDCServerMetadata
 from authly.oidc.id_token import IDTokenGenerator
-from authly.oidc.userinfo import UserInfoResponse
-from authly.oidc.userinfo import UserInfoService
+from authly.oidc.userinfo import UserInfoResponse, UserInfoService
 from authly.tokens import TokenService, get_token_service
 from authly.users.models import UserModel
-
 
 logger = logging.getLogger(__name__)
 

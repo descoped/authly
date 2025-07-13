@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 import pytest
-from fastapi import FastAPI, Depends
+from fastapi import Depends, FastAPI
 from psycopg_pool import AsyncConnectionPool
 
 from authly import Authly, authly_db_connection, get_config

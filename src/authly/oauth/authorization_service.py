@@ -15,14 +15,14 @@ from authly.oauth.client_repository import ClientRepository
 from authly.oauth.models import (
     AuthorizationError,
     CodeChallengeMethod,
+    OAuthAuthorizationErrorResponse,
     OAuthAuthorizationRequest,
     OAuthAuthorizationResponse,
-    OAuthAuthorizationErrorResponse,
     OAuthClientModel,
-    ResponseType,
-    UserConsentRequest,
     Prompt,
     ResponseMode,
+    ResponseType,
+    UserConsentRequest,
 )
 from authly.oauth.scope_repository import ScopeRepository
 

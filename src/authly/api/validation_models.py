@@ -6,6 +6,7 @@ validation constraints based on configuration values rather than hardcoded value
 """
 
 from typing import Optional
+
 from pydantic import BaseModel, Field, constr
 
 

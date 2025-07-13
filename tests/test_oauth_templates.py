@@ -8,20 +8,22 @@ Comprehensive tests for the Jinja2 template rendering in OAuth authorization flo
 - User interface components
 """
 
+import os
+from datetime import datetime, timezone
+from uuid import uuid4
+
 import pytest
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi_testing import AsyncTestServer
-from authly.api import auth_router, users_router, oauth_router
-from authly.auth.core import get_password_hash
-from authly.users import UserModel, UserRepository
-from authly.oauth.client_repository import ClientRepository
-from authly.oauth.scope_repository import ScopeRepository
-from authly.oauth.models import OAuthClientModel, OAuthScopeModel, ClientType
-from uuid import uuid4
-from datetime import datetime, timezone
 from psycopg_toolkit import TransactionManager
-import os
+
+from authly.api import auth_router, oauth_router, users_router
+from authly.auth.core import get_password_hash
+from authly.oauth.client_repository import ClientRepository
+from authly.oauth.models import ClientType, OAuthClientModel, OAuthScopeModel
+from authly.oauth.scope_repository import ScopeRepository
+from authly.users import UserModel, UserRepository
 
 
 class TestOAuthTemplates:

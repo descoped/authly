@@ -4,24 +4,24 @@ Tests for OIDC ID Token functionality.
 This module tests the OpenID Connect ID token generation and validation.
 """
 
-import pytest
-from datetime import datetime, timezone, timedelta
-from uuid import uuid4
+from datetime import datetime, timedelta, timezone
 from unittest.mock import Mock
+from uuid import uuid4
 
-from jose import jwt, JWTError
+import pytest
 from fastapi import HTTPException
+from jose import JWTError, jwt
 
+from authly.config import AuthlyConfig
+from authly.oauth.models import OAuthClientModel
 from authly.oidc.id_token import (
+    IDTokenClaims,
     IDTokenGenerator,
     IDTokenService,
-    IDTokenClaims,
     create_id_token_service,
-    validate_id_token_scopes
+    validate_id_token_scopes,
 )
 from authly.users.models import UserModel
-from authly.oauth.models import OAuthClientModel
-from authly.config import AuthlyConfig
 
 
 class TestIDTokenGenerator:
@@ -213,8 +213,8 @@ class TestIDTokenGenerator:
         """Test validation of token with invalid signature."""
         # Create token with wrong RSA key - we'll simulate this by creating a token with a different key
         # and then validating it with the correct generator
-        from cryptography.hazmat.primitives.asymmetric import rsa
         from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives.asymmetric import rsa
         
         # Generate a different RSA key pair
         wrong_private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
@@ -248,8 +248,9 @@ class TestIDTokenGenerator:
     def test_validate_id_token_expired(self, generator, test_client):
         """Test validation of expired token."""
         # Create expired token using the current signing key
-        from authly.oidc.jwks import get_current_signing_key
         from cryptography.hazmat.primitives import serialization
+
+        from authly.oidc.jwks import get_current_signing_key
         
         signing_key = get_current_signing_key()
         if not signing_key:

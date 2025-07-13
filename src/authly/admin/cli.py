@@ -145,9 +145,9 @@ def status(ctx: click.Context):
 
 
 # Import command groups after main is defined to avoid circular imports
+from authly.admin.auth_commands import auth_group, login_alias, logout_alias, whoami_alias
 from authly.admin.client_commands import client_group
 from authly.admin.scope_commands import scope_group
-from authly.admin.auth_commands import auth_group, login_alias, logout_alias, whoami_alias
 
 # Add command groups
 main.add_command(auth_group)

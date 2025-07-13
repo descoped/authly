@@ -4,14 +4,16 @@ Tests that validate OAuth 2.1 token endpoint functionality without
 complex database transaction isolation issues.
 """
 
+from datetime import datetime, timezone
+from uuid import uuid4
+
 import pytest
 from fastapi_testing import AsyncTestServer
+from psycopg_toolkit import TransactionManager
+
 from authly.api import auth_router, oauth_router, users_router
 from authly.auth.core import get_password_hash
 from authly.users import UserModel, UserRepository
-from uuid import uuid4
-from datetime import datetime, timezone
-from psycopg_toolkit import TransactionManager
 
 
 class TestOAuth21EndToEndFlow:

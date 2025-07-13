@@ -2,16 +2,14 @@
 Tests for OIDC UserInfo endpoint and service.
 """
 
-from datetime import datetime
-from datetime import timezone
+from datetime import datetime, timezone
 from unittest.mock import Mock
 from uuid import uuid4
 
 import pytest
 from fastapi import HTTPException
 
-from authly.oidc.userinfo import UserInfoResponse
-from authly.oidc.userinfo import UserInfoService
+from authly.oidc.userinfo import UserInfoResponse, UserInfoService
 from authly.users.models import UserModel
 
 

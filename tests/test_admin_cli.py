@@ -3,11 +3,12 @@
 Tests CLI command structure, validation, and underlying service functionality.
 """
 
+from uuid import uuid4
+
 import pytest
 from click.testing import CliRunner
 from fastapi import HTTPException
 from psycopg_toolkit import TransactionManager
-from uuid import uuid4
 
 from authly import Authly
 from authly.admin.cli import main
