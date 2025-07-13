@@ -165,6 +165,22 @@ wait_for_services() {
     done
     
     log_error "Authly service did not become ready within $((max_attempts * 2)) seconds"
+    
+    # Check for database connection issues
+    local compose_cmd="docker compose"
+    if command -v docker-compose >/dev/null 2>&1; then
+        compose_cmd="docker-compose"
+    fi
+    
+    if $compose_cmd logs authly --tail 10 2>/dev/null | grep -q "password authentication failed"; then
+        log_error "Database authentication failure detected!"
+        log_error "This is often caused by persistent postgres volumes with old credentials."
+        log_error "Try running with the --clean flag to reset the database:"
+        log_error "  $0 $* --clean"
+        log_error "Or manually reset with:"
+        log_error "  $0 reset"
+    fi
+    
     return 1
 }
 
@@ -187,6 +203,34 @@ show_configuration() {
     echo "  Cleanup on Success: ${CLEANUP_ON_SUCCESS}"
     echo "  Cleanup on Failure: ${CLEANUP_ON_FAILURE}"
     echo ""
+}
+
+# Function to clean postgres volume
+clean_postgres_volume() {
+    log_info "Cleaning postgres volume to reset database..."
+    
+    local compose_cmd="docker compose"
+    if command -v docker-compose >/dev/null 2>&1; then
+        compose_cmd="docker-compose"
+    fi
+    
+    # Stop services first
+    log_info "Stopping services before volume cleanup..."
+    $compose_cmd down >/dev/null 2>&1
+    
+    # Remove postgres volume
+    if docker volume ls -q | grep -q "authly_postgres_data"; then
+        log_info "Removing postgres data volume..."
+        if docker volume rm authly_postgres_data >/dev/null 2>&1; then
+            log_success "Postgres volume cleaned successfully"
+        else
+            log_warning "Could not remove postgres volume (may not exist)"
+        fi
+    else
+        log_info "Postgres volume does not exist, skipping cleanup"
+    fi
+    
+    return 0
 }
 
 # Function to start Docker Compose services
@@ -225,6 +269,32 @@ stop_docker_services() {
     return 0
 }
 
+# Function to reset all volumes and containers
+reset_all_services() {
+    log_info "Resetting all Docker services and volumes..."
+    
+    local compose_cmd="docker compose"
+    if command -v docker-compose >/dev/null 2>&1; then
+        compose_cmd="docker-compose"
+    fi
+    
+    # Stop and remove everything
+    log_info "Stopping and removing all containers..."
+    $compose_cmd down -v --remove-orphans >/dev/null 2>&1
+    
+    # Remove specific volumes
+    local volumes=("authly_postgres_data" "authly_redis_data" "authly_authly_logs")
+    for volume in "${volumes[@]}"; do
+        if docker volume ls -q | grep -q "$volume"; then
+            log_info "Removing volume: $volume"
+            docker volume rm "$volume" >/dev/null 2>&1 || log_warning "Could not remove $volume"
+        fi
+    done
+    
+    log_success "All services and volumes reset"
+    return 0
+}
+
 # Function to display usage
 show_usage() {
     echo "Usage: $0 [TEST_MODE] [OPTIONS]"
@@ -243,6 +313,8 @@ show_usage() {
     echo "  start          - Start Docker Compose services and wait for readiness"
     echo "  stop           - Stop Docker Compose services"
     echo "  restart        - Restart Docker Compose services"
+    echo "  reset          - Stop services and remove all volumes (full reset)"
+    echo "  clean          - Clean postgres volume and restart services"
     echo ""
     echo "Options:"
     echo "  --help, -h        - Show this help message"
@@ -250,6 +322,7 @@ show_usage() {
     echo "  --no-docker-check - Skip Docker service checks"
     echo "  --start-services  - Start services before running tests"
     echo "  --stop-after      - Stop services after running tests"
+    echo "  --clean           - Clean postgres volume before starting (fixes auth issues)"
     echo ""
     echo "Environment Variables:"
     echo "  AUTHLY_ADMIN_PASSWORD - Admin password (auto-detected if not set)"
@@ -261,9 +334,17 @@ show_usage() {
     echo "  $0 start                     # Start Docker services"
     echo "  $0 comprehensive             # Run comprehensive tests"
     echo "  $0 oauth --start-services    # Start services and run OAuth tests"
+    echo "  $0 comprehensive --clean     # Clean database and run all tests"
+    echo "  $0 reset                     # Full reset of all services and volumes"
+    echo "  $0 clean                     # Clean postgres volume and restart"
     echo "  $0 stop                      # Stop Docker services"
     echo "  $0 --setup-only              # Setup environment and show config"
     echo "  AUTHLY_ADMIN_PASSWORD='secret' $0  # Use specific admin password"
+    echo ""
+    echo "Troubleshooting:"
+    echo "  If you see database authentication errors, try:"
+    echo "    $0 comprehensive --clean     # Clean postgres volume"
+    echo "    $0 reset                     # Full reset if clean doesn't work"
 }
 
 # Main function
@@ -273,6 +354,7 @@ main() {
     local skip_docker_check=false
     local start_services=false
     local stop_after=false
+    local clean_volumes=false
     
     # Parse arguments
     while [[ $# -gt 0 ]]; do
@@ -297,6 +379,10 @@ main() {
                 stop_after=true
                 shift
                 ;;
+            --clean)
+                clean_volumes=true
+                shift
+                ;;
             start)
                 start_docker_services
                 wait_for_services
@@ -308,6 +394,16 @@ main() {
                 ;;
             restart)
                 stop_docker_services
+                start_docker_services
+                wait_for_services
+                exit $?
+                ;;
+            reset)
+                reset_all_services
+                exit $?
+                ;;
+            clean)
+                clean_postgres_volume
                 start_docker_services
                 wait_for_services
                 exit $?
@@ -327,6 +423,12 @@ main() {
     log_info "=== Authly Integration Test Wrapper ==="
     log_info "Test mode: $test_mode"
     echo ""
+    
+    # Clean volumes if requested
+    if [[ "$clean_volumes" == "true" ]]; then
+        clean_postgres_volume || exit 1
+        start_services=true  # Auto-start services after cleaning
+    fi
     
     # Start services if requested
     if [[ "$start_services" == "true" ]]; then

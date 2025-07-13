@@ -53,6 +53,8 @@ This framework provides end-to-end testing of:
 | `start` | Start Docker Compose services and wait for readiness |
 | `stop` | Stop Docker Compose services |
 | `restart` | Restart Docker Compose services |
+| `reset` | Stop services and remove all volumes (full reset) |
+| `clean` | Clean postgres volume and restart services |
 
 ### Utility Modes
 
@@ -84,6 +86,12 @@ This framework provides end-to-end testing of:
 
 # Restart services
 ./scripts/run-integration-tests.sh restart
+
+# Clean postgres volume and restart (fixes auth issues)
+./scripts/run-integration-tests.sh clean
+
+# Full reset - remove all volumes and containers
+./scripts/run-integration-tests.sh reset
 ```
 
 ### Advanced Options
@@ -93,6 +101,12 @@ This framework provides end-to-end testing of:
 
 # Stop services after testing
 ./scripts/run-integration-tests.sh comprehensive --stop-after
+
+# Clean postgres volume before testing (fixes database auth issues)
+./scripts/run-integration-tests.sh comprehensive --clean
+
+# Combination: clean, start, test, and stop
+./scripts/run-integration-tests.sh comprehensive --clean --start-services --stop-after
 
 # Setup environment without running tests
 ./scripts/run-integration-tests.sh --setup-only
@@ -201,6 +215,8 @@ scripts/
 - Admin password auto-detection
 - Service readiness checks
 - Test execution coordination
+- **Enhanced database troubleshooting** with automatic cleanup suggestions
+- **Volume management** for persistent state issues
 
 #### Test Orchestrator (`integration-tests/run-full-stack-test.sh`)
 - Master test runner with multiple execution modes
@@ -237,6 +253,14 @@ scripts/
 | `RUN_OAUTH_TESTS` | `true` | Enable OAuth flow tests |
 | `CLEANUP_ON_SUCCESS` | `true` | Cleanup test data after successful tests |
 | `CLEANUP_ON_FAILURE` | `true` | Cleanup test data after failed tests |
+
+### Cleanup Options
+
+| Option/Command | Description | Use Case |
+|----------------|-------------|----------|
+| `--clean` | Remove postgres volume before starting | Database auth issues |
+| `clean` | Clean postgres volume and restart | Quick database reset |
+| `reset` | Remove all volumes and containers | Full cleanup for stubborn issues |
 
 ### Configuration Example
 ```bash
@@ -301,6 +325,25 @@ pkce_json=$(generate_pkce_pair)
 
 ### Common Issues
 
+#### **Database Authentication Failures** (Most Common)
+
+This happens when postgres volumes persist with old credentials:
+
+```bash
+# Quick fix: Clean postgres volume
+./scripts/run-integration-tests.sh comprehensive --clean
+
+# Manual cleanup if needed
+./scripts/run-integration-tests.sh clean
+
+# Full reset for stubborn issues
+./scripts/run-integration-tests.sh reset
+```
+
+**Symptoms**: "password authentication failed for user authly", service fails to start
+**Cause**: Persistent postgres volumes with mismatched credentials
+**Solution**: The `--clean` flag removes postgres volumes and starts fresh
+
 #### "Admin password not configured"
 ```bash
 # Solution 1: Let script auto-detect
@@ -328,7 +371,10 @@ curl http://localhost:8000/health
 # Check Docker logs
 docker compose logs authly
 
-# Restart services
+# Try cleaning postgres volume first
+./scripts/run-integration-tests.sh clean
+
+# Or restart services
 ./scripts/run-integration-tests.sh restart
 ```
 
@@ -341,6 +387,19 @@ docker compose exec authly env | grep ADMIN
 curl -X POST http://localhost:8000/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username":"admin","password":"ci_admin_test_password"}'
+```
+
+### **Enhanced Error Detection**
+
+The script now automatically detects database authentication issues and suggests fixes:
+
+```
+[ERROR] Database authentication failure detected!
+[ERROR] This is often caused by persistent postgres volumes with old credentials.
+[ERROR] Try running with the --clean flag to reset the database:
+[ERROR]   ./scripts/run-integration-tests.sh comprehensive --clean
+[ERROR] Or manually reset with:
+[ERROR]   ./scripts/run-integration-tests.sh reset
 ```
 
 ### Debug Mode
