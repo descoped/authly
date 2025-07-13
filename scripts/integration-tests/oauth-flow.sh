@@ -38,7 +38,7 @@ create_oauth_test_client() {
     # Ensure we have admin authentication
     if ! load_admin_token || ! is_admin_token_valid; then
         log_info "Admin token not available, performing admin login"
-        admin_login "$ADMIN_USERNAME" "$ADMIN_PASSWORD" || return 1
+        admin_login "$ADMIN_USERNAME" "$AUTHLY_ADMIN_PASSWORD" || return 1
     fi
     
     # Generate client data
@@ -188,7 +188,7 @@ test_authorization_code_exchange_mock() {
 {
   "grant_type": "password",
   "username": "admin",
-  "password": "$ADMIN_PASSWORD",
+  "password": "$AUTHLY_ADMIN_PASSWORD",
   "scope": "$OAUTH_SCOPES"
 }
 EOF

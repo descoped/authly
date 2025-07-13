@@ -455,7 +455,7 @@ run_scope_management_test() {
     # Ensure admin authentication is available
     if ! load_admin_token || ! is_admin_token_valid; then
         log_info "Admin token not available, performing admin login"
-        admin_login "$ADMIN_USERNAME" "$ADMIN_PASSWORD" || return 1
+        admin_login "$ADMIN_USERNAME" "$AUTHLY_ADMIN_PASSWORD" || return 1
     fi
     
     # Verify scope management endpoints are available

@@ -110,19 +110,16 @@ setup_environment() {
     export ADMIN_USERNAME="${ADMIN_USERNAME:-admin}"
     
     # Try to get admin password if not already set
-    if [[ -z "${AUTHLY_ADMIN_PASSWORD:-}" && -z "${ADMIN_PASSWORD:-}" ]]; then
+    if [[ -z "${AUTHLY_ADMIN_PASSWORD:-}" ]]; then
         log_info "Admin password not set, attempting to detect..."
         if DETECTED_PASSWORD=$(get_admin_password); then
             export AUTHLY_ADMIN_PASSWORD="$DETECTED_PASSWORD"
-            export ADMIN_PASSWORD="$DETECTED_PASSWORD"
         else
-            log_error "Please set AUTHLY_ADMIN_PASSWORD or ADMIN_PASSWORD environment variable"
+            log_error "Please set AUTHLY_ADMIN_PASSWORD environment variable"
             log_error "Example: export AUTHLY_ADMIN_PASSWORD='your_admin_password'"
             return 1
         fi
     else
-        # Use existing password
-        export ADMIN_PASSWORD="${ADMIN_PASSWORD:-${AUTHLY_ADMIN_PASSWORD:-}}"
         log_success "Using provided admin password"
     fi
     
@@ -189,7 +186,7 @@ show_configuration() {
     log_info "Integration Test Configuration:"
     echo "  Base URL: ${AUTHLY_BASE_URL}"
     echo "  Admin User: ${ADMIN_USERNAME}"
-    echo "  Admin Password: $(echo "${ADMIN_PASSWORD}" | sed 's/./*/g')"
+    echo "  Admin Password: $(echo "${AUTHLY_ADMIN_PASSWORD}" | sed 's/./*/g')"
     echo "  Test Prefixes: ${TEST_USER_PREFIX}, ${TEST_CLIENT_PREFIX}, ${TEST_SCOPE_PREFIX}"
     echo ""
     log_info "Test Modules:"
@@ -463,12 +460,17 @@ main() {
     log_info "Starting integration tests..."
     echo ""
     
-    # Set up cleanup to stop services if requested
+    # Run the test script
     if [[ "$stop_after" == "true" ]]; then
-        trap 'stop_docker_services' EXIT
+        # If stop_after is requested, don't use exec so we can stop services after
+        "$SCRIPT_DIR/integration-tests/run-full-stack-test.sh" "$test_mode"
+        local test_result=$?
+        stop_docker_services
+        exit $test_result
+    else
+        # Use exec to replace current process when not stopping services
+        exec "$SCRIPT_DIR/integration-tests/run-full-stack-test.sh" "$test_mode"
     fi
-    
-    exec "$SCRIPT_DIR/integration-tests/run-full-stack-test.sh" "$test_mode"
 }
 
 # Run main function with all arguments

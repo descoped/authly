@@ -7,7 +7,8 @@ AUTHLY_API_BASE="${AUTHLY_BASE_URL}/api/v1"
 
 # Admin configuration
 ADMIN_USERNAME="${ADMIN_USERNAME:-admin}"
-ADMIN_PASSWORD="${ADMIN_PASSWORD:-${AUTHLY_ADMIN_PASSWORD:-}}"
+# Admin password - standardized on AUTHLY_ADMIN_PASSWORD
+AUTHLY_ADMIN_PASSWORD="${AUTHLY_ADMIN_PASSWORD:-}"
 
 # Test configuration
 TEST_USER_PREFIX="${TEST_USER_PREFIX:-testuser}"
@@ -87,8 +88,8 @@ validate_config() {
     done
     
     # Check required environment variables
-    if [[ -z "$ADMIN_PASSWORD" ]]; then
-        log_error "Admin password not configured. Set AUTHLY_ADMIN_PASSWORD or ADMIN_PASSWORD"
+    if [[ -z "$AUTHLY_ADMIN_PASSWORD" ]]; then
+        log_error "Admin password not configured. Set AUTHLY_ADMIN_PASSWORD environment variable"
         return 1
     fi
     
@@ -102,7 +103,7 @@ show_config() {
     echo "  Base URL: $AUTHLY_BASE_URL"
     echo "  API Base: $AUTHLY_API_BASE"
     echo "  Admin User: $ADMIN_USERNAME"
-    echo "  Admin Password: $(echo "$ADMIN_PASSWORD" | sed 's/./*/g')"
+    echo "  Admin Password: $(echo "$AUTHLY_ADMIN_PASSWORD" | sed 's/./*/g')"
     echo "  Test Prefixes: $TEST_USER_PREFIX, $TEST_CLIENT_PREFIX, $TEST_SCOPE_PREFIX"
     echo "  Cleanup on Success: $CLEANUP_ON_SUCCESS"
     echo "  Cleanup on Failure: $CLEANUP_ON_FAILURE"
@@ -110,7 +111,7 @@ show_config() {
 
 # Export configuration variables
 export AUTHLY_BASE_URL AUTHLY_API_BASE
-export ADMIN_USERNAME ADMIN_PASSWORD
+export ADMIN_USERNAME AUTHLY_ADMIN_PASSWORD
 export TEST_USER_PREFIX TEST_CLIENT_PREFIX TEST_SCOPE_PREFIX
 export AUTH_LOGIN_ENDPOINT AUTH_TOKEN_ENDPOINT AUTH_REVOKE_ENDPOINT
 export USERS_ENDPOINT ADMIN_USERS_ENDPOINT CLIENTS_ENDPOINT SCOPES_ENDPOINT

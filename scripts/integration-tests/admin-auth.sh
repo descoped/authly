@@ -247,7 +247,7 @@ run_admin_auth_test() {
         log_info "Using existing valid admin token"
     else
         # Perform fresh login
-        admin_login "$ADMIN_USERNAME" "$ADMIN_PASSWORD" || return 1
+        admin_login "$ADMIN_USERNAME" "$AUTHLY_ADMIN_PASSWORD" || return 1
     fi
     
     # Validate the token works

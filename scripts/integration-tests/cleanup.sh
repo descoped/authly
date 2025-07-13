@@ -196,7 +196,7 @@ comprehensive_cleanup() {
     # Ensure we have admin authentication
     if ! load_admin_token || ! is_admin_token_valid; then
         log_info "Admin token not available, performing admin login for cleanup"
-        if ! admin_login "$ADMIN_USERNAME" "$ADMIN_PASSWORD"; then
+        if ! admin_login "$ADMIN_USERNAME" "$AUTHLY_ADMIN_PASSWORD"; then
             log_error "Failed to authenticate admin user for cleanup"
             return 1
         fi
@@ -327,17 +327,17 @@ run_cleanup() {
             show_cleanup_status
             ;;
         "clients")
-            admin_login "$ADMIN_USERNAME" "$ADMIN_PASSWORD" || return 1
+            admin_login "$ADMIN_USERNAME" "$AUTHLY_ADMIN_PASSWORD" || return 1
             cleanup_all_test_clients
             admin_logout
             ;;
         "scopes")
-            admin_login "$ADMIN_USERNAME" "$ADMIN_PASSWORD" || return 1
+            admin_login "$ADMIN_USERNAME" "$AUTHLY_ADMIN_PASSWORD" || return 1
             cleanup_all_test_scopes
             admin_logout
             ;;
         "users")
-            admin_login "$ADMIN_USERNAME" "$ADMIN_PASSWORD" || return 1
+            admin_login "$ADMIN_USERNAME" "$AUTHLY_ADMIN_PASSWORD" || return 1
             cleanup_all_test_users
             admin_logout
             ;;

@@ -71,7 +71,7 @@ run_test_script() {
     local exit_code=0
     
     # Run the test script and capture output
-    if AUTHLY_ADMIN_PASSWORD="$ADMIN_PASSWORD" "$script_path" >/dev/null 2>&1; then
+    if AUTHLY_ADMIN_PASSWORD="$AUTHLY_ADMIN_PASSWORD" "$script_path" >/dev/null 2>&1; then
         local test_end=$(date +%s)
         local duration=$((test_end - test_start))
         record_test_result "$test_description" "PASSED" "$duration"
@@ -207,7 +207,7 @@ run_cleanup() {
     local cleanup_start=$(date +%s)
     
     if [[ -f "$SCRIPT_DIR/cleanup.sh" ]]; then
-        if AUTHLY_ADMIN_PASSWORD="$ADMIN_PASSWORD" "$SCRIPT_DIR/cleanup.sh" "$cleanup_type" >/dev/null 2>&1; then
+        if AUTHLY_ADMIN_PASSWORD="$AUTHLY_ADMIN_PASSWORD" "$SCRIPT_DIR/cleanup.sh" "$cleanup_type" >/dev/null 2>&1; then
             local cleanup_end=$(date +%s)
             local duration=$((cleanup_end - cleanup_start))
             record_test_result "$description" "PASSED" "$duration"
