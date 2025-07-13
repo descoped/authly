@@ -23,7 +23,7 @@ class TokenEndpointAuthMethod(str, Enum):
 
 class IDTokenSigningAlgorithm(str, Enum):
     """OpenID Connect ID token signing algorithms"""
-    
+
     RS256 = "RS256"  # RSA using SHA-256 (default and recommended)
     HS256 = "HS256"  # HMAC using SHA-256
     ES256 = "ES256"  # ECDSA using P-256 and SHA-256
@@ -31,8 +31,8 @@ class IDTokenSigningAlgorithm(str, Enum):
 
 class SubjectType(str, Enum):
     """OpenID Connect subject identifier types"""
-    
-    PUBLIC = "public"    # Same sub value for all clients
+
+    PUBLIC = "public"  # Same sub value for all clients
     PAIRWISE = "pairwise"  # Different sub value per client
 
 
@@ -58,6 +58,7 @@ class CodeChallengeMethod(str, Enum):
 
 class ResponseMode(str, Enum):
     """OpenID Connect response modes"""
+
     QUERY = "query"
     FRAGMENT = "fragment"
     FORM_POST = "form_post"
@@ -65,6 +66,7 @@ class ResponseMode(str, Enum):
 
 class Display(str, Enum):
     """OpenID Connect display parameter values"""
+
     PAGE = "page"
     POPUP = "popup"
     TOUCH = "touch"
@@ -73,6 +75,7 @@ class Display(str, Enum):
 
 class Prompt(str, Enum):
     """OpenID Connect prompt parameter values"""
+
     NONE = "none"
     LOGIN = "login"
     CONSENT = "consent"
@@ -107,7 +110,7 @@ class OAuthClientModel(BaseModel):
     jwks_uri: Optional[str] = None  # JSON Web Key Set URI
     software_id: Optional[str] = Field(None, max_length=255)
     software_version: Optional[str] = Field(None, max_length=50)
-    
+
     # OpenID Connect specific fields
     id_token_signed_response_alg: IDTokenSigningAlgorithm = IDTokenSigningAlgorithm.RS256
     subject_type: SubjectType = SubjectType.PUBLIC
@@ -116,7 +119,7 @@ class OAuthClientModel(BaseModel):
     default_max_age: Optional[int] = None  # Default max_age for authentication
     initiate_login_uri: Optional[str] = None  # URI for third-party initiated login
     request_uris: List[str] = Field(default_factory=list)  # Pre-registered request URIs
-    
+
     # OIDC Client Registration fields
     application_type: str = "web"  # "web" or "native"
     contacts: List[str] = Field(default_factory=list)  # Contact email addresses
@@ -145,14 +148,14 @@ class OAuthClientModel(BaseModel):
     def is_redirect_uri_allowed(self, redirect_uri: str) -> bool:
         """Check if a redirect URI is allowed for this client"""
         return redirect_uri in self.redirect_uris
-    
+
     def is_oidc_client(self) -> bool:
         """Check if this client has OpenID Connect capabilities (openid scope in default scopes)"""
         if not self.scope:
             return False
         scopes = self.scope.split()
         return "openid" in scopes
-    
+
     def get_oidc_scopes(self) -> List[str]:
         """Get OIDC-specific scopes for this client"""
         if not self.scope:
@@ -220,7 +223,7 @@ class OAuthAuthorizationCodeModel(BaseModel):
     def is_valid(self) -> bool:
         """Check if the authorization code is valid (not used and not expired)"""
         return not self.is_used and not self.is_expired()
-    
+
     def is_oidc_request(self) -> bool:
         """Check if this authorization code is for an OpenID Connect request"""
         if not self.scope:
@@ -259,7 +262,7 @@ class OAuthClientCreateRequest(BaseModel):
     policy_uri: Optional[str] = None
     software_id: Optional[str] = None
     software_version: Optional[str] = None
-    
+
     # OpenID Connect specific fields
     id_token_signed_response_alg: Optional[IDTokenSigningAlgorithm] = None
     subject_type: Optional[SubjectType] = None
@@ -296,7 +299,7 @@ class OAuthClientResponse(BaseModel):
     policy_uri: Optional[str]
     software_id: Optional[str]
     software_version: Optional[str]
-    
+
     # OpenID Connect specific fields
     id_token_signed_response_alg: IDTokenSigningAlgorithm = IDTokenSigningAlgorithm.RS256
     subject_type: SubjectType = SubjectType.PUBLIC
@@ -323,92 +326,98 @@ class OAuthClientCredentialsResponse(BaseModel):
 
 class OAuthAuthorizationRequest(BaseModel):
     """OAuth 2.1 Authorization Request Model (RFC 6749 Section 4.1.1 + PKCE) with OpenID Connect extensions"""
-    
+
     # Required OAuth 2.1 parameters
     response_type: ResponseType = Field(..., description="Must be 'code' for authorization code flow")
     client_id: str = Field(..., min_length=1, max_length=255, description="Client identifier")
     redirect_uri: str = Field(..., min_length=1, description="Client redirect URI")
-    
+
     # PKCE parameters (OAuth 2.1 mandatory)
     code_challenge: str = Field(..., min_length=43, max_length=128, description="PKCE code challenge")
-    code_challenge_method: CodeChallengeMethod = Field(default=CodeChallengeMethod.S256, description="PKCE challenge method")
-    
+    code_challenge_method: CodeChallengeMethod = Field(
+        default=CodeChallengeMethod.S256, description="PKCE challenge method"
+    )
+
     # Optional parameters
     scope: Optional[str] = Field(None, description="Requested scopes (space-separated)")
     state: Optional[str] = Field(None, max_length=255, description="CSRF protection parameter")
-    
+
     # OpenID Connect specific parameters
     nonce: Optional[str] = Field(None, max_length=255, description="OpenID Connect nonce for ID token binding")
     response_mode: Optional[ResponseMode] = Field(None, description="How the authorization response should be returned")
-    display: Optional[Display] = Field(None, description="How the authorization server displays authentication interface")
+    display: Optional[Display] = Field(
+        None, description="How the authorization server displays authentication interface"
+    )
     prompt: Optional[Prompt] = Field(None, description="Whether to prompt for re-authentication/consent")
     max_age: Optional[int] = Field(None, ge=0, description="Maximum authentication age in seconds")
     ui_locales: Optional[str] = Field(None, max_length=255, description="Preferred UI languages (space-separated)")
-    id_token_hint: Optional[str] = Field(None, max_length=2048, description="ID token hint for logout or re-authentication")
+    id_token_hint: Optional[str] = Field(
+        None, max_length=2048, description="ID token hint for logout or re-authentication"
+    )
     login_hint: Optional[str] = Field(None, max_length=255, description="Hint to identify the user for authentication")
     acr_values: Optional[str] = Field(None, max_length=255, description="Authentication Context Class Reference values")
-    
+
     def get_scope_list(self) -> List[str]:
         """Convert space-separated scopes to list"""
         if not self.scope:
             return []
         return self.scope.split()
-    
+
     def get_ui_locales_list(self) -> List[str]:
         """Convert space-separated UI locales to list"""
         if not self.ui_locales:
             return []
         return self.ui_locales.split()
-    
+
     def get_acr_values_list(self) -> List[str]:
         """Convert space-separated ACR values to list"""
         if not self.acr_values:
             return []
         return self.acr_values.split()
-    
+
     def is_oidc_request(self) -> bool:
         """Check if this is an OpenID Connect request (contains 'openid' scope)"""
         return "openid" in self.get_scope_list()
-    
+
     def validate_pkce_params(self) -> bool:
         """Validate PKCE parameters according to OAuth 2.1"""
         # Code challenge must be base64url-encoded with length 43-128
         if not self.code_challenge or len(self.code_challenge) < 43 or len(self.code_challenge) > 128:
             return False
-        
+
         # OAuth 2.1 only allows S256
         return self.code_challenge_method == CodeChallengeMethod.S256
-    
+
     def validate_oidc_params(self) -> bool:
         """Validate OpenID Connect specific parameters"""
         # If prompt=none, user must not be prompted for authentication or consent
         if self.prompt == Prompt.NONE:
             # Additional validation could be added here
             return True
-        
+
         # max_age must be non-negative if provided
         if self.max_age is not None and self.max_age < 0:
             return False
-        
+
         return True
 
 
 class OAuthAuthorizationResponse(BaseModel):
     """OAuth 2.1 Authorization Response Model (RFC 6749 Section 4.1.2)"""
-    
+
     # Success response
     code: Optional[str] = Field(None, description="Authorization code")
     state: Optional[str] = Field(None, description="State parameter from request")
-    
+
     # Error response (RFC 6749 Section 4.1.2.1)
     error: Optional[str] = Field(None, description="Error code")
     error_description: Optional[str] = Field(None, description="Human-readable error description")
     error_uri: Optional[str] = Field(None, description="URI to error information page")
-    
+
     def is_success(self) -> bool:
         """Check if this is a successful response"""
         return self.code is not None and self.error is None
-    
+
     def is_error(self) -> bool:
         """Check if this is an error response"""
         return self.error is not None
@@ -416,7 +425,7 @@ class OAuthAuthorizationResponse(BaseModel):
 
 class OAuthAuthorizationErrorResponse(BaseModel):
     """OAuth 2.1 Authorization Error Response Model"""
-    
+
     error: str = Field(..., description="Error code")
     error_description: Optional[str] = Field(None, description="Human-readable error description")
     error_uri: Optional[str] = Field(None, description="URI to error information page")
@@ -426,7 +435,7 @@ class OAuthAuthorizationErrorResponse(BaseModel):
 # OAuth 2.1 Error Codes (RFC 6749 Section 4.1.2.1)
 class AuthorizationError(str, Enum):
     """OAuth 2.1 Authorization Error Codes"""
-    
+
     INVALID_REQUEST = "invalid_request"
     UNAUTHORIZED_CLIENT = "unauthorized_client"
     ACCESS_DENIED = "access_denied"
@@ -438,16 +447,17 @@ class AuthorizationError(str, Enum):
 
 # User Consent Models
 
+
 class UserConsentRequest(BaseModel):
     """User consent request for authorization flow with OpenID Connect support"""
-    
+
     client_id: str = Field(..., description="Client requesting authorization")
     redirect_uri: str = Field(..., description="Redirect URI")
     scope: Optional[str] = Field(None, description="Requested scopes")
     state: Optional[str] = Field(None, description="State parameter")
     code_challenge: str = Field(..., description="PKCE code challenge")
     code_challenge_method: CodeChallengeMethod = Field(default=CodeChallengeMethod.S256)
-    
+
     # OpenID Connect parameters
     nonce: Optional[str] = Field(None, description="OpenID Connect nonce")
     response_mode: Optional[ResponseMode] = Field(None, description="Response mode")
@@ -458,7 +468,7 @@ class UserConsentRequest(BaseModel):
     id_token_hint: Optional[str] = Field(None, description="ID token hint")
     login_hint: Optional[str] = Field(None, description="Login hint")
     acr_values: Optional[str] = Field(None, description="ACR values")
-    
+
     # User decision
     user_id: UUID = Field(..., description="Authenticated user ID")
     approved: bool = Field(..., description="Whether user approved the request")
@@ -467,15 +477,15 @@ class UserConsentRequest(BaseModel):
 
 class AuthorizationCodeGrantRequest(BaseModel):
     """Authorization code grant request for token endpoint"""
-    
+
     grant_type: GrantType = Field(..., description="Must be 'authorization_code'")
     code: str = Field(..., description="Authorization code received")
     redirect_uri: str = Field(..., description="Redirect URI from authorization request")
     client_id: str = Field(..., description="Client identifier")
-    
+
     # PKCE verification (OAuth 2.1 mandatory)
     code_verifier: str = Field(..., min_length=43, max_length=128, description="PKCE code verifier")
-    
+
     def validate_pkce_verifier(self) -> bool:
         """Validate PKCE code verifier according to OAuth 2.1"""
         # Code verifier must be base64url-encoded with length 43-128

@@ -104,37 +104,35 @@ class TestAdminCLIStructure:
     def test_client_create_validation_errors(self, cli_runner: CliRunner):
         """Test client create command validation."""
         # Missing required name
-        result = cli_runner.invoke(main, [
-            "client", "create",
-            "--type", "public",
-            "--redirect-uri", "https://example.com/callback"
-        ])
+        result = cli_runner.invoke(
+            main, ["client", "create", "--type", "public", "--redirect-uri", "https://example.com/callback"]
+        )
         assert result.exit_code != 0
 
         # Invalid client type
-        result = cli_runner.invoke(main, [
-            "client", "create",
-            "--name", "Test",
-            "--type", "invalid_type",
-            "--redirect-uri", "https://example.com/callback"
-        ])
+        result = cli_runner.invoke(
+            main,
+            [
+                "client",
+                "create",
+                "--name",
+                "Test",
+                "--type",
+                "invalid_type",
+                "--redirect-uri",
+                "https://example.com/callback",
+            ],
+        )
         assert result.exit_code != 0
 
         # Missing redirect URI
-        result = cli_runner.invoke(main, [
-            "client", "create",
-            "--name", "Test",
-            "--type", "public"
-        ])
+        result = cli_runner.invoke(main, ["client", "create", "--name", "Test", "--type", "public"])
         assert result.exit_code != 0
 
     def test_scope_create_validation_errors(self, cli_runner: CliRunner):
         """Test scope create command validation."""
         # Missing required name
-        result = cli_runner.invoke(main, [
-            "scope", "create",
-            "--description", "Test description"
-        ])
+        result = cli_runner.invoke(main, ["scope", "create", "--description", "Test description"])
         assert result.exit_code != 0
 
 
@@ -142,11 +140,7 @@ class TestAdminCLIServices:
     """Test CLI underlying service functionality with real database."""
 
     @pytest.mark.asyncio
-    async def test_client_service_integration(
-        self,
-        initialize_authly: Authly,
-        transaction_manager: TransactionManager
-    ):
+    async def test_client_service_integration(self, initialize_authly: Authly, transaction_manager: TransactionManager):
         """Test client service functionality that CLI commands would use."""
         async with transaction_manager.transaction() as conn:
             client_repo = ClientRepository(conn)
@@ -160,7 +154,7 @@ class TestAdminCLIServices:
                 client_type=ClientType.PUBLIC,
                 redirect_uris=["https://example.com/callback"],
                 scope="read write",
-                require_pkce=True
+                require_pkce=True,
             )
 
             created_client = await client_service.create_client(create_request)
@@ -188,11 +182,7 @@ class TestAdminCLIServices:
             assert success is True
 
     @pytest.mark.asyncio
-    async def test_scope_service_integration(
-        self,
-        initialize_authly: Authly,
-        transaction_manager: TransactionManager
-    ):
+    async def test_scope_service_integration(self, initialize_authly: Authly, transaction_manager: TransactionManager):
         """Test scope service functionality that CLI commands would use."""
         async with transaction_manager.transaction() as conn:
             scope_repo = ScopeRepository(conn)
@@ -202,10 +192,7 @@ class TestAdminCLIServices:
             scope_name = f"cli_test_scope_{uuid4().hex[:8]}"
 
             created_scope = await scope_service.create_scope(
-                scope_name=scope_name,
-                description="CLI test scope",
-                is_default=True,
-                is_active=True
+                scope_name=scope_name, description="CLI test scope", is_default=True, is_active=True
             )
             assert created_scope.scope_name == scope_name
             assert created_scope.description == "CLI test scope"
@@ -223,9 +210,7 @@ class TestAdminCLIServices:
 
             # Test updating scope (what CLI update command does)
             update_data = {"description": "Updated CLI test scope"}
-            updated_scope = await scope_service.update_scope(
-                scope_name, update_data, requesting_admin=True
-            )
+            updated_scope = await scope_service.update_scope(scope_name, update_data, requesting_admin=True)
             assert updated_scope.description == "Updated CLI test scope"
 
             # Test getting default scopes (what CLI defaults command does)
@@ -240,9 +225,7 @@ class TestAdminCLIServices:
 
     @pytest.mark.asyncio
     async def test_confidential_client_secret_generation(
-        self,
-        initialize_authly: Authly,
-        transaction_manager: TransactionManager
+        self, initialize_authly: Authly, transaction_manager: TransactionManager
     ):
         """Test confidential client creation with secret generation."""
         async with transaction_manager.transaction() as conn:
@@ -256,7 +239,7 @@ class TestAdminCLIServices:
                 client_name=client_name,
                 client_type=ClientType.CONFIDENTIAL,
                 redirect_uris=["https://example.com/callback"],
-                require_pkce=True
+                require_pkce=True,
             )
 
             created_client = await client_service.create_client(create_request)
@@ -272,11 +255,7 @@ class TestAdminCLIServices:
             assert len(new_secret) > 20
 
     @pytest.mark.asyncio
-    async def test_client_scope_associations(
-        self,
-        initialize_authly: Authly,
-        transaction_manager: TransactionManager
-    ):
+    async def test_client_scope_associations(self, initialize_authly: Authly, transaction_manager: TransactionManager):
         """Test client-scope associations functionality."""
         async with transaction_manager.transaction() as conn:
             client_repo = ClientRepository(conn)
@@ -289,16 +268,10 @@ class TestAdminCLIServices:
             scope2_name = f"test_scope_2_{uuid4().hex[:8]}"
 
             await scope_service.create_scope(
-                scope_name=scope1_name,
-                description="Test scope 1",
-                is_default=False,
-                is_active=True
+                scope_name=scope1_name, description="Test scope 1", is_default=False, is_active=True
             )
             await scope_service.create_scope(
-                scope_name=scope2_name,
-                description="Test scope 2",
-                is_default=True,
-                is_active=True
+                scope_name=scope2_name, description="Test scope 2", is_default=True, is_active=True
             )
 
             # Create client with scopes
@@ -308,22 +281,18 @@ class TestAdminCLIServices:
                 client_type=ClientType.PUBLIC,
                 redirect_uris=["https://example.com/callback"],
                 scope=f"{scope1_name} {scope2_name}",  # Multiple scopes
-                require_pkce=True
+                require_pkce=True,
             )
 
             created_client = await client_service.create_client(create_request)
-            
+
             # Test getting client scopes (what CLI show command displays)
             client_scopes = await client_service.get_client_scopes(created_client.client_id)
             assert scope1_name in client_scopes
             assert scope2_name in client_scopes
 
     @pytest.mark.asyncio
-    async def test_cli_service_error_handling(
-        self,
-        initialize_authly: Authly,
-        transaction_manager: TransactionManager
-    ):
+    async def test_cli_service_error_handling(self, initialize_authly: Authly, transaction_manager: TransactionManager):
         """Test error handling in services that CLI commands would encounter."""
         async with transaction_manager.transaction() as conn:
             client_repo = ClientRepository(conn)

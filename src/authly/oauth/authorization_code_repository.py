@@ -26,9 +26,7 @@ class AuthorizationCodeRepository(BaseRepository[OAuthAuthorizationCodeModel, UU
             primary_key="id",
         )
 
-    async def create_authorization_code(
-        self, code_data: dict
-    ) -> OAuthAuthorizationCodeModel:
+    async def create_authorization_code(self, code_data: dict) -> OAuthAuthorizationCodeModel:
         """
         Create a new authorization code from dictionary data.
         """
@@ -42,9 +40,7 @@ class AuthorizationCodeRepository(BaseRepository[OAuthAuthorizationCodeModel, UU
                 insert_data["is_used"] = False
 
             # Build insert query
-            insert_query = PsycopgHelper.build_insert_query(
-                table_name="oauth_authorization_codes", data=insert_data
-            )
+            insert_query = PsycopgHelper.build_insert_query(table_name="oauth_authorization_codes", data=insert_data)
 
             async with self.db_connection.cursor(row_factory=dict_row) as cur:
                 await cur.execute(insert_query + SQL(" RETURNING *"), list(insert_data.values()))
@@ -78,6 +74,7 @@ class AuthorizationCodeRepository(BaseRepository[OAuthAuthorizationCodeModel, UU
             # Generate cryptographically secure authorization code
             try:
                 from authly import get_config
+
                 config = get_config()
                 auth_code_length = config.authorization_code_length
             except RuntimeError:
@@ -212,11 +209,11 @@ class AuthorizationCodeRepository(BaseRepository[OAuthAuthorizationCodeModel, UU
     async def verify_pkce_challenge(self, code: str, code_verifier: str) -> bool:
         """
         Verify PKCE challenge for an authorization code.
-        
+
         Args:
             code: Authorization code
             code_verifier: PKCE code verifier to validate
-            
+
         Returns:
             True if PKCE verification succeeds
         """
@@ -224,9 +221,9 @@ class AuthorizationCodeRepository(BaseRepository[OAuthAuthorizationCodeModel, UU
             auth_code = await self.get_by_code(code)
             if not auth_code:
                 return False
-                
+
             return self._verify_pkce(code_verifier, auth_code.code_challenge, auth_code.code_challenge_method)
-            
+
         except Exception as e:
             logger.error(f"Error in verify_pkce_challenge: {e}")
             return False

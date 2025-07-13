@@ -324,12 +324,12 @@ class TestJWKSGlobalFunctions:
         """Test global get_key_for_verification function."""
         # Get current signing key
         signing_key = get_current_signing_key()
-        
+
         # Test getting key for verification
         verification_key = get_key_for_verification(signing_key.key_id)
         assert verification_key is not None
         assert verification_key.key_id == signing_key.key_id
-        
+
         # Test with non-existent key
         assert get_key_for_verification("nonexistent") is None
 

@@ -79,7 +79,13 @@ class TokenService:
         if invalidated_count == 0:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No active sessions found")
 
-    async def create_token_pair(self, user: UserModel, scope: Optional[str] = None, client_id: Optional[UUID] = None, oidc_params: Optional[dict] = None) -> TokenPairResponse:
+    async def create_token_pair(
+        self,
+        user: UserModel,
+        scope: Optional[str] = None,
+        client_id: Optional[UUID] = None,
+        oidc_params: Optional[dict] = None,
+    ) -> TokenPairResponse:
         """
         Create a new access and refresh token pair for a user, with optional ID token for OIDC flows.
 
@@ -103,7 +109,7 @@ class TokenService:
 
             # Prepare token data
             access_data = {"sub": str(user.id), "jti": access_jti}
-            
+
             # Add scope to access token if provided (OAuth 2.1 compliance)
             if scope:
                 access_data["scope"] = scope
@@ -171,7 +177,9 @@ class TokenService:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not create authentication tokens"
             )
 
-    async def refresh_token_pair(self, refresh_token: str, user_repo: UserRepository, client_id: Optional[UUID] = None) -> TokenPairResponse:
+    async def refresh_token_pair(
+        self, refresh_token: str, user_repo: UserRepository, client_id: Optional[UUID] = None
+    ) -> TokenPairResponse:
         """
         Create a new token pair using a refresh token, invalidating the old refresh token.
 
@@ -205,7 +213,7 @@ class TokenService:
             original_token = await self.get_token(token_jti)
             if not original_token or not await self.is_token_valid(token_jti):
                 raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token is invalid or expired")
-            
+
             # Extract scope from original token for preservation
             original_scope = original_token.scope
 
@@ -218,7 +226,7 @@ class TokenService:
             if not user.is_active:
                 raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User is inactive")
 
-            # Generate new JTIs for both tokens  
+            # Generate new JTIs for both tokens
             config = get_config()
             new_access_jti = secrets.token_hex(config.token_hex_length)
             new_refresh_jti = secrets.token_hex(config.token_hex_length)
@@ -227,7 +235,7 @@ class TokenService:
             access_data = {"sub": user_id, "jti": new_access_jti}
             if original_scope:
                 access_data["scope"] = original_scope
-            
+
             # Create new tokens
             new_access_token = create_access_token(
                 data=access_data,
@@ -336,26 +344,26 @@ class TokenService:
     async def revoke_token(self, token: str, token_type_hint: Optional[str] = None) -> bool:
         """
         Revoke a token according to RFC 7009 OAuth 2.0 Token Revocation.
-        
+
         Args:
             token: The token to revoke (JWT string)
             token_type_hint: Optional hint ("access_token" or "refresh_token")
-            
+
         Returns:
             bool: True if token was successfully revoked, False if token was invalid
-            
+
         Notes:
             - If revoking a refresh token, also revokes related access tokens
             - If revoking an access token, only revokes that specific token
             - Returns False for invalid tokens (don't raise exceptions per RFC 7009)
         """
         config = get_config()
-        
+
         try:
             # Try to decode as access token first (most common case)
             token_payload = None
             token_type = None
-            
+
             # Use hint to optimize token lookup if provided
             if token_type_hint == "refresh_token":
                 # Try refresh token first
@@ -365,7 +373,7 @@ class TokenService:
                         token_type = TokenType.REFRESH
                 except ValueError:
                     pass
-                    
+
                 # If refresh failed, try access token
                 if token_payload is None:
                     try:
@@ -386,23 +394,23 @@ class TokenService:
                             token_type = TokenType.REFRESH
                     except ValueError:
                         return False
-            
+
             if token_payload is None or token_type is None:
                 return False
-                
+
             # Extract JTI from token
             jti = token_payload.get("jti")
             if not jti:
                 return False
-                
+
             # Check if token exists and is valid in database
             if not await self.is_token_valid(jti):
                 # Token doesn't exist or already invalidated
                 return False
-                
+
             # Revoke the token
             success = await self.invalidate_token(jti)
-            
+
             # If this is a refresh token, also revoke related access tokens
             if success and token_type == TokenType.REFRESH:
                 user_id = token_payload.get("sub")
@@ -416,12 +424,12 @@ class TokenService:
                         logger.info(f"Revoked refresh token and related access tokens for user {user_uuid}")
                     except (ValueError, TypeError):
                         logger.warning(f"Invalid user ID in refresh token: {user_id}")
-            
+
             if success:
                 logger.info(f"Successfully revoked {token_type.value} token with JTI: {jti}")
-            
+
             return success
-            
+
         except Exception as e:
             # Log error but don't raise exception per RFC 7009
             logger.error(f"Error during token revocation: {str(e)}")
@@ -430,28 +438,30 @@ class TokenService:
     def _is_oidc_request(self, scope: Optional[str]) -> bool:
         """
         Check if this is an OpenID Connect request (contains 'openid' scope).
-        
+
         Args:
             scope: Space-separated scopes string
-            
+
         Returns:
             True if this is an OIDC request
         """
         if not scope:
             return False
-        
+
         scopes = scope.split()
         return OIDCClaimsMapping.is_oidc_request(scopes)
 
-    async def _generate_id_token(self, user: UserModel, scope: str, client_id: UUID, oidc_params: Optional[dict] = None) -> str:
+    async def _generate_id_token(
+        self, user: UserModel, scope: str, client_id: UUID, oidc_params: Optional[dict] = None
+    ) -> str:
         """
         Generate an ID token for OpenID Connect flows.
-        
+
         Args:
             user: The user to create ID token for
             scope: Granted scopes (space-separated string)
             oidc_params: Optional OIDC parameters from authorization code
-            
+
         Returns:
             JWT ID token string
         """
@@ -459,47 +469,38 @@ class TokenService:
         from authly import authly_db_connection, get_config
         from authly.oauth.client_repository import ClientRepository
         from authly.oidc.id_token import create_id_token_service
-        
+
         try:
             # Get configuration
             config = get_config()
-            
+
             # Create ID token service
             id_token_service = create_id_token_service(config)
-            
+
             # Get client information for ID token audience
             async for conn in authly_db_connection():
                 client_repo = ClientRepository(conn)
                 client = await client_repo.get_by_id(client_id)
                 break
-            
+
             if not client:
                 raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid client for ID token generation"
+                    status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid client for ID token generation"
                 )
-            
+
             # Extract scopes
             scopes = scope.split() if scope else []
-            
+
             # Extract OIDC parameters
             nonce = oidc_params.get("nonce") if oidc_params else None
             max_age = oidc_params.get("max_age") if oidc_params else None
             acr_values = oidc_params.get("acr_values") if oidc_params else None
-            
+
             # Generate ID token
-            id_token = await id_token_service.create_id_token(
-                user=user,
-                client=client,
-                scopes=scopes,
-                nonce=nonce
-            )
-            
+            id_token = await id_token_service.create_id_token(user=user, client=client, scopes=scopes, nonce=nonce)
+
             return id_token
-            
+
         except Exception as e:
             logger.error(f"Error generating ID token: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Could not generate ID token"
-            )
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not generate ID token")

@@ -191,7 +191,11 @@ class TestGetCurrentClientDependency:
 
     @pytest.mark.asyncio
     async def test_http_basic_auth_confidential_client(
-        self, initialize_authly: Authly, created_confidential_client, test_confidential_client_data: dict, transaction_manager: TransactionManager
+        self,
+        initialize_authly: Authly,
+        created_confidential_client,
+        test_confidential_client_data: dict,
+        transaction_manager: TransactionManager,
     ):
         """Test HTTP Basic Authentication with confidential client."""
         async with transaction_manager.transaction() as conn:
@@ -203,19 +207,18 @@ class TestGetCurrentClientDependency:
             class MockRequest:
                 def __init__(self):
                     self.headers = {}
-                    
+
             request = MockRequest()
 
             # Test the dependency
             client_id = test_confidential_client_data["client_id"]
             client_secret = test_confidential_client_data["client_secret"]
             from fastapi.security import HTTPBasicCredentials
+
             basic_credentials = HTTPBasicCredentials(username=client_id, password=client_secret)
-            
+
             authenticated_client = await get_current_client(
-                request=request,
-                client_service=client_service,
-                basic_credentials=basic_credentials
+                request=request, client_service=client_service, basic_credentials=basic_credentials
             )
 
             assert authenticated_client is not None
@@ -224,7 +227,11 @@ class TestGetCurrentClientDependency:
 
     @pytest.mark.asyncio
     async def test_http_basic_auth_public_client(
-        self, initialize_authly: Authly, created_public_client, test_public_client_data: dict, transaction_manager: TransactionManager
+        self,
+        initialize_authly: Authly,
+        created_public_client,
+        test_public_client_data: dict,
+        transaction_manager: TransactionManager,
     ):
         """Test HTTP Basic Authentication with public client (no secret)."""
         async with transaction_manager.transaction() as conn:
@@ -236,18 +243,17 @@ class TestGetCurrentClientDependency:
             class MockRequest:
                 def __init__(self):
                     self.headers = {}
-                    
+
             request = MockRequest()
 
             # Test the dependency with public client (no credentials)
             client_id = test_public_client_data["client_id"]
             from fastapi.security import HTTPBasicCredentials
+
             basic_credentials = HTTPBasicCredentials(username=client_id, password="")
-            
+
             authenticated_client = await get_current_client(
-                request=request,
-                client_service=client_service,
-                basic_credentials=basic_credentials
+                request=request, client_service=client_service, basic_credentials=basic_credentials
             )
 
             assert authenticated_client is not None
@@ -255,9 +261,7 @@ class TestGetCurrentClientDependency:
             assert authenticated_client.client_type == ClientType.PUBLIC
 
     @pytest.mark.asyncio
-    async def test_invalid_client_credentials(
-        self, initialize_authly: Authly, transaction_manager: TransactionManager
-    ):
+    async def test_invalid_client_credentials(self, initialize_authly: Authly, transaction_manager: TransactionManager):
         """Test authentication failure with invalid credentials."""
         async with transaction_manager.transaction() as conn:
             client_repo = ClientRepository(conn)
@@ -268,27 +272,24 @@ class TestGetCurrentClientDependency:
             class MockRequest:
                 def __init__(self):
                     self.headers = {}
-                    
+
             request = MockRequest()
 
             # Test with invalid credentials
             from fastapi.security import HTTPBasicCredentials
+
             basic_credentials = HTTPBasicCredentials(username="invalid_client", password="invalid_secret")
-            
+
             with pytest.raises(HTTPException) as exc_info:
                 await get_current_client(
-                    request=request,
-                    client_service=client_service,
-                    basic_credentials=basic_credentials
+                    request=request, client_service=client_service, basic_credentials=basic_credentials
                 )
 
             assert exc_info.value.status_code == 401
             assert "Invalid client credentials" in exc_info.value.detail
 
     @pytest.mark.asyncio
-    async def test_missing_client_credentials(
-        self, initialize_authly: Authly, transaction_manager: TransactionManager
-    ):
+    async def test_missing_client_credentials(self, initialize_authly: Authly, transaction_manager: TransactionManager):
         """Test authentication failure with missing credentials."""
         async with transaction_manager.transaction() as conn:
             client_repo = ClientRepository(conn)
@@ -299,23 +300,23 @@ class TestGetCurrentClientDependency:
             class MockRequest:
                 def __init__(self):
                     self.headers = {}
-                    
+
             request = MockRequest()
 
             # Test with no credentials
             with pytest.raises(HTTPException) as exc_info:
-                await get_current_client(
-                    request=request,
-                    client_service=client_service,
-                    basic_credentials=None
-                )
+                await get_current_client(request=request, client_service=client_service, basic_credentials=None)
 
             assert exc_info.value.status_code == 401
             assert "Client authentication required" in exc_info.value.detail
 
     @pytest.mark.asyncio
     async def test_confidential_client_wrong_secret(
-        self, initialize_authly: Authly, created_confidential_client, test_confidential_client_data: dict, transaction_manager: TransactionManager
+        self,
+        initialize_authly: Authly,
+        created_confidential_client,
+        test_confidential_client_data: dict,
+        transaction_manager: TransactionManager,
     ):
         """Test confidential client with wrong secret fails authentication."""
         async with transaction_manager.transaction() as conn:
@@ -327,19 +328,18 @@ class TestGetCurrentClientDependency:
             class MockRequest:
                 def __init__(self):
                     self.headers = {}
-                    
+
             request = MockRequest()
 
             # Test with wrong secret
             client_id = test_confidential_client_data["client_id"]
             from fastapi.security import HTTPBasicCredentials
+
             basic_credentials = HTTPBasicCredentials(username=client_id, password="wrong_secret")
-            
+
             with pytest.raises(HTTPException) as exc_info:
                 await get_current_client(
-                    request=request,
-                    client_service=client_service,
-                    basic_credentials=basic_credentials
+                    request=request, client_service=client_service, basic_credentials=basic_credentials
                 )
 
             assert exc_info.value.status_code == 401
@@ -347,7 +347,11 @@ class TestGetCurrentClientDependency:
 
     @pytest.mark.asyncio
     async def test_public_client_with_secret_fails(
-        self, initialize_authly: Authly, created_public_client, test_public_client_data: dict, transaction_manager: TransactionManager
+        self,
+        initialize_authly: Authly,
+        created_public_client,
+        test_public_client_data: dict,
+        transaction_manager: TransactionManager,
     ):
         """Test public client providing secret fails authentication."""
         async with transaction_manager.transaction() as conn:
@@ -359,19 +363,18 @@ class TestGetCurrentClientDependency:
             class MockRequest:
                 def __init__(self):
                     self.headers = {}
-                    
+
             request = MockRequest()
 
             # Test public client with secret (should fail)
             client_id = test_public_client_data["client_id"]
             from fastapi.security import HTTPBasicCredentials
+
             basic_credentials = HTTPBasicCredentials(username=client_id, password="unexpected_secret")
-            
+
             with pytest.raises(HTTPException) as exc_info:
                 await get_current_client(
-                    request=request,
-                    client_service=client_service,
-                    basic_credentials=basic_credentials
+                    request=request, client_service=client_service, basic_credentials=basic_credentials
                 )
 
             assert exc_info.value.status_code == 401
@@ -391,9 +394,9 @@ class TestGetCurrentClientDependency:
             inactive_client_data = test_confidential_client_data.copy()
             inactive_client_data["is_active"] = False
             inactive_client_data["client_id"] = "inactive_client_" + uuid4().hex[:8]
-            
+
             created_client = await client_repo.create_client(inactive_client_data)
-            
+
             # Deactivate the client
             await client_repo.delete_client(created_client.id)
 
@@ -401,29 +404,31 @@ class TestGetCurrentClientDependency:
             class MockRequest:
                 def __init__(self):
                     self.headers = {}
-                    
+
             request = MockRequest()
 
             # Test with inactive client
             from fastapi.security import HTTPBasicCredentials
+
             basic_credentials = HTTPBasicCredentials(
-                username=inactive_client_data["client_id"], 
-                password=inactive_client_data["client_secret"]
+                username=inactive_client_data["client_id"], password=inactive_client_data["client_secret"]
             )
-            
+
             with pytest.raises(HTTPException) as exc_info:
                 await get_current_client(
-                    request=request,
-                    client_service=client_service,
-                    basic_credentials=basic_credentials
+                    request=request, client_service=client_service, basic_credentials=basic_credentials
                 )
 
             assert exc_info.value.status_code == 401
             assert "Invalid client credentials" in exc_info.value.detail
 
-    @pytest.mark.asyncio  
+    @pytest.mark.asyncio
     async def test_form_data_authentication(
-        self, initialize_authly: Authly, created_post_client, test_confidential_client_post_data: dict, transaction_manager: TransactionManager
+        self,
+        initialize_authly: Authly,
+        created_post_client,
+        test_confidential_client_post_data: dict,
+        transaction_manager: TransactionManager,
     ):
         """Test client authentication via form data (CLIENT_SECRET_POST)."""
         async with transaction_manager.transaction() as conn:
@@ -436,27 +441,25 @@ class TestGetCurrentClientDependency:
                 def get(self, key, default=None):
                     data = {
                         "client_id": test_confidential_client_post_data["client_id"],
-                        "client_secret": test_confidential_client_post_data["client_secret"]
+                        "client_secret": test_confidential_client_post_data["client_secret"],
                     }
                     return data.get(key, default)
-            
+
             class MockRequest:
                 def __init__(self):
                     self.headers = {"content-type": "application/x-www-form-urlencoded"}
-                    
+
                 async def form(self):
                     return MockFormData()
-                    
+
                 async def json(self):
                     raise Exception("Not JSON")
-            
+
             request = MockRequest()
 
             # Test the dependency (no basic credentials, should fallback to form data)
             authenticated_client = await get_current_client(
-                request=request,
-                client_service=client_service,
-                basic_credentials=None
+                request=request, client_service=client_service, basic_credentials=None
             )
 
             assert authenticated_client is not None

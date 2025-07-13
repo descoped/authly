@@ -99,23 +99,23 @@ class JWKSService:
         """Load existing keys from database into memory."""
         if not self._repository:
             return
-            
+
         try:
             db_keys = await self._repository.get_active_keys()
             for db_key in db_keys:
                 # Skip if already loaded
                 if db_key.kid in self._key_pairs:
                     continue
-                    
+
                 # Note: We can only load the public key from database
                 # Private keys should not be stored in database for security
                 # This method is mainly for JWKS endpoint serving public keys
                 logger.info(f"Loaded public key {db_key.kid} from database")
-                
+
                 # Set current key if none exists
                 if self._current_key_id is None:
                     self._current_key_id = db_key.kid
-                    
+
         except Exception as e:
             logger.error(f"Failed to load keys from database: {e}")
 
@@ -134,12 +134,13 @@ class JWKSService:
         if key_size is None:
             try:
                 from authly import get_config
+
                 config = get_config()
                 key_size = config.rsa_key_size
             except RuntimeError:
                 # Fallback for tests without full Authly initialization
                 key_size = 2048
-            
+
         logger.info(f"Generating new RSA key pair (size: {key_size}, algorithm: {algorithm})")
 
         # Generate private key
@@ -168,7 +169,7 @@ class JWKSService:
             try:
                 # Convert to JWK format for database storage
                 jwk_model = self.convert_to_jwk(key_pair)
-                
+
                 # Create database model
                 db_key_model = JWKSKeyModel(
                     kid=key_id,
@@ -178,12 +179,12 @@ class JWKSService:
                     key_use="sig",
                     is_active=True,
                     created_at=key_pair.created_at,
-                    key_size=key_size
+                    key_size=key_size,
                 )
-                
+
                 await self._repository.store_key(db_key_model)
                 logger.info(f"Stored key pair {key_id} in database")
-                
+
             except Exception as e:
                 logger.error(f"Failed to store key pair in database: {e}")
                 # Continue without database storage
@@ -198,28 +199,28 @@ class JWKSService:
     def _generate_rsa_key_pair_sync(self, key_size: int = 2048, algorithm: str = "RS256") -> RSAKeyPair:
         """
         Synchronous wrapper for RSA key pair generation.
-        
+
         Used for backwards compatibility when async context is not available.
         Note: This will not store keys in database since it's sync.
-        
+
         Args:
             key_size: RSA key size in bits (default 2048)
             algorithm: JWT algorithm (RS256, RS384, RS512)
-            
+
         Returns:
             RSAKeyPair: New key pair with unique key ID
         """
         logger.info(f"Generating RSA key pair synchronously (size: {key_size}, algorithm: {algorithm})")
-        
+
         # Generate private key
         private_key = rsa.generate_private_key(public_exponent=65537, key_size=key_size)
-        
+
         # Get public key
         public_key = private_key.public_key()
-        
+
         # Generate unique key ID
         key_id = self._generate_key_id()
-        
+
         # Create key pair object
         key_pair = RSAKeyPair(
             private_key=private_key,
@@ -228,14 +229,14 @@ class JWKSService:
             created_at=datetime.now(timezone.utc),
             algorithm=algorithm,
         )
-        
+
         # Store key pair in memory
         self._key_pairs[key_id] = key_pair
-        
+
         # Set as current key if no current key exists
         if self._current_key_id is None:
             self._current_key_id = key_id
-        
+
         logger.info(f"Generated RSA key pair synchronously with ID: {key_id}")
         return key_pair
 

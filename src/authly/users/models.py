@@ -18,7 +18,7 @@ class UserModel(BaseModel):
     is_verified: bool = False
     is_admin: bool = False
     requires_password_change: bool = False
-    
+
     # OIDC Standard Claims - Profile scope
     given_name: Optional[str] = Field(None, description="OIDC: Given name (first name)")
     family_name: Optional[str] = Field(None, description="OIDC: Family name (last name)")
@@ -32,14 +32,14 @@ class UserModel(BaseModel):
     birthdate: Optional[str] = Field(None, description="OIDC: Birthdate in YYYY-MM-DD format")
     zoneinfo: Optional[str] = Field(None, description="OIDC: Time zone identifier (e.g., America/New_York)")
     locale: Optional[str] = Field(None, description="OIDC: Preferred locale (e.g., en-US)")
-    
-    # OIDC Standard Claims - Phone scope  
+
+    # OIDC Standard Claims - Phone scope
     phone_number: Optional[str] = Field(None, description="OIDC: Phone number")
     phone_number_verified: Optional[bool] = Field(None, description="OIDC: Phone number verification status")
-    
+
     # OIDC Standard Claims - Address scope (structured claim)
     address: Optional[Dict[str, Any]] = Field(None, description="OIDC: Structured address claim")
-    
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -74,7 +74,7 @@ class UserModel(BaseModel):
                     "locality": "Anytown",
                     "region": "ST",
                     "postal_code": "12345",
-                    "country": "USA"
-                }
+                    "country": "USA",
+                },
             }
         }

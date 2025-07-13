@@ -66,6 +66,7 @@ class ClientService:
             if request.client_type == ClientType.CONFIDENTIAL:
                 try:
                     from authly import get_config
+
                     config = get_config()
                     client_secret_length = config.client_secret_length
                 except RuntimeError:
@@ -109,7 +110,7 @@ class ClientService:
             # Validate requested scopes exist
             if request.scope:
                 await self._validate_scope_string(request.scope)
-            
+
             # Validate OIDC specific fields
             self._validate_oidc_fields(request)
 
@@ -452,12 +453,13 @@ class ClientService:
             # Basic URI validation
             try:
                 from authly import get_config
+
                 config = get_config()
                 redirect_uri_max_length = config.redirect_uri_max_length
             except RuntimeError:
                 # Fallback for tests
                 redirect_uri_max_length = 2000
-                
+
             if not uri or len(uri) > redirect_uri_max_length:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid redirect URI: {uri}")
 
@@ -472,12 +474,12 @@ class ClientService:
             if client_type == ClientType.PUBLIC:
                 # Public clients can use:
                 # 1. HTTPS for web applications
-                # 2. Localhost for development/testing  
+                # 2. Localhost for development/testing
                 # 3. Custom schemes for mobile applications (RFC 8252)
                 is_https = uri.startswith("https://")
                 is_localhost = uri.startswith("http://localhost") or uri.startswith("http://127.0.0.1")
                 is_custom_scheme = "://" in uri and not uri.startswith("http://") and not uri.startswith("https://")
-                
+
                 if not (is_https or is_localhost or is_custom_scheme):
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
@@ -501,54 +503,48 @@ class ClientService:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid scopes: {', '.join(invalid_scopes)}"
             )
-    
+
     def _validate_oidc_fields(self, request: OAuthClientCreateRequest) -> None:
         """Validate OpenID Connect specific client fields"""
-        
+
         # Check if this is an OIDC client (has openid scope)
         is_oidc_client = False
         if request.scope:
             scopes = request.scope.split()
             is_oidc_client = "openid" in scopes
-        
+
         # Validate sector_identifier_uri for pairwise subject type
         if request.subject_type == "pairwise" and not request.sector_identifier_uri:
             if is_oidc_client:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="sector_identifier_uri is required for pairwise subject type"
+                    detail="sector_identifier_uri is required for pairwise subject type",
                 )
-        
+
         # Validate default_max_age
         if request.default_max_age is not None and request.default_max_age < 0:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="default_max_age must be non-negative"
-            )
-        
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="default_max_age must be non-negative")
+
         # Validate request_uris (if provided)
         if request.request_uris:
             for uri in request.request_uris:
                 if not uri.startswith("https://"):
                     raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"request_uris must use HTTPS: {uri}"
+                        status_code=status.HTTP_400_BAD_REQUEST, detail=f"request_uris must use HTTPS: {uri}"
                     )
-        
+
         # Validate contacts (basic email format check)
         if request.contacts:
             for contact in request.contacts:
                 if "@" not in contact or "." not in contact:
                     raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"Invalid contact email format: {contact}"
+                        status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid contact email format: {contact}"
                     )
-        
+
         # Validate application_type
         if request.application_type and request.application_type not in ["web", "native"]:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="application_type must be 'web' or 'native'"
+                status_code=status.HTTP_400_BAD_REQUEST, detail="application_type must be 'web' or 'native'"
             )
 
     async def _assign_scopes_to_client(self, client_id: UUID, scope_string: Optional[str]) -> None:

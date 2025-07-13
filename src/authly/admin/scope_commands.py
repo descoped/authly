@@ -35,44 +35,30 @@ def scope_group():
 @click.option("--default", "is_default", is_flag=True, help="Mark as default scope")
 @click.option("--output", type=click.Choice(["table", "json"]), default="table", help="Output format")
 @click.pass_context
-def create_scope(
-    ctx: click.Context,
-    name: str,
-    description: Optional[str],
-    is_default: bool,
-    output: str
-):
+def create_scope(ctx: click.Context, name: str, description: Optional[str], is_default: bool, output: str):
     """Create a new OAuth 2.1 scope."""
     verbose = ctx.obj.get("verbose", False)
     dry_run = ctx.obj.get("dry_run", False)
-    
+
     if verbose:
         click.echo(f"Creating OAuth scope: {name}")
-    
+
     if dry_run:
         click.echo("DRY RUN: Would create scope with the following configuration:")
         if output == "json":
-            scope_data = {
-                "name": name,
-                "description": description,
-                "is_default": is_default
-            }
+            scope_data = {"name": name, "description": description, "is_default": is_default}
             click.echo(json.dumps(scope_data, indent=2))
         else:
             click.echo(f"  Name: {name}")
             click.echo(f"  Description: {description or 'None'}")
             click.echo(f"  Default: {'✅ Yes' if is_default else '❌ No'}")
         return
-    
+
     async def run_create():
         async with get_api_client() as client:
             try:
-                result = await client.create_scope(
-                    name=name,
-                    description=description,
-                    is_default=is_default
-                )
-                
+                result = await client.create_scope(name=name, description=description, is_default=is_default)
+
                 if output == "json":
                     click.echo(json.dumps(result.model_dump(), indent=2, default=str))
                 else:
@@ -82,11 +68,11 @@ def create_scope(
                     click.echo(f"  Default: {'✅ Yes' if result.is_default else '❌ No'}")
                     click.echo(f"  Active: {'✅ Yes' if result.is_active else '❌ No'}")
                     click.echo(f"  Created: {result.created_at}")
-                        
+
             except Exception as e:
                 click.echo(f"❌ Error creating scope: {e}", err=True)
                 sys.exit(1)
-    
+
     try:
         asyncio.run(run_create())
     except Exception as e:
@@ -104,54 +90,49 @@ def create_scope(
 def list_scopes(ctx: click.Context, limit: int, offset: int, output: str, show_inactive: bool, default_only: bool):
     """List OAuth 2.1 scopes."""
     verbose = ctx.obj.get("verbose", False)
-    
+
     if verbose:
         click.echo(f"Listing OAuth scopes (limit: {limit}, offset: {offset})")
-    
+
     async def run_list():
         async with get_api_client() as client:
             try:
                 if default_only:
                     scopes = await client.get_default_scopes()
                 else:
-                    scopes = await client.list_scopes(
-                        active_only=not show_inactive,
-                        limit=limit,
-                        offset=offset
-                    )
-                
+                    scopes = await client.list_scopes(active_only=not show_inactive, limit=limit, offset=offset)
+
                 if output == "json":
                     click.echo(json.dumps([scope.model_dump() for scope in scopes], indent=2, default=str))
                 else:
                     if not scopes:
                         click.echo("No scopes found.")
                         return
-                    
+
                     # Table header
                     click.echo(f"{'Scope Name':<20} {'Description':<40} {'Default':<7} {'Active':<6} {'Created'}")
                     click.echo("-" * 100)
-                    
+
                     # Table rows
                     for scope in scopes:
                         description = scope.description or ""
                         if len(description) > 37:
                             description = description[:37] + "..."
-                        
+
                         default_flag = "✅" if scope.is_default else "❌"
                         active_flag = "✅" if scope.is_active else "❌"
                         created = scope.created_at.strftime("%Y-%m-%d")
-                        
+
                         click.echo(
-                            f"{scope.scope_name:<20} {description:<40} "
-                            f"{default_flag:<7} {active_flag:<6} {created}"
+                            f"{scope.scope_name:<20} {description:<40} {default_flag:<7} {active_flag:<6} {created}"
                         )
-                    
+
                     click.echo(f"\nTotal: {len(scopes)} scope(s)")
-                    
+
             except Exception as e:
                 click.echo(f"❌ Error listing scopes: {e}", err=True)
                 sys.exit(1)
-    
+
     try:
         asyncio.run(run_list())
     except Exception as e:
@@ -166,15 +147,15 @@ def list_scopes(ctx: click.Context, limit: int, offset: int, output: str, show_i
 def show_scope(ctx: click.Context, scope_name: str, output: str):
     """Show detailed information about a specific scope."""
     verbose = ctx.obj.get("verbose", False)
-    
+
     if verbose:
         click.echo(f"Getting scope details: {scope_name}")
-    
+
     async def run_show():
         async with get_api_client() as client:
             try:
                 scope = await client.get_scope(scope_name)
-                
+
                 if output == "json":
                     click.echo(json.dumps(scope.model_dump(), indent=2, default=str))
                 else:
@@ -186,14 +167,14 @@ def show_scope(ctx: click.Context, scope_name: str, output: str):
                     click.echo(f"Active: {'✅ Yes' if scope.is_active else '❌ No'}")
                     click.echo(f"Created: {scope.created_at}")
                     click.echo(f"Updated: {scope.updated_at}")
-                    
+
             except Exception as e:
                 if "404" in str(e):
                     click.echo(f"❌ Scope not found: {scope_name}", err=True)
                 else:
                     click.echo(f"❌ Error getting scope details: {e}", err=True)
                 sys.exit(1)
-    
+
     try:
         asyncio.run(run_show())
     except Exception as e:
@@ -216,20 +197,20 @@ def update_scope(
     make_default: bool,
     remove_default: bool,
     activate: bool,
-    deactivate: bool
+    deactivate: bool,
 ):
     """Update scope information."""
     verbose = ctx.obj.get("verbose", False)
     dry_run = ctx.obj.get("dry_run", False)
-    
+
     if make_default and remove_default:
         click.echo("❌ Cannot specify both --make-default and --remove-default", err=True)
         sys.exit(1)
-    
+
     if activate and deactivate:
         click.echo("❌ Cannot specify both --activate and --deactivate", err=True)
         sys.exit(1)
-    
+
     # Build update data
     update_data = {}
     if description is not None:
@@ -242,41 +223,41 @@ def update_scope(
         update_data["is_active"] = True
     elif deactivate:
         update_data["is_active"] = False
-    
+
     if not update_data:
         click.echo("❌ No update options specified", err=True)
         sys.exit(1)
-    
+
     if verbose:
         click.echo(f"Updating scope: {scope_name}")
         click.echo(f"Changes: {update_data}")
-    
+
     if dry_run:
         click.echo("DRY RUN: Would update scope with:")
         for key, value in update_data.items():
             click.echo(f"  {key}: {value}")
         return
-    
+
     async def run_update():
         async with get_api_client() as client:
             try:
                 updated_scope = await client.update_scope(
-                    scope_name, 
+                    scope_name,
                     description=update_data.get("description"),
                     is_default=update_data.get("is_default"),
-                    is_active=update_data.get("is_active")
+                    is_active=update_data.get("is_active"),
                 )
-                
+
                 click.echo("✅ Scope updated successfully!")
                 click.echo(f"  Scope Name: {updated_scope.scope_name}")
                 click.echo(f"  Description: {updated_scope.description or 'None'}")
                 click.echo(f"  Default: {'✅ Yes' if updated_scope.is_default else '❌ No'}")
                 click.echo(f"  Active: {'✅ Yes' if updated_scope.is_active else '❌ No'}")
-                
+
             except Exception as e:
                 click.echo(f"❌ Error updating scope: {e}", err=True)
                 sys.exit(1)
-    
+
     try:
         asyncio.run(run_update())
     except Exception as e:
@@ -292,34 +273,34 @@ def delete_scope(ctx: click.Context, scope_name: str, confirm: bool):
     """Delete (deactivate) a scope."""
     verbose = ctx.obj.get("verbose", False)
     dry_run = ctx.obj.get("dry_run", False)
-    
+
     if verbose:
         click.echo(f"Deleting scope: {scope_name}")
-    
+
     if not confirm and not dry_run:
         if not click.confirm(f"This will deactivate scope '{scope_name}'. Continue?"):
             click.echo("Operation cancelled.")
             return
-    
+
     if dry_run:
         click.echo("DRY RUN: Would deactivate scope")
         return
-    
+
     async def run_delete():
         async with get_api_client() as client:
             try:
                 result = await client.delete_scope(scope_name)
-                
+
                 click.echo("✅ Scope deactivated successfully!")
                 click.echo(f"  Message: {result.get('message', 'Scope deleted')}")
-                
+
             except Exception as e:
                 if "404" in str(e):
                     click.echo("❌ Scope not found or cannot be deactivated", err=True)
                 else:
                     click.echo(f"❌ Error deleting scope: {e}", err=True)
                 sys.exit(1)
-    
+
     try:
         asyncio.run(run_delete())
     except Exception as e:
@@ -333,38 +314,38 @@ def delete_scope(ctx: click.Context, scope_name: str, confirm: bool):
 def show_defaults(ctx: click.Context, output: str):
     """Show all default scopes."""
     verbose = ctx.obj.get("verbose", False)
-    
+
     if verbose:
         click.echo("Getting default scopes")
-    
+
     async def run_defaults():
         async with get_api_client() as client:
             try:
                 default_scopes = await client.get_default_scopes()
-                
+
                 if output == "json":
                     click.echo(json.dumps([scope.model_dump() for scope in default_scopes], indent=2, default=str))
                 else:
                     if not default_scopes:
                         click.echo("No default scopes configured.")
                         return
-                    
+
                     click.echo("Default Scopes")
                     click.echo("=" * 50)
-                    
+
                     for scope in default_scopes:
                         click.echo(f"  {scope.scope_name}")
                         if scope.description:
                             click.echo(f"    Description: {scope.description}")
                         click.echo(f"    Active: {'✅ Yes' if scope.is_active else '❌ No'}")
                         click.echo()
-                    
+
                     click.echo(f"Total: {len(default_scopes)} default scope(s)")
-                    
+
             except Exception as e:
                 click.echo(f"❌ Error getting default scopes: {e}", err=True)
                 sys.exit(1)
-    
+
     try:
         asyncio.run(run_defaults())
     except Exception as e:

@@ -98,7 +98,7 @@ async def _post_initialize_db(pool: AsyncConnectionPool) -> None:
                 )
                 await user_repo.create(user)
                 logger.info("Created user: %s (admin: %s)", user.username, user.is_admin)
-        
+
         # Bootstrap admin system with proper scopes
         try:
             bootstrap_results = await bootstrap_admin_system(connection)
@@ -110,28 +110,28 @@ async def _post_initialize_db(pool: AsyncConnectionPool) -> None:
 
 async def init_app():
     """Initialize the application with PostgreSQL container and FastAPI app"""
-    
+
     # Create PostgreSQL container with proper configuration
     postgres = PostgresContainer(
         image="pgvector/pgvector:pg17",  # Use same image as tests
         username="authly",
-        password="authly", 
-        dbname="authly"
+        password="authly",
+        dbname="authly",
     ).with_env("POSTGRES_HOST_AUTH_METHOD", "trust")
-    
+
     # Add volume mapping for SQL initialization scripts
     postgres.with_volume_mapping(
         str(find_root_folder() / "docker"),
         "/docker-entrypoint-initdb.d",
     )
-    
+
     # Start the container without problematic port binding
     postgres.start()
 
     # Get dynamic port assignment from container
     host = postgres.get_container_host_ip()
     port = postgres.get_exposed_port(5432)
-    
+
     # Build connection settings using dynamic port
     settings = DatabaseSettings(
         host=host,
@@ -142,11 +142,13 @@ async def init_app():
     )
 
     logger.info(f"PostgreSQL container started on {host}:{port}")
-    
+
     # Build connection string for CLI testing
     database_url = f"postgresql://{settings.user}:{settings.password}@{settings.host}:{settings.port}/{settings.dbname}"
     print(f"\n🔧 To test CLI with this database, run:")
-    print(f"JWT_SECRET_KEY='test-secret-key' JWT_REFRESH_SECRET_KEY='test-refresh-key' DATABASE_URL='{database_url}' poetry run python -m authly.admin.cli status\n")
+    print(
+        f"JWT_SECRET_KEY='test-secret-key' JWT_REFRESH_SECRET_KEY='test-refresh-key' DATABASE_URL='{database_url}' poetry run python -m authly.admin.cli status\n"
+    )
 
     # Create database pool and initialize
     db = Database(settings)
@@ -165,31 +167,29 @@ async def init_app():
     secret_provider = StaticSecretProvider("my-secret", "refresh-secret")
     database_provider = StaticDatabaseProvider(database_url)
     config = AuthlyConfig.load(secret_provider, database_provider)
-    
+
     # Initialize Authly singleton
     _ = Authly.initialize(pool=db_pool, configuration=config)
 
     # Create FastAPI application
     app = FastAPI(
-        title="Authly Auth API",
-        version="0.1.0",
-        description="Authly Authentication and Authorization Service"
+        title="Authly Auth API", version="0.1.0", description="Authly Authentication and Authorization Service"
     )
-    
+
     # Setup admin security middleware
     setup_admin_middleware(app)
-    
+
     # Mount static files for OAuth templates
     static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "src", "authly", "static")
     if os.path.exists(static_dir):
         app.mount("/static", StaticFiles(directory=static_dir), name="static")
-    
+
     # Include all routers
     app.include_router(health_router)
     app.include_router(auth_router, prefix=config.fastapi_api_version_prefix)
     app.include_router(users_router, prefix=config.fastapi_api_version_prefix)
     app.include_router(oauth_router, prefix=config.fastapi_api_version_prefix)
-    
+
     # Include admin router
     app.include_router(admin_router)
 
@@ -257,10 +257,7 @@ async def main():
     signals = (signal.SIGTERM, signal.SIGINT)
 
     for sig in signals:
-        loop.add_signal_handler(
-            sig, 
-            lambda s=sig: asyncio.create_task(shutdown(server, db, postgres))
-        )
+        loop.add_signal_handler(sig, lambda s=sig: asyncio.create_task(shutdown(server, db, postgres)))
 
     # Start server
     try:

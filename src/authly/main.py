@@ -27,27 +27,27 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """
     FastAPI lifespan context manager for proper resource management.
-    
+
     Handles startup and shutdown of database connections and other resources.
     """
     logger.info("Starting Authly application...")
-    
+
     try:
         # Load configuration from environment
         secret_provider = EnvSecretProvider()
         database_provider = EnvDatabaseProvider()
         config = AuthlyConfig.load(secret_provider, database_provider)
-        
+
         # Create database connection pool using psycopg-toolkit Database class
         from urllib.parse import urlparse
 
         from psycopg_toolkit import Database, DatabaseSettings
-        
+
         database_url = database_provider.get_database_config().database_url
-        
+
         # Parse database URL into settings
         url = urlparse(database_url)
-        
+
         # Get default port from config
         try:
             config = authly.get_config()
@@ -55,25 +55,25 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         except RuntimeError:
             # Fallback for tests without full initialization
             default_port = 5432
-            
+
         settings = DatabaseSettings(
             host=url.hostname,
             port=url.port or default_port,
-            dbname=url.path.lstrip('/'),
+            dbname=url.path.lstrip("/"),
             user=url.username,
             password=url.password,
         )
-        
+
         # Create database with proper lifecycle management
         db = Database(settings)
         await db.create_pool()
         await db.init_db()
         pool = await db.get_pool()
-        
+
         # Initialize Authly singleton with pool and configuration
         authly = Authly.initialize(pool=pool, configuration=config)
         logger.info("Authly initialized successfully")
-        
+
         # Bootstrap admin system if enabled
         bootstrap_enabled = os.getenv("AUTHLY_BOOTSTRAP_ENABLED", "true").lower() == "true"
         if bootstrap_enabled:
@@ -86,13 +86,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             except Exception as e:
                 logger.error(f"Admin bootstrap failed: {e}")
                 # Continue startup even if bootstrap fails (for existing deployments)
-        
+
         # Note: Database instance is managed through Authly singleton and dependency injection
         # Do not store state on app.state.db - use FastAPI dependency injection instead
-        
+
         # Application is ready
         yield
-        
+
     except Exception as e:
         logger.error(f"Failed to initialize application: {e}")
         raise
@@ -101,7 +101,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         logger.info("Shutting down Authly application...")
         try:
             # Clean up database properly
-            if hasattr(app.state, 'db'):
+            if hasattr(app.state, "db"):
                 await app.state.db.cleanup()
                 logger.info("Database cleanup completed")
         except Exception as e:
@@ -111,7 +111,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 def create_app() -> FastAPI:
     """
     Create and configure the FastAPI application.
-    
+
     Returns:
         Configured FastAPI application instance
     """
@@ -122,12 +122,9 @@ def setup_logging():
     """Configure logging for production deployment"""
     log_level = os.getenv("LOG_LEVEL", "INFO").upper()
     log_format = os.getenv("LOG_FORMAT", "%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-    
-    logging.basicConfig(
-        level=getattr(logging, log_level),
-        format=log_format
-    )
-    
+
+    logging.basicConfig(level=getattr(logging, log_level), format=log_format)
+
     # Set specific logger levels
     logging.getLogger("uvicorn").setLevel(logging.INFO)
     logging.getLogger("authly").setLevel(log_level)
@@ -136,18 +133,18 @@ def setup_logging():
 async def main():
     """
     Main entry point for running the server directly.
-    
+
     This is useful for development or when not using a WSGI server.
     """
     setup_logging()
-    
+
     app = create_app()
-    
+
     # Configuration from environment
     host = os.getenv("HOST", "0.0.0.0")
     port = int(os.getenv("PORT", "8000"))
     workers = int(os.getenv("WORKERS", "1"))
-    
+
     # Create uvicorn configuration
     config = uvicorn.Config(
         app,
@@ -157,20 +154,20 @@ async def main():
         log_level=os.getenv("LOG_LEVEL", "info").lower(),
         access_log=os.getenv("ACCESS_LOG", "true").lower() == "true",
     )
-    
+
     server = uvicorn.Server(config)
-    
+
     # Setup signal handlers for graceful shutdown
     loop = asyncio.get_event_loop()
     signals = (signal.SIGTERM, signal.SIGINT)
-    
+
     def signal_handler():
         logger.info("Received shutdown signal")
         server.should_exit = True
-    
+
     for sig in signals:
         loop.add_signal_handler(sig, signal_handler)
-    
+
     try:
         logger.info(f"Starting Authly server on {host}:{port}")
         await server.serve()

@@ -20,20 +20,20 @@ logger = logging.getLogger(__name__)
 
 class TokenRequest(BaseModel):
     grant_type: str
-    
+
     # Password grant fields
     username: Optional[str] = None
     password: Optional[str] = None
-    
-    # Authorization code grant fields  
+
+    # Authorization code grant fields
     code: Optional[str] = None
     redirect_uri: Optional[str] = None
     client_id: Optional[str] = None
     code_verifier: Optional[str] = None  # PKCE
-    
+
     # OAuth 2.1 scope field
     scope: Optional[str] = None
-    
+
     # Refresh token grant fields
     refresh_token: Optional[str] = None
     client_secret: Optional[str] = None
@@ -69,6 +69,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         # Get HSTS config
         try:
             from authly import get_config
+
             config = get_config()
             hsts_max_age = config.hsts_max_age_seconds
         except RuntimeError:
@@ -121,12 +122,12 @@ async def get_access_token(
 ):
     """
     OAuth 2.1 Token Endpoint - supports multiple grant types.
-    
+
     Supported grant types:
     - password: Username/password authentication (existing)
     - authorization_code: OAuth 2.1 authorization code flow with PKCE
     """
-    
+
     if request.grant_type == "password":
         return await _handle_password_grant(request, user_repo, token_service, rate_limiter)
     elif request.grant_type == "authorization_code":
@@ -135,8 +136,7 @@ async def get_access_token(
         return await _handle_refresh_token_grant(request, user_repo, token_service)
     else:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, 
-            detail=f"Unsupported grant type: {request.grant_type}"
+            status_code=status.HTTP_400_BAD_REQUEST, detail=f"Unsupported grant type: {request.grant_type}"
         )
 
 
@@ -147,12 +147,11 @@ async def _handle_password_grant(
     rate_limiter,
 ) -> TokenResponse:
     """Handle password grant type (existing functionality)."""
-    
+
     # Validate required fields for password grant
     if not request.username or not request.password:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username and password are required for password grant"
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Username and password are required for password grant"
         )
 
     # Rate limiting check
@@ -198,11 +197,11 @@ async def _handle_password_grant(
             token_type=token_response.token_type,
             expires_in=token_response.expires_in,
         )
-        
+
         if user.requires_password_change:
             logger.info(f"User {user.username} requires password change on login")
             response.requires_password_change = True
-            
+
         return response
 
     except HTTPException:
@@ -210,8 +209,7 @@ async def _handle_password_grant(
         raise
     except Exception:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
-            detail="Could not create authentication tokens"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not create authentication tokens"
         )
 
 
@@ -222,12 +220,12 @@ async def _handle_authorization_code_grant(
     authorization_service: AuthorizationService,
 ) -> TokenResponse:
     """Handle authorization_code grant type with PKCE verification."""
-    
+
     # Validate required fields for authorization code grant
     if not request.code or not request.redirect_uri or not request.client_id or not request.code_verifier:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="code, redirect_uri, client_id, and code_verifier are required for authorization_code grant"
+            detail="code, redirect_uri, client_id, and code_verifier are required for authorization_code grant",
         )
 
     try:
@@ -236,53 +234,46 @@ async def _handle_authorization_code_grant(
             code=request.code,
             client_id=request.client_id,
             redirect_uri=request.redirect_uri,
-            code_verifier=request.code_verifier
+            code_verifier=request.code_verifier,
         )
-        
+
         if not success:
             logger.warning(f"Authorization code exchange failed: {error_msg}")
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=error_msg or "Invalid authorization code"
+                status_code=status.HTTP_400_BAD_REQUEST, detail=error_msg or "Invalid authorization code"
             )
-        
+
         # Get user for token generation
         user = await user_repo.get_by_id(code_data["user_id"])
         if not user:
             logger.error(f"User not found for authorization code: {code_data['user_id']}")
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid authorization code"
-            )
-        
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid authorization code")
+
         if not user.is_active:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is deactivated")
-        
+
         if not user.is_verified:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account not verified")
-        
+
         # Extract OIDC parameters from authorization code data for ID token generation
         oidc_params = None
         if code_data.get("nonce") or code_data.get("max_age") or code_data.get("acr_values"):
             oidc_params = {
                 "nonce": code_data.get("nonce"),
                 "max_age": code_data.get("max_age"),
-                "acr_values": code_data.get("acr_values")
+                "acr_values": code_data.get("acr_values"),
             }
-        
+
         # Create token pair with scope information and OIDC parameters
         token_response = await token_service.create_token_pair(
-            user, 
-            scope=code_data.get("scope"), 
-            client_id=code_data.get("client_id"),
-            oidc_params=oidc_params
+            user, scope=code_data.get("scope"), client_id=code_data.get("client_id"), oidc_params=oidc_params
         )
-        
+
         # Update last login
         await user_repo.update_last_login(user.id)
-        
+
         logger.info(f"Authorization code exchanged successfully for user {user.id}")
-        
+
         return TokenResponse(
             access_token=token_response.access_token,
             refresh_token=token_response.refresh_token,
@@ -290,15 +281,14 @@ async def _handle_authorization_code_grant(
             expires_in=token_response.expires_in,
             id_token=token_response.id_token,
         )
-        
+
     except HTTPException:
         # Re-raise HTTP exceptions
         raise
     except Exception as e:
         logger.error(f"Error handling authorization code grant: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Could not process authorization code"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not process authorization code"
         )
 
 
@@ -308,14 +298,13 @@ async def _handle_refresh_token_grant(
     token_service: TokenService,
 ) -> TokenResponse:
     """Handle refresh_token grant type with client authentication."""
-    
+
     # Validate required fields for refresh token grant
     if not request.refresh_token:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="refresh_token is required for refresh_token grant"
+            status_code=status.HTTP_400_BAD_REQUEST, detail="refresh_token is required for refresh_token grant"
         )
-    
+
     try:
         # Get client_id from request for ID token generation
         client_id = None
@@ -323,23 +312,19 @@ async def _handle_refresh_token_grant(
             # Convert client_id string to UUID for client lookup
             from authly import authly_db_connection
             from authly.oauth.client_repository import ClientRepository
-            
+
             async for conn in authly_db_connection():
                 client_repo = ClientRepository(conn)
                 client = await client_repo.get_by_client_id(request.client_id)
                 if client:
                     client_id = client.id
                 break
-        
+
         # Refresh token pair with client_id for ID token generation
-        token_response = await token_service.refresh_token_pair(
-            request.refresh_token, 
-            user_repo, 
-            client_id=client_id
-        )
-        
+        token_response = await token_service.refresh_token_pair(request.refresh_token, user_repo, client_id=client_id)
+
         logger.info(f"Refresh token exchanged successfully")
-        
+
         return TokenResponse(
             access_token=token_response.access_token,
             token_type=token_response.token_type,
@@ -347,16 +332,13 @@ async def _handle_refresh_token_grant(
             refresh_token=token_response.refresh_token,
             id_token=token_response.id_token,
         )
-        
+
     except HTTPException:
         # Re-raise HTTPExceptions (like invalid refresh token) as-is
         raise
     except Exception as e:
         logger.error(f"Error handling refresh token grant: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Could not process refresh token"
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not process refresh token")
 
 
 @router.post("/refresh", response_model=TokenResponse)
@@ -423,15 +405,15 @@ async def revoke_token(
 ):
     """
     OAuth 2.0 Token Revocation Endpoint (RFC 7009).
-    
+
     Allows clients to notify the authorization server that a previously obtained
     refresh or access token is no longer needed. This invalidates the token and,
     if applicable, related tokens.
-    
+
     **Request Parameters:**
     - token: The token to revoke (access or refresh token)
     - token_type_hint: Optional hint ("access_token" or "refresh_token")
-    
+
     **Response:**
     Always returns HTTP 200 OK per RFC 7009, even for invalid tokens.
     This prevents token enumeration attacks.
@@ -439,18 +421,18 @@ async def revoke_token(
     try:
         # Attempt to revoke the token using the token service
         revoked = await token_service.revoke_token(request.token, request.token_type_hint)
-        
+
         if revoked:
             logger.info("Token revoked successfully")
         else:
             # Don't log details about invalid tokens to prevent information leakage
             logger.debug("Token revocation request processed (token may have been invalid)")
-        
+
         # Always return 200 OK per RFC 7009 Section 2.2:
         # "The authorization server responds with HTTP status code 200 if the token
         # has been revoked successfully or if the client submitted an invalid token"
         return {"message": "Token revocation processed successfully"}
-        
+
     except Exception as e:
         # Even on errors, return 200 OK per RFC 7009 to prevent information disclosure
         logger.error(f"Error during token revocation: {str(e)}")

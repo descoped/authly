@@ -20,29 +20,27 @@ class DatabaseConfig:
             parsed = urlparse(self.database_url)
             if parsed.password:
                 # Replace password with asterisks
-                masked_netloc = parsed.netloc.replace(
-                    f":{parsed.password}@", ":***@"
-                )
+                masked_netloc = parsed.netloc.replace(f":{parsed.password}@", ":***@")
                 masked_url = self.database_url.replace(parsed.netloc, masked_netloc)
                 return masked_url
             return self.database_url
         except Exception:
             # If URL parsing fails, just mask anything that looks like a password
-            return re.sub(r':([^:@]+)@', ':***@', self.database_url)
+            return re.sub(r":([^:@]+)@", ":***@", self.database_url)
 
     def validate(self) -> None:
         """Validate database URL format."""
         if not self.database_url:
             raise ValueError("Database URL cannot be empty")
-        
-        if not self.database_url.startswith(('postgresql://', 'postgres://')):
+
+        if not self.database_url.startswith(("postgresql://", "postgres://")):
             raise ValueError("Database URL must be a PostgreSQL connection string (postgresql:// or postgres://)")
-        
+
         try:
             parsed = urlparse(self.database_url)
             if not parsed.hostname:
                 raise ValueError("Database URL must include hostname")
-            if not parsed.path or parsed.path == '/':
+            if not parsed.path or parsed.path == "/":
                 raise ValueError("Database URL must include database name")
         except Exception as e:
             raise ValueError(f"Invalid database URL format: {e}")
@@ -53,7 +51,7 @@ class DatabaseProvider(ABC):
 
     TODO: Implement additional providers:
     - AWSRDSProvider
-    - AzureSQLProvider  
+    - AzureSQLProvider
     - GCPCloudSQLProvider
     - KubernetesSecretProvider
     - HashiCorpVaultProvider
@@ -112,7 +110,7 @@ class EnvDatabaseProvider(DatabaseProvider):
 
     def __init__(self, default_url: Optional[str] = None):
         """Initialize with optional default database URL.
-        
+
         Args:
             default_url: Default database URL to use if DATABASE_URL env var is not set.
                         If None, will use a sensible development default that works out of the box.
@@ -121,12 +119,12 @@ class EnvDatabaseProvider(DatabaseProvider):
 
     def get_database_config(self) -> DatabaseConfig:
         """Get database configuration from environment with fallback to defaults.
-        
+
         This provider follows library-first principles:
         - Always provides a working default for development
         - Respects host application's environment variable setup
         - Does not impose configuration loading choices on the host application
-        
+
         Returns:
             DatabaseConfig: Configuration with validated database URL
         """

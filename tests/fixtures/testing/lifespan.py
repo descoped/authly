@@ -27,12 +27,12 @@ async def custom_test_server(
     from authly.api import auth_router, health_router, oauth_router, oidc_router, users_router
     from authly.api.admin_middleware import setup_admin_middleware
     from authly.api.admin_router import admin_router
-    
+
     app = FastAPI(title="Authly Test Server")
-    
+
     # Set up admin middleware
     setup_admin_middleware(app)
-    
+
     # Include all routers like main.py but without lifespan
     app.include_router(health_router)
     app.include_router(auth_router, prefix="/api/v1")
@@ -40,7 +40,7 @@ async def custom_test_server(
     app.include_router(oauth_router, prefix="/api/v1")
     app.include_router(oidc_router)  # OIDC router (no prefix - uses well-known paths)
     app.include_router(admin_router)
-    
+
     # Create test server with the configured app
     server = AsyncTestServer()
     server.app = app
@@ -50,12 +50,13 @@ async def custom_test_server(
     dependency_overrides = {
         get_config: lambda: test_config,
     }
-    
+
     # Add database connection override if provided
     if db_connection_override:
         from authly import authly_db_connection
+
         dependency_overrides[authly_db_connection] = db_connection_override
-    
+
     app_.dependency_overrides.update(dependency_overrides)
 
     try:

@@ -127,7 +127,8 @@ class TestUserAPI:
         await response.expect_status(204)
 
         response = await test_server.client.get(
-            f"/api/v1/users/{test_user.id}", headers=headers  # Include auth headers
+            f"/api/v1/users/{test_user.id}",
+            headers=headers,  # Include auth headers
         )
         await response.expect_status(404)
 

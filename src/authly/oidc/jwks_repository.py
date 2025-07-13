@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 class JWKSKeyModel:
     """Model representing a JWKS key stored in database."""
-    
+
     def __init__(
         self,
         kid: str,
@@ -33,7 +33,7 @@ class JWKSKeyModel:
         created_at: datetime = None,
         expires_at: datetime = None,
         key_size: int = None,
-        curve: str = None
+        curve: str = None,
     ):
         self.kid = kid
         self.key_data = key_data
@@ -49,18 +49,18 @@ class JWKSKeyModel:
 
 class JWKSRepository:
     """Repository for JWKS key database operations."""
-    
+
     def __init__(self, db_connection: AsyncConnection):
         """Initialize repository with database connection."""
         self.db_connection = db_connection
-    
+
     async def store_key(self, key_model: JWKSKeyModel) -> bool:
         """
         Store a JWKS key in the database.
-        
+
         Args:
             key_model: JWKS key model to store
-            
+
         Returns:
             bool: True if stored successfully
         """
@@ -75,41 +75,39 @@ class JWKSRepository:
                 "created_at": key_model.created_at,
                 "expires_at": key_model.expires_at,
                 "key_size": key_model.key_size,
-                "curve": key_model.curve
+                "curve": key_model.curve,
             }
-            
+
             # Build insert query
-            insert_query = PsycopgHelper.build_insert_query(
-                table_name="oidc_jwks_keys", data=insert_data
-            )
-            
+            insert_query = PsycopgHelper.build_insert_query(table_name="oidc_jwks_keys", data=insert_data)
+
             async with self.db_connection.cursor() as cur:
                 await cur.execute(insert_query, list(insert_data.values()))
-                
+
             logger.info(f"Stored JWKS key with kid: {key_model.kid}")
             return True
-            
+
         except Exception as e:
             logger.error(f"Error storing JWKS key: {e}")
             raise OperationError(f"Failed to store JWKS key: {str(e)}") from e
-    
+
     async def get_key_by_kid(self, kid: str) -> Optional[JWKSKeyModel]:
         """
         Retrieve a JWKS key by key ID.
-        
+
         Args:
             kid: Key ID to retrieve
-            
+
         Returns:
             JWKSKeyModel or None if not found
         """
         try:
             query = SQL("SELECT * FROM oidc_jwks_keys WHERE kid = %s")
-            
+
             async with self.db_connection.cursor(row_factory=dict_row) as cur:
                 await cur.execute(query, (kid,))
                 result = await cur.fetchone()
-                
+
                 if result:
                     return JWKSKeyModel(
                         kid=result["kid"],
@@ -121,90 +119,92 @@ class JWKSRepository:
                         created_at=result["created_at"],
                         expires_at=result["expires_at"],
                         key_size=result["key_size"],
-                        curve=result["curve"]
+                        curve=result["curve"],
                     )
-                    
+
                 return None
-                
+
         except Exception as e:
             logger.error(f"Error retrieving JWKS key by kid {kid}: {e}")
             raise OperationError(f"Failed to retrieve JWKS key: {str(e)}") from e
-    
+
     async def get_active_keys(self) -> List[JWKSKeyModel]:
         """
         Retrieve all active JWKS keys.
-        
+
         Returns:
             List of active JWKSKeyModel instances
         """
         try:
             query = SQL("SELECT * FROM oidc_jwks_keys WHERE is_active = true ORDER BY created_at DESC")
-            
+
             async with self.db_connection.cursor(row_factory=dict_row) as cur:
                 await cur.execute(query)
                 results = await cur.fetchall()
-                
+
                 keys = []
                 for result in results:
-                    keys.append(JWKSKeyModel(
-                        kid=result["kid"],
-                        key_data=json.loads(result["key_data"]),
-                        key_type=result["key_type"],
-                        algorithm=result["algorithm"],
-                        key_use=result["key_use"],
-                        is_active=result["is_active"],
-                        created_at=result["created_at"],
-                        expires_at=result["expires_at"],
-                        key_size=result["key_size"],
-                        curve=result["curve"]
-                    ))
-                
+                    keys.append(
+                        JWKSKeyModel(
+                            kid=result["kid"],
+                            key_data=json.loads(result["key_data"]),
+                            key_type=result["key_type"],
+                            algorithm=result["algorithm"],
+                            key_use=result["key_use"],
+                            is_active=result["is_active"],
+                            created_at=result["created_at"],
+                            expires_at=result["expires_at"],
+                            key_size=result["key_size"],
+                            curve=result["curve"],
+                        )
+                    )
+
                 return keys
-                
+
         except Exception as e:
             logger.error(f"Error retrieving active JWKS keys: {e}")
             raise OperationError(f"Failed to retrieve active JWKS keys: {str(e)}") from e
-    
+
     async def deactivate_key(self, kid: str) -> bool:
         """
         Deactivate a JWKS key.
-        
+
         Args:
             kid: Key ID to deactivate
-            
+
         Returns:
             bool: True if deactivated successfully
         """
         try:
             query = SQL("UPDATE oidc_jwks_keys SET is_active = false WHERE kid = %s")
-            
+
             async with self.db_connection.cursor() as cur:
                 await cur.execute(query, (kid,))
-                
+
             logger.info(f"Deactivated JWKS key with kid: {kid}")
             return True
-            
+
         except Exception as e:
             logger.error(f"Error deactivating JWKS key {kid}: {e}")
             raise OperationError(f"Failed to deactivate JWKS key: {str(e)}") from e
-    
+
     async def cleanup_expired_keys(self) -> int:
         """
         Remove expired JWKS keys from database.
-        
+
         Returns:
             int: Number of keys removed
         """
         try:
             query = SQL("DELETE FROM oidc_jwks_keys WHERE expires_at IS NOT NULL AND expires_at < %s")
-            
+
             async with self.db_connection.cursor() as cur:
                 await cur.execute(query, (datetime.now(timezone.utc),))
                 rows_affected = cur.rowcount
-                
+
             logger.info(f"Cleaned up {rows_affected} expired JWKS keys")
             return rows_affected
-            
+
         except Exception as e:
             logger.error(f"Error cleaning up expired JWKS keys: {e}")
             raise OperationError(f"Failed to cleanup expired JWKS keys: {str(e)}") from e

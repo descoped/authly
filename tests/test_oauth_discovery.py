@@ -25,36 +25,33 @@ class TestDiscoveryService:
     async def test_get_server_metadata_without_scope_repo(self):
         """Test generating server metadata without scope repository."""
         service = DiscoveryService()
-        
-        metadata = await service.get_server_metadata(
-            issuer_url="https://auth.example.com",
-            api_prefix="/api/v1"
-        )
-        
+
+        metadata = await service.get_server_metadata(issuer_url="https://auth.example.com", api_prefix="/api/v1")
+
         assert isinstance(metadata, OAuthServerMetadata)
         assert metadata.issuer == "https://auth.example.com"
         assert metadata.authorization_endpoint == "https://auth.example.com/api/v1/oauth/authorize"
         assert metadata.token_endpoint == "https://auth.example.com/api/v1/auth/token"
         assert metadata.revocation_endpoint == "https://auth.example.com/api/v1/auth/revoke"
-        
+
         # OAuth 2.1 requirements
         assert metadata.response_types_supported == ["code"]
         assert "authorization_code" in metadata.grant_types_supported
         assert "refresh_token" in metadata.grant_types_supported
         assert metadata.code_challenge_methods_supported == ["S256"]
         assert metadata.require_pkce is True
-        
+
         # Authentication methods
         assert "client_secret_basic" in metadata.token_endpoint_auth_methods_supported
         assert "client_secret_post" in metadata.token_endpoint_auth_methods_supported
         assert "none" in metadata.token_endpoint_auth_methods_supported
-        
+
         # Response modes
         assert "query" in metadata.response_modes_supported
-        
+
         # No scopes since no repository provided
         assert metadata.scopes_supported is None
-        
+
         # Documentation URL
         assert metadata.service_documentation == "https://auth.example.com/docs"
 
@@ -66,7 +63,7 @@ class TestDiscoveryService:
         async with transaction_manager.transaction() as conn:
             scope_repo = ScopeRepository(conn)
             service = DiscoveryService(scope_repo)
-            
+
             # Create test scopes
             test_scopes = [
                 {
@@ -86,24 +83,21 @@ class TestDiscoveryService:
                     "description": "Admin access",
                     "is_default": False,
                     "is_active": True,
-                }
+                },
             ]
-            
+
             created_scopes = []
             for scope_data in test_scopes:
                 created_scope = await scope_repo.create_scope(scope_data)
                 created_scopes.append(created_scope)
-            
+
             # Generate metadata
-            metadata = await service.get_server_metadata(
-                issuer_url="https://auth.example.com",
-                api_prefix="/api/v1"
-            )
-            
+            metadata = await service.get_server_metadata(issuer_url="https://auth.example.com", api_prefix="/api/v1")
+
             # Verify scopes are included
             assert metadata.scopes_supported is not None
             assert len(metadata.scopes_supported) >= 3
-            
+
             # Check that our created scopes are included
             scope_names = [scope.scope_name for scope in created_scopes]
             for scope_name in scope_names:
@@ -113,12 +107,12 @@ class TestDiscoveryService:
     async def test_get_server_metadata_with_trailing_slash(self):
         """Test issuer URL handling with trailing slash."""
         service = DiscoveryService()
-        
+
         metadata = await service.get_server_metadata(
             issuer_url="https://auth.example.com/",  # Note trailing slash
-            api_prefix="/api/v1"
+            api_prefix="/api/v1",
         )
-        
+
         # Should strip trailing slash
         assert metadata.issuer == "https://auth.example.com"
         assert metadata.authorization_endpoint == "https://auth.example.com/api/v1/oauth/authorize"
@@ -131,29 +125,24 @@ class TestDiscoveryService:
         async with transaction_manager.transaction() as conn:
             scope_repo = ScopeRepository(conn)
             service = DiscoveryService(scope_repo)
-            
+
             # Mock a broken scope repository by closing connection
             await conn.close()
-            
+
             # Should handle error gracefully and return metadata without scopes
-            metadata = await service.get_server_metadata(
-                issuer_url="https://auth.example.com",
-                api_prefix="/api/v1"
-            )
-            
+            metadata = await service.get_server_metadata(issuer_url="https://auth.example.com", api_prefix="/api/v1")
+
             assert isinstance(metadata, OAuthServerMetadata)
             assert metadata.scopes_supported is None  # Should be None due to error
 
     def test_get_static_metadata(self):
         """Test static metadata generation."""
         service = DiscoveryService()
-        
+
         metadata = service.get_static_metadata(
-            issuer_url="https://auth.example.com",
-            api_prefix="/api/v1",
-            scopes=["read", "write", "admin"]
+            issuer_url="https://auth.example.com", api_prefix="/api/v1", scopes=["read", "write", "admin"]
         )
-        
+
         assert isinstance(metadata, OAuthServerMetadata)
         assert metadata.issuer == "https://auth.example.com"
         assert metadata.scopes_supported == ["read", "write", "admin"]
@@ -162,31 +151,25 @@ class TestDiscoveryService:
     def test_get_static_metadata_no_scopes(self):
         """Test static metadata generation without scopes."""
         service = DiscoveryService()
-        
-        metadata = service.get_static_metadata(
-            issuer_url="https://auth.example.com",
-            api_prefix="/api/v1"
-        )
-        
+
+        metadata = service.get_static_metadata(issuer_url="https://auth.example.com", api_prefix="/api/v1")
+
         assert metadata.scopes_supported is None
 
     @pytest.mark.asyncio
     async def test_different_api_prefixes(self):
         """Test metadata generation with different API prefixes."""
         service = DiscoveryService()
-        
+
         test_cases = [
             ("/api/v1", "https://auth.example.com/api/v1"),
             ("/v2", "https://auth.example.com/v2"),
             ("", "https://auth.example.com"),
         ]
-        
+
         for api_prefix, expected_base in test_cases:
-            metadata = await service.get_server_metadata(
-                issuer_url="https://auth.example.com",
-                api_prefix=api_prefix
-            )
-            
+            metadata = await service.get_server_metadata(issuer_url="https://auth.example.com", api_prefix=api_prefix)
+
             if api_prefix:
                 assert metadata.authorization_endpoint == f"{expected_base}/oauth/authorize"
                 assert metadata.token_endpoint == f"{expected_base}/auth/token"
@@ -202,15 +185,15 @@ class TestDiscoveryEndpoint:
         """Test basic discovery endpoint functionality."""
         app = FastAPI()
         app.include_router(oauth_router)
-        
+
         client = TestClient(app)
-        
+
         with client:
             response = client.get("/oauth/.well-known/oauth-authorization-server")
-            
+
             assert response.status_code == 200
             data = response.json()
-            
+
             # Verify required fields
             assert "issuer" in data
             assert "authorization_endpoint" in data
@@ -219,7 +202,7 @@ class TestDiscoveryEndpoint:
             assert "grant_types_supported" in data
             assert "code_challenge_methods_supported" in data
             assert "token_endpoint_auth_methods_supported" in data
-            
+
             # Verify OAuth 2.1 requirements
             assert data["response_types_supported"] == ["code"]
             assert "authorization_code" in data["grant_types_supported"]
@@ -230,12 +213,12 @@ class TestDiscoveryEndpoint:
         """Test discovery endpoint returns JSON content type."""
         app = FastAPI()
         app.include_router(oauth_router)
-        
+
         client = TestClient(app)
-        
+
         with client:
             response = client.get("/oauth/.well-known/oauth-authorization-server")
-            
+
             assert response.status_code == 200
             assert "application/json" in response.headers["content-type"]
 
@@ -247,28 +230,28 @@ class TestDiscoveryEndpoint:
         # Create test scopes in database
         async with transaction_manager.transaction() as conn:
             scope_repo = ScopeRepository(conn)
-            
+
             test_scope = {
                 "scope_name": f"integration_test_{uuid4().hex[:8]}",
                 "description": "Integration test scope",
                 "is_default": False,
                 "is_active": True,
             }
-            
+
             created_scope = await scope_repo.create_scope(test_scope)
-            
+
         # Now test the endpoint
         app = FastAPI()
         app.include_router(oauth_router)
-        
+
         client = TestClient(app)
-        
+
         with client:
             response = client.get("/oauth/.well-known/oauth-authorization-server")
-            
+
             assert response.status_code == 200
             data = response.json()
-            
+
             # The endpoint should work even if it can't access scopes in test mode
             assert "issuer" in data
             assert isinstance(data["scopes_supported"], (list, type(None)))
@@ -277,24 +260,18 @@ class TestDiscoveryEndpoint:
         """Test that discovery endpoint builds URLs correctly."""
         app = FastAPI()
         app.include_router(oauth_router)
-        
+
         client = TestClient(app)
-        
+
         with client:
             # Test with different base URLs via headers
-            headers = {
-                "Host": "auth.example.com",
-                "X-Forwarded-Proto": "https"
-            }
-            
-            response = client.get(
-                "/oauth/.well-known/oauth-authorization-server",
-                headers=headers
-            )
-            
+            headers = {"Host": "auth.example.com", "X-Forwarded-Proto": "https"}
+
+            response = client.get("/oauth/.well-known/oauth-authorization-server", headers=headers)
+
             assert response.status_code == 200
             data = response.json()
-            
+
             # URLs should be built from headers
             assert data["issuer"].startswith("https://")
             assert "auth.example.com" in data["authorization_endpoint"]
@@ -303,16 +280,16 @@ class TestDiscoveryEndpoint:
         """Test discovery endpoint error handling."""
         app = FastAPI()
         app.include_router(oauth_router)
-        
+
         client = TestClient(app)
-        
+
         with client:
             # Should always return a valid response, even with errors
             response = client.get("/oauth/.well-known/oauth-authorization-server")
-            
+
             # Should not fail completely
             assert response.status_code in [200, 500]
-            
+
             if response.status_code == 200:
                 data = response.json()
                 assert "issuer" in data
@@ -332,13 +309,13 @@ class TestOAuthServerMetadataModel:
             "authorization_endpoint": "https://auth.example.com/api/v1/oauth/authorize",
             "token_endpoint": "https://auth.example.com/api/v1/auth/token",
         }
-        
+
         metadata = OAuthServerMetadata(**data)
-        
+
         assert metadata.issuer == "https://auth.example.com"
         assert metadata.authorization_endpoint == "https://auth.example.com/api/v1/oauth/authorize"
         assert metadata.token_endpoint == "https://auth.example.com/api/v1/auth/token"
-        
+
         # Check defaults
         assert metadata.response_types_supported == ["code"]
         assert metadata.grant_types_supported == ["authorization_code", "refresh_token"]
@@ -353,11 +330,11 @@ class TestOAuthServerMetadataModel:
             "token_endpoint": "https://auth.example.com/api/v1/auth/token",
             "revocation_endpoint": "https://auth.example.com/api/v1/auth/revoke",
             "scopes_supported": ["read", "write", "admin"],
-            "service_documentation": "https://auth.example.com/docs"
+            "service_documentation": "https://auth.example.com/docs",
         }
-        
+
         metadata = OAuthServerMetadata(**data)
-        
+
         assert metadata.revocation_endpoint == "https://auth.example.com/api/v1/auth/revoke"
         assert metadata.scopes_supported == ["read", "write", "admin"]
         assert metadata.service_documentation == "https://auth.example.com/docs"
@@ -368,11 +345,11 @@ class TestOAuthServerMetadataModel:
             issuer="https://auth.example.com",
             authorization_endpoint="https://auth.example.com/api/v1/oauth/authorize",
             token_endpoint="https://auth.example.com/api/v1/auth/token",
-            scopes_supported=["read", "write"]
+            scopes_supported=["read", "write"],
         )
-        
+
         json_data = metadata.model_dump()
-        
+
         assert json_data["issuer"] == "https://auth.example.com"
         assert json_data["scopes_supported"] == ["read", "write"]
         assert json_data["require_pkce"] is True
@@ -387,10 +364,10 @@ class TestOAuthServerMetadataModel:
             "response_types_supported": ["code"],
             "grant_types_supported": ["authorization_code", "refresh_token"],
             "code_challenge_methods_supported": ["S256"],
-            "require_pkce": True
+            "require_pkce": True,
         }
-        
+
         metadata = OAuthServerMetadata.model_validate(json_data)
-        
+
         assert metadata.issuer == "https://auth.example.com"
         assert metadata.require_pkce is True

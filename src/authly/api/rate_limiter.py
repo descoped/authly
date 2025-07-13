@@ -11,6 +11,7 @@ class RateLimiter:
         if max_requests is None or window_seconds is None:
             try:
                 from authly import get_config
+
                 config = get_config()
                 self.max_requests = max_requests or config.rate_limit_max_requests
                 self.window_seconds = window_seconds or config.rate_limit_window_seconds

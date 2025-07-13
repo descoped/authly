@@ -325,12 +325,13 @@ async def jwks_endpoint():
         # Get cache config
         try:
             from authly import get_config
+
             config = get_config()
             cache_max_age = config.jwks_cache_max_age_seconds
         except RuntimeError:
             # Fallback for tests
             cache_max_age = 3600
-            
+
         return JSONResponse(
             content=jwks_response,
             headers={
@@ -418,24 +419,26 @@ async def oidc_end_session(
         if id_token_hint:
             try:
                 from authly import get_config
+
                 config = get_config()
                 id_token_generator = IDTokenGenerator(config)
-                
+
                 # Decode token without full validation (we just need client_id)
                 from jose import jwt
+
                 # Get claims without verification for hint processing
                 unverified_claims = jwt.get_unverified_claims(id_token_hint)
-                
-                if 'aud' in unverified_claims:
+
+                if "aud" in unverified_claims:
                     # Get client_id from audience claim (can be string or list)
-                    aud = unverified_claims['aud']
+                    aud = unverified_claims["aud"]
                     client_id = aud[0] if isinstance(aud, list) else aud
                     logger.info(f"OIDC logout with id_token_hint for client: {client_id}")
-                
-                if 'sub' in unverified_claims:
-                    user_id = unverified_claims['sub']
+
+                if "sub" in unverified_claims:
+                    user_id = unverified_claims["sub"]
                     logger.info(f"OIDC logout for user: {user_id}")
-                    
+
             except Exception as e:
                 logger.warning(f"Invalid id_token_hint provided: {e}")
                 # Continue with logout even if token hint is invalid
@@ -448,43 +451,45 @@ async def oidc_end_session(
                 try:
                     client = await client_repository.get_by_client_id(client_id)
                     if client and not client.is_redirect_uri_allowed(post_logout_redirect_uri):
-                        logger.warning(f"Invalid post_logout_redirect_uri for client {client_id}: {post_logout_redirect_uri}")
+                        logger.warning(
+                            f"Invalid post_logout_redirect_uri for client {client_id}: {post_logout_redirect_uri}"
+                        )
                         raise HTTPException(
                             status_code=status.HTTP_400_BAD_REQUEST,
-                            detail="Invalid post_logout_redirect_uri for this client"
+                            detail="Invalid post_logout_redirect_uri for this client",
                         )
                 except Exception:
                     # If we can't validate, be conservative and reject
                     logger.warning(f"Could not validate redirect URI for client {client_id}")
                     raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="Could not validate post_logout_redirect_uri"
+                        status_code=status.HTTP_400_BAD_REQUEST, detail="Could not validate post_logout_redirect_uri"
                     )
             else:
                 # No client_id from token hint, cannot validate redirect URI
                 logger.warning("post_logout_redirect_uri provided without valid client identification")
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="post_logout_redirect_uri requires valid id_token_hint"
+                    detail="post_logout_redirect_uri requires valid id_token_hint",
                 )
 
         # Perform session termination
         logout_success = False
         invalidated_count = 0
-        
+
         if user_id:
             try:
                 # Use token service to invalidate user sessions
                 # Note: We don't have the specific token, so we invalidate all user tokens
                 from uuid import UUID
+
                 user_uuid = UUID(user_id)
-                
+
                 # Invalidate all tokens for the user (similar to /auth/logout)
                 invalidated_count = await token_service.invalidate_user_tokens(user_uuid)
                 logout_success = True
-                
+
                 logger.info(f"OIDC logout: invalidated {invalidated_count} tokens for user {user_id}")
-                
+
             except Exception as e:
                 logger.error(f"Error during OIDC logout for user {user_id}: {e}")
                 # Continue to show success page even if token invalidation fails
@@ -503,7 +508,7 @@ async def oidc_end_session(
             if state:
                 separator = "&" if "?" in redirect_url else "?"
                 redirect_url = f"{redirect_url}{separator}state={state}"
-            
+
             logger.info(f"OIDC logout redirecting to: {redirect_url}")
             return RedirectResponse(url=redirect_url, status_code=status.HTTP_302_FOUND)
         else:
@@ -530,7 +535,7 @@ async def oidc_end_session(
             </body>
             </html>
             """
-            
+
             logger.info("OIDC logout completed with success page")
             return HTMLResponse(content=html_content, status_code=status.HTTP_200_OK)
 
@@ -540,8 +545,7 @@ async def oidc_end_session(
     except Exception as e:
         logger.error(f"Unexpected error during OIDC logout: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unable to complete logout request"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unable to complete logout request"
         )
 
 
@@ -596,7 +600,7 @@ async def oidc_session_iframe(request: Request):
     try:
         # Get base URL for iframe communication
         base_url = get_base_url(request)
-        
+
         # Session management iframe HTML content
         iframe_html = f"""
         <!DOCTYPE html>
@@ -707,9 +711,9 @@ async def oidc_session_iframe(request: Request):
         </body>
         </html>
         """
-        
+
         logger.info("OIDC session iframe served successfully")
-        
+
         return HTMLResponse(
             content=iframe_html,
             status_code=status.HTTP_200_OK,
@@ -718,14 +722,13 @@ async def oidc_session_iframe(request: Request):
                 "Pragma": "no-cache",
                 "Expires": "0",
                 "X-Frame-Options": "SAMEORIGIN",  # Allow iframe embedding
-            }
+            },
         )
-        
+
     except Exception as e:
         logger.error(f"Error serving OIDC session iframe: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unable to serve session management iframe"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unable to serve session management iframe"
         )
 
 
@@ -792,46 +795,47 @@ async def oidc_session_check(
         # 1. Browser cookies for session tokens
         # 2. Server-side session storage
         # 3. Client-specific session state
-        
+
         session_status = {
             "session_state": "unknown",
             "authenticated": False,
             "client_id": client_id,
             "check_time": datetime.now(timezone.utc).isoformat(),
         }
-        
+
         # Check for session indicators (cookies, headers, etc.)
         # This is simplified - in a full implementation:
         # - Check session cookies
         # - Validate session tokens
         # - Check server-side session storage
         # - Return proper session state
-        
+
         # Simple session detection based on common patterns
         has_session_cookie = "session" in request.cookies or "sessionid" in request.cookies
         has_auth_header = "authorization" in request.headers
-        
+
         if has_session_cookie or has_auth_header:
-            session_status.update({
-                "session_state": "active",
-                "authenticated": True,
-            })
+            session_status.update(
+                {
+                    "session_state": "active",
+                    "authenticated": True,
+                }
+            )
         else:
-            session_status.update({
-                "session_state": "logged_out",
-                "authenticated": False,
-            })
-        
+            session_status.update(
+                {
+                    "session_state": "logged_out",
+                    "authenticated": False,
+                }
+            )
+
         logger.info(f"OIDC session check for client: {client_id}, status: {session_status['session_state']}")
-        
+
         return session_status
-        
+
     except Exception as e:
         logger.error(f"Error during OIDC session check: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unable to check session status"
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unable to check session status")
 
 
 @oidc_router.get(
@@ -897,22 +901,19 @@ async def oidc_frontchannel_logout(
     try:
         # Get base URL for issuer validation
         base_url = get_base_url(request)
-        
+
         # Validate issuer parameter
         if iss and iss != base_url:
             logger.warning(f"Invalid issuer in front-channel logout: {iss}, expected: {base_url}")
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid issuer parameter"
-            )
-        
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid issuer parameter")
+
         # Process front-channel logout
         # In a full implementation, this would:
         # 1. Validate session ID
         # 2. Identify all clients for this session
         # 3. Generate logout notifications for each client
         # 4. Return appropriate response
-        
+
         logout_response = f"""
         <!DOCTYPE html>
         <html>
@@ -974,9 +975,9 @@ async def oidc_frontchannel_logout(
         </body>
         </html>
         """
-        
+
         logger.info(f"OIDC front-channel logout processed for issuer: {iss}, session: {sid}")
-        
+
         return HTMLResponse(
             content=logout_response,
             status_code=status.HTTP_200_OK,
@@ -984,15 +985,14 @@ async def oidc_frontchannel_logout(
                 "Cache-Control": "no-cache, no-store, must-revalidate",
                 "Pragma": "no-cache",
                 "Expires": "0",
-            }
+            },
         )
-        
+
     except HTTPException:
         # Re-raise HTTP exceptions without modification
         raise
     except Exception as e:
         logger.error(f"Error during OIDC front-channel logout: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unable to process front-channel logout"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unable to process front-channel logout"
         )

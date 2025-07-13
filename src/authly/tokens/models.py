@@ -23,7 +23,7 @@ class TokenModel(BaseModel):
     invalidated_at: Optional[datetime] = None
     expires_at: datetime
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    
+
     # OAuth 2.1 fields (matches database schema)
     client_id: Optional[UUID] = None  # For OAuth flows
     scope: Optional[str] = None  # Space-separated scopes

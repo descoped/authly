@@ -254,7 +254,7 @@ class ScopeRepository(BaseRepository[OAuthScopeModel, UUID]):
 
             query = f"""
                 INSERT INTO oauth_token_scopes (token_id, scope_id, created_at)
-                VALUES {', '.join(placeholders)}
+                VALUES {", ".join(placeholders)}
                 ON CONFLICT (token_id, scope_id) DO NOTHING
             """
 

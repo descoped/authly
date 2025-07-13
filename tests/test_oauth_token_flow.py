@@ -23,7 +23,7 @@ class TestOAuth21EndToEndFlow:
     async def oauth_server(self, test_server) -> AsyncTestServer:
         """Configure test server with OAuth routers."""
         test_server.app.include_router(auth_router, prefix="/api/v1")
-        test_server.app.include_router(users_router, prefix="/api/v1") 
+        test_server.app.include_router(users_router, prefix="/api/v1")
         test_server.app.include_router(oauth_router, prefix="/api/v1")
         return test_server
 
@@ -38,20 +38,16 @@ class TestOAuth21EndToEndFlow:
             is_verified=True,
             is_admin=False,
             created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc)
+            updated_at=datetime.now(timezone.utc),
         )
-        
+
         async with transaction_manager.transaction() as conn:
             user_repo = UserRepository(conn)
             return await user_repo.create(user_data)
 
     @pytest.mark.asyncio
     async def test_oauth21_flow_expired_code(
-        self, 
-        oauth_server: AsyncTestServer, 
-        test_user: UserModel, 
-        test_client=None,
-        test_scopes=None
+        self, oauth_server: AsyncTestServer, test_user: UserModel, test_client=None, test_scopes=None
     ):
         """Test OAuth 2.1 flow with expired authorization code."""
         # Test with invalid/non-existent code
@@ -62,32 +58,24 @@ class TestOAuth21EndToEndFlow:
                 "code": "invalid_authorization_code",
                 "redirect_uri": "https://client.example.com/callback",
                 "client_id": "test_client",
-                "code_verifier": "test_verifier"
-            }
+                "code_verifier": "test_verifier",
+            },
         )
-        
+
         # Should fail with 400 Bad Request
         await token_response.expect_status(400)
         error_data = await token_response.json()
         assert "Invalid authorization code" in error_data["detail"]
 
     @pytest.mark.asyncio
-    async def test_backward_compatibility_password_grant(
-        self, 
-        oauth_server: AsyncTestServer, 
-        test_user: UserModel
-    ):
+    async def test_backward_compatibility_password_grant(self, oauth_server: AsyncTestServer, test_user: UserModel):
         """Test that password grant still works (backward compatibility)."""
         # Test existing password grant flow
         token_response = await oauth_server.client.post(
             "/api/v1/auth/token",
-            json={
-                "grant_type": "password",
-                "username": test_user.username,
-                "password": "Test123!"
-            }
+            json={"grant_type": "password", "username": test_user.username, "password": "Test123!"},
         )
-        
+
         # Should succeed with valid credentials
         await token_response.expect_status(200)
         token_data = await token_response.json()
@@ -99,18 +87,14 @@ class TestOAuth21EndToEndFlow:
     async def test_invalid_grant_type(self, oauth_server: AsyncTestServer):
         """Test error handling for invalid grant types."""
         token_response = await oauth_server.client.post(
-            "/api/v1/auth/token",
-            json={
-                "grant_type": "invalid_grant_type",
-                "some_param": "some_value"
-            }
+            "/api/v1/auth/token", json={"grant_type": "invalid_grant_type", "some_param": "some_value"}
         )
-        
+
         # Should fail with 400 Bad Request
         await token_response.expect_status(400)
         error_data = await token_response.json()
         assert "Unsupported grant type" in error_data["detail"]
-        
+
     @pytest.mark.asyncio
     async def test_authorization_code_grant_supported(self, oauth_server: AsyncTestServer):
         """Test that authorization_code grant is recognized and processed."""
@@ -121,16 +105,16 @@ class TestOAuth21EndToEndFlow:
                 "code": "test_invalid_code",
                 "redirect_uri": "https://example.com/callback",
                 "client_id": "test_client",
-                "code_verifier": "test_verifier"
-            }
+                "code_verifier": "test_verifier",
+            },
         )
-        
+
         # Should fail with authorization code error, NOT grant type error
         await token_response.expect_status(400)
         error_data = await token_response.json()
         assert "Invalid authorization code" in error_data["detail"]
         assert "Unsupported grant type" not in error_data["detail"]
-        
+
     @pytest.mark.asyncio
     async def test_pkce_parameter_validation(self, oauth_server: AsyncTestServer):
         """Test PKCE parameter validation for authorization_code grant."""
@@ -139,11 +123,11 @@ class TestOAuth21EndToEndFlow:
             "/api/v1/auth/token",
             json={
                 "grant_type": "authorization_code",
-                "code": "test_code"
+                "code": "test_code",
                 # Missing: redirect_uri, client_id, code_verifier
-            }
+            },
         )
-        
+
         await token_response.expect_status(400)
         error_data = await token_response.json()
         assert "code, redirect_uri, client_id, and code_verifier are required" in error_data["detail"]

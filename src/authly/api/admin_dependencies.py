@@ -29,44 +29,39 @@ ADMIN_SCOPES = {
     "admin:clients:read": "Read OAuth client configurations",
     "admin:clients:write": "Create and modify OAuth clients",
     "admin:scopes:read": "Read OAuth scope definitions",
-    "admin:scopes:write": "Create and modify OAuth scopes", 
+    "admin:scopes:write": "Create and modify OAuth scopes",
     "admin:users:read": "Read user accounts",
     "admin:users:write": "Create and modify user accounts",
     "admin:system:read": "Read system status and configuration",
-    "admin:system:write": "Modify system configuration"
+    "admin:system:write": "Modify system configuration",
 }
 
 
-async def require_admin_user(
-    current_user: UserModel = Depends(get_current_user)
-) -> UserModel:
+async def require_admin_user(current_user: UserModel = Depends(get_current_user)) -> UserModel:
     """
     Require intrinsic admin authority.
-    
+
     This dependency validates that the current user has the is_admin flag set,
     which represents intrinsic administrative capability at the database level.
     This is the first layer of the two-layer security model.
-    
+
     Args:
         current_user: Current authenticated user from JWT token
-        
+
     Returns:
         UserModel with verified admin authority
-        
+
     Raises:
         HTTPException: If user is not an admin
     """
     if not current_user.is_admin:
-        logger.warning(
-            f"Admin access denied for non-admin user: {current_user.username} "
-            f"(user_id: {current_user.id})"
-        )
+        logger.warning(f"Admin access denied for non-admin user: {current_user.username} (user_id: {current_user.id})")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Administrative privileges required. User must have admin authority.",
-            headers={"WWW-Authenticate": "Bearer"}
+            headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     logger.info(f"Admin authority verified for user: {current_user.username}")
     return current_user
 
@@ -74,35 +69,35 @@ async def require_admin_user(
 def require_admin_scope(required_scope: str):
     """
     Factory function to create admin scope validation dependency.
-    
+
     This creates a dependency that validates both intrinsic admin authority
     and specific OAuth scopes. This is the second layer of the two-layer
     security model.
-    
+
     Args:
         required_scope: The admin scope required (e.g., "admin:clients:write")
-        
+
     Returns:
         FastAPI dependency function that validates scope permissions
     """
-    
+
     async def validate_admin_scope(
         admin_user: UserModel = Depends(require_admin_user),
-        credentials: HTTPAuthorizationCredentials = Depends(admin_bearer)
+        credentials: HTTPAuthorizationCredentials = Depends(admin_bearer),
     ) -> UserModel:
         """
         Validate admin scope permissions.
-        
+
         This dependency validates that the admin user's token contains
         the required scope for the operation.
-        
+
         Args:
             admin_user: Verified admin user from require_admin_user
             credentials: HTTP Bearer token credentials
-            
+
         Returns:
             UserModel with verified admin authority and scope permissions
-            
+
         Raises:
             HTTPException: If scope validation fails
         """
@@ -110,26 +105,21 @@ def require_admin_scope(required_scope: str):
         if required_scope not in ADMIN_SCOPES:
             logger.error(f"Unknown admin scope requested: {required_scope}")
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Unknown admin scope: {required_scope}"
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Unknown admin scope: {required_scope}"
             )
-        
+
         try:
             # Get configuration for JWT validation
             authly = Authly.get_instance()
             config = authly.get_config()
-            
+
             # Decode and validate JWT token
-            payload = jwt.decode(
-                credentials.credentials,
-                config.secret_key,
-                algorithms=[config.algorithm]
-            )
-            
+            payload = jwt.decode(credentials.credentials, config.secret_key, algorithms=[config.algorithm])
+
             # Extract scopes from token (OAuth 2.1 uses "scope" as space-separated string)
             scope_string = payload.get("scope", "")
             token_scopes = scope_string.split() if scope_string else []
-            
+
             # Validate required scope is present
             if required_scope not in token_scopes:
                 logger.warning(
@@ -139,16 +129,13 @@ def require_admin_scope(required_scope: str):
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail=f"Missing required admin scope: {required_scope}",
-                    headers={"WWW-Authenticate": "Bearer"}
+                    headers={"WWW-Authenticate": "Bearer"},
                 )
-            
-            logger.info(
-                f"Admin scope validated for user {admin_user.username}: "
-                f"scope '{required_scope}'"
-            )
-            
+
+            logger.info(f"Admin scope validated for user {admin_user.username}: scope '{required_scope}'")
+
             return admin_user
-            
+
         except HTTPException:
             # Let HTTPExceptions pass through
             raise
@@ -157,22 +144,21 @@ def require_admin_scope(required_scope: str):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid authentication token",
-                headers={"WWW-Authenticate": "Bearer"}
+                headers={"WWW-Authenticate": "Bearer"},
             )
         except Exception as e:
             logger.error(f"Admin scope validation error: {e}")
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Admin scope validation failed"
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Admin scope validation failed"
             )
-    
+
     return validate_admin_scope
 
 
 async def get_admin_scopes() -> Dict[str, str]:
     """
     Get all available admin scopes and their descriptions.
-    
+
     Returns:
         Dictionary mapping scope names to descriptions
     """
@@ -182,24 +168,23 @@ async def get_admin_scopes() -> Dict[str, str]:
 async def validate_admin_scopes(scopes: List[str]) -> List[str]:
     """
     Validate that the provided scopes are valid admin scopes.
-    
+
     Args:
         scopes: List of scope names to validate
-        
+
     Returns:
         List of valid scope names
-        
+
     Raises:
         HTTPException: If any scope is invalid
     """
     invalid_scopes = [scope for scope in scopes if scope not in ADMIN_SCOPES]
-    
+
     if invalid_scopes:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid admin scopes: {', '.join(invalid_scopes)}"
+            status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid admin scopes: {', '.join(invalid_scopes)}"
         )
-    
+
     return scopes
 
 

@@ -22,7 +22,7 @@ class ClientRepository(BaseRepository[OAuthClientModel, UUID]):
         super().__init__(
             db_connection=db_connection, table_name="oauth_clients", model_class=OAuthClientModel, primary_key="id"
         )
-    
+
     def _process_client_result(self, result: dict) -> dict:
         """Process database result and convert arrays, handle missing OIDC fields"""
         # Convert PostgreSQL arrays to Python lists
@@ -31,7 +31,7 @@ class ClientRepository(BaseRepository[OAuthClientModel, UUID]):
         result["response_types"] = list(result["response_types"]) if result["response_types"] else []
         result["request_uris"] = list(result["request_uris"]) if result["request_uris"] else []
         result["contacts"] = list(result["contacts"]) if result["contacts"] else []
-        
+
         # Handle missing OIDC fields with defaults
         if "id_token_signed_response_alg" not in result or result["id_token_signed_response_alg"] is None:
             result["id_token_signed_response_alg"] = "RS256"
@@ -41,7 +41,7 @@ class ClientRepository(BaseRepository[OAuthClientModel, UUID]):
             result["application_type"] = "web"
         if "require_auth_time" not in result or result["require_auth_time"] is None:
             result["require_auth_time"] = False
-        
+
         return result
 
     async def get_by_client_id(self, client_id: str) -> Optional[OAuthClientModel]:
@@ -85,7 +85,7 @@ class ClientRepository(BaseRepository[OAuthClientModel, UUID]):
                 insert_data["response_types"] = [
                     rt.value if hasattr(rt, "value") else str(rt) for rt in insert_data["response_types"]
                 ]
-            
+
             # Handle OIDC array fields
             if "request_uris" in insert_data:
                 insert_data["request_uris"] = list(insert_data["request_uris"]) if insert_data["request_uris"] else []
@@ -96,15 +96,15 @@ class ClientRepository(BaseRepository[OAuthClientModel, UUID]):
             # Remove any manually set timestamps to use NOW() from database
             insert_data.pop("created_at", None)
             insert_data.pop("updated_at", None)
-            
+
             # Build columns and values for the insert
             columns = list(insert_data.keys()) + ["created_at", "updated_at"]
             values_placeholders = ["%s"] * len(insert_data) + ["NOW()", "NOW()"]
             values = list(insert_data.values())
-            
+
             insert_query = SQL("INSERT INTO oauth_clients ({}) VALUES ({})").format(
                 SQL(", ").join(SQL('"{}"'.format(col)) for col in columns),
-                SQL(", ").join(SQL(placeholder) for placeholder in values_placeholders)
+                SQL(", ").join(SQL(placeholder) for placeholder in values_placeholders),
             )
 
             async with self.db_connection.cursor(row_factory=dict_row) as cur:
@@ -138,30 +138,32 @@ class ClientRepository(BaseRepository[OAuthClientModel, UUID]):
                 prepared_data["response_types"] = [
                     rt.value if hasattr(rt, "value") else str(rt) for rt in prepared_data["response_types"]
                 ]
-            
+
             # Handle OIDC array fields
             if "request_uris" in prepared_data:
-                prepared_data["request_uris"] = list(prepared_data["request_uris"]) if prepared_data["request_uris"] else []
+                prepared_data["request_uris"] = (
+                    list(prepared_data["request_uris"]) if prepared_data["request_uris"] else []
+                )
             if "contacts" in prepared_data:
                 prepared_data["contacts"] = list(prepared_data["contacts"]) if prepared_data["contacts"] else []
 
             # Set updated timestamp using NOW() for accurate timing
             # We need to do this in the query, not in Python, to ensure proper ordering
-            
+
             # Build a custom query that includes NOW() for updated_at
             set_clauses = []
             values = []
-            
+
             for key, value in prepared_data.items():
                 set_clauses.append(f'"{key}" = %s')
                 values.append(value)
-            
+
             # Add updated_at with clock_timestamp() for precise timing
             set_clauses.append('"updated_at" = clock_timestamp()')
-            
+
             # Add client_id for WHERE clause
             values.append(client_id)
-            
+
             update_query = SQL("UPDATE oauth_clients SET {} WHERE id = %s").format(
                 SQL(", ").join(SQL(clause) for clause in set_clauses)
             )
@@ -318,17 +320,11 @@ class ClientRepository(BaseRepository[OAuthClientModel, UUID]):
             insert_data = []
             now = datetime.now(timezone.utc)
             for scope_id in scope_ids:
-                insert_data.append({
-                    "client_id": client_id,
-                    "scope_id": scope_id,
-                    "created_at": now
-                })
+                insert_data.append({"client_id": client_id, "scope_id": scope_id, "created_at": now})
 
             # Use the first data item as template
             query = PsycopgHelper.build_insert_query(
-                table_name="oauth_client_scopes",
-                data=insert_data[0],
-                batch_size=len(insert_data)
+                table_name="oauth_client_scopes", data=insert_data[0], batch_size=len(insert_data)
             )
 
             # Prepare values for batch insert

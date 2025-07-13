@@ -48,7 +48,7 @@ templates = Jinja2Templates(directory=TEMPLATES_DIR)
 async def get_discovery_service() -> DiscoveryService:
     """
     Get an instance of the DiscoveryService.
-    
+
     Note: Scope repository is acquired dynamically to handle cases
     where database is not available (e.g., testing).
     """
@@ -63,19 +63,19 @@ async def get_discovery_service() -> DiscoveryService:
 def _build_issuer_url(request: Request) -> str:
     """
     Build the issuer URL from the request.
-    
+
     Args:
         request: FastAPI request object
-        
+
     Returns:
         str: Complete issuer URL (e.g., https://auth.example.com)
     """
     # Use X-Forwarded-Proto and X-Forwarded-Host headers if available (for reverse proxy setups)
     scheme = request.headers.get("x-forwarded-proto", request.url.scheme)
-    
+
     # Get host, handling the case where it might include port
     host_header = request.headers.get("x-forwarded-host", request.headers.get("host"))
-    
+
     if host_header:
         # Host header might include port (e.g., "localhost:8000")
         # Parse it to separate hostname and port
@@ -94,10 +94,9 @@ def _build_issuer_url(request: Request) -> str:
         # Fallback to request URL
         host = request.url.hostname or "localhost"
         port_num = request.url.port
-    
+
     # Add port only if it's not standard (80 for HTTP, 443 for HTTPS)
-    if port_num and not ((scheme == "https" and port_num == 443) or 
-                        (scheme == "http" and port_num == 80)):
+    if port_num and not ((scheme == "https" and port_num == 443) or (scheme == "http" and port_num == 80)):
         return f"{scheme}://{host}:{port_num}"
     else:
         return f"{scheme}://{host}"
@@ -138,32 +137,27 @@ def _build_issuer_url(request: Request) -> str:
                         "response_types_supported": ["code"],
                         "grant_types_supported": ["authorization_code", "refresh_token"],
                         "code_challenge_methods_supported": ["S256"],
-                        "token_endpoint_auth_methods_supported": [
-                            "client_secret_basic", 
-                            "client_secret_post", 
-                            "none"
-                        ],
+                        "token_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post", "none"],
                         "require_pkce": True,
                         "response_modes_supported": ["query"],
                         "scopes_supported": ["read", "write", "admin"],
-                        "ui_locales_supported": ["en"]
+                        "ui_locales_supported": ["en"],
                     }
                 }
-            }
+            },
         },
-        500: {"description": "Internal server error"}
-    }
+        500: {"description": "Internal server error"},
+    },
 )
 async def oauth_discovery(
-    request: Request,
-    discovery_service: DiscoveryService = Depends(get_discovery_service)
+    request: Request, discovery_service: DiscoveryService = Depends(get_discovery_service)
 ) -> OAuthServerMetadata:
     """
     OAuth 2.1 Authorization Server Discovery endpoint.
-    
+
     Returns metadata about the authorization server's capabilities and endpoints
     according to RFC 8414 and OAuth 2.1 specifications.
-    
+
     This endpoint is publicly accessible and provides essential information
     for OAuth 2.1 clients to discover server capabilities.
     """
@@ -175,41 +169,38 @@ async def oauth_discovery(
         except Exception:
             # Fallback for testing or when Authly not initialized
             api_prefix = "/api/v1"
-        
+
         # Build issuer URL from request
         issuer_url = _build_issuer_url(request)
-        
+
         # Generate server metadata
-        metadata = await discovery_service.get_server_metadata(
-            issuer_url=issuer_url,
-            api_prefix=api_prefix
-        )
-        
+        metadata = await discovery_service.get_server_metadata(issuer_url=issuer_url, api_prefix=api_prefix)
+
         logger.info(f"OAuth discovery request from {request.client.host if request.client else 'unknown'}")
-        
+
         return metadata
-        
+
     except Exception as e:
         logger.error(f"Error generating OAuth discovery metadata: {e}")
         # Return a minimal static response on error
         try:
             issuer_url = _build_issuer_url(request)
-            
+
             static_metadata = DiscoveryService().get_static_metadata(
                 issuer_url=issuer_url,
                 api_prefix="/api/v1",  # Fallback API prefix
-                scopes=["read", "write"]  # Fallback scopes
+                scopes=["read", "write"],  # Fallback scopes
             )
-            
+
             logger.warning("Returned static OAuth discovery metadata due to error")
             return static_metadata
-            
+
         except Exception as fallback_error:
             logger.error(f"Failed to generate fallback discovery metadata: {fallback_error}")
             # This should rarely happen, but we need to handle it gracefully
             return JSONResponse(
                 status_code=500,
-                content={"error": "internal_server_error", "error_description": "Unable to generate server metadata"}
+                content={"error": "internal_server_error", "error_description": "Unable to generate server metadata"},
             )
 
 
@@ -251,7 +242,7 @@ async def oauth_discovery(
         200: {"description": "Authorization form displayed", "content": {"text/html": {}}},
         302: {"description": "Redirect to client with error"},
         400: {"description": "Invalid request parameters"},
-    }
+    },
 )
 async def authorize_get(
     request: Request,
@@ -273,11 +264,11 @@ async def authorize_get(
     login_hint: Optional[str] = Query(None, description="Login hint"),
     acr_values: Optional[str] = Query(None, description="ACR values"),
     current_user: UserModel = Depends(get_current_user),
-    authorization_service: AuthorizationService = Depends(get_authorization_service)
+    authorization_service: AuthorizationService = Depends(get_authorization_service),
 ):
     """
     OAuth 2.1 Authorization endpoint (GET).
-    
+
     Validates the authorization request and displays a consent form.
     """
     try:
@@ -299,24 +290,24 @@ async def authorize_get(
             ui_locales=ui_locales,
             id_token_hint=id_token_hint,
             login_hint=login_hint,
-            acr_values=acr_values
+            acr_values=acr_values,
         )
-        
+
         # Validate the authorization request
         is_valid, error_code, client = await authorization_service.validate_authorization_request(auth_request)
-        
+
         if not is_valid:
             # Redirect back to client with error
             error_params = {"error": error_code}
             if state:
                 error_params["state"] = state
-            
+
             error_url = f"{redirect_uri}?{urlencode(error_params)}"
             return RedirectResponse(url=error_url, status_code=302)
-        
+
         # Get requested scopes for display
         requested_scopes = await authorization_service.get_requested_scopes(scope, client)
-        
+
         # Render the authorization consent template
         return templates.TemplateResponse(
             request=request,
@@ -341,23 +332,17 @@ async def authorize_get(
                 "id_token_hint": id_token_hint,
                 "login_hint": login_hint,
                 "acr_values": acr_values,
-                "is_oidc_request": auth_request.is_oidc_request()
-            }
+                "is_oidc_request": auth_request.is_oidc_request(),
+            },
         )
-        
+
     except ValueError as e:
         # Invalid enum values
         logger.warning(f"Invalid parameter in authorization request: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid request parameters"
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid request parameters")
     except Exception as e:
         logger.error(f"Error in authorization endpoint: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Authorization server error"
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Authorization server error")
 
 
 @oauth_router.post(
@@ -373,7 +358,7 @@ async def authorize_get(
         302: {"description": "Redirect to client with code or error"},
         400: {"description": "Invalid request"},
         500: {"description": "Server error"},
-    }
+    },
 )
 async def authorize_post(
     request: Request,
@@ -395,32 +380,32 @@ async def authorize_post(
     login_hint: Optional[str] = Form(None),
     acr_values: Optional[str] = Form(None),
     current_user: UserModel = Depends(get_current_user),
-    authorization_service: AuthorizationService = Depends(get_authorization_service)
+    authorization_service: AuthorizationService = Depends(get_authorization_service),
 ):
     """
     OAuth 2.1 Authorization processing endpoint (POST).
-    
+
     Handles user consent and generates authorization code.
     """
     try:
         # Use the authenticated user ID from the JWT token
         authenticated_user_id = current_user.id
-        
+
         # Convert approved string to boolean
         user_approved = approved.lower() == "true"
-        
+
         if not user_approved:
             # User denied the request
             error_params = {
                 "error": AuthorizationError.ACCESS_DENIED,
-                "error_description": "The resource owner denied the request"
+                "error_description": "The resource owner denied the request",
             }
             if state:
                 error_params["state"] = state
-            
+
             error_url = f"{redirect_uri}?{urlencode(error_params)}"
             return RedirectResponse(url=error_url, status_code=302)
-        
+
         # Create consent request with OpenID Connect parameters
         consent_request = UserConsentRequest(
             client_id=client_id,
@@ -441,51 +426,48 @@ async def authorize_post(
             ui_locales=ui_locales,
             id_token_hint=id_token_hint,
             login_hint=login_hint,
-            acr_values=acr_values
+            acr_values=acr_values,
         )
-        
+
         # Generate authorization code
         auth_code = await authorization_service.generate_authorization_code(consent_request)
-        
+
         if auth_code:
             # Success - redirect with authorization code
             success_params = {"code": auth_code}
             if state:
                 success_params["state"] = state
-            
+
             success_url = f"{redirect_uri}?{urlencode(success_params)}"
             return RedirectResponse(url=success_url, status_code=302)
         else:
             # Failed to generate code
             error_params = {
                 "error": AuthorizationError.SERVER_ERROR,
-                "error_description": "Failed to generate authorization code"
+                "error_description": "Failed to generate authorization code",
             }
             if state:
                 error_params["state"] = state
-            
+
             error_url = f"{redirect_uri}?{urlencode(error_params)}"
             return RedirectResponse(url=error_url, status_code=302)
-        
+
     except Exception as e:
         logger.error(f"Error processing authorization: {e}")
-        
+
         # Try to redirect with error, fall back to HTTP error
         try:
             error_params = {
                 "error": AuthorizationError.SERVER_ERROR,
-                "error_description": "Authorization server encountered an error"
+                "error_description": "Authorization server encountered an error",
             }
             if state:
                 error_params["state"] = state
-            
+
             error_url = f"{redirect_uri}?{urlencode(error_params)}"
             return RedirectResponse(url=error_url, status_code=302)
         except:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Authorization server error"
-            )
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Authorization server error")
 
 
 # Additional OAuth endpoints to be implemented

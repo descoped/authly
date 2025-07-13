@@ -22,7 +22,7 @@ from .userinfo import UserInfoResponse, UserInfoService
 
 __all__ = [
     "OIDC_SCOPES",
-    "OIDCClaimsMapping", 
+    "OIDCClaimsMapping",
     "get_oidc_scopes_with_descriptions",
     "IDTokenGenerator",
     "IDTokenService",

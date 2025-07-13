@@ -70,15 +70,15 @@ class EnvSecretProvider(SecretProvider):
 
     def get_secrets(self) -> Secrets:
         """Get JWT secrets from environment variables.
-        
+
         This provider follows library-first principles:
         - Does not impose configuration loading choices on the host application
         - Provides clear guidance for different deployment scenarios
         - Respects host application's environment management approach
-        
+
         Returns:
             Secrets: JWT secret keys from environment
-            
+
         Raises:
             ValueError: If required JWT secrets are not found in environment
         """

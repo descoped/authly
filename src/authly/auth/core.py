@@ -32,10 +32,11 @@ def create_access_token(
     else:
         try:
             from authly import get_config
+
             config = get_config()
             access_token_expire_minutes = config.access_token_expire_minutes
         except RuntimeError:
-            # Fallback for tests without full Authly initialization  
+            # Fallback for tests without full Authly initialization
             access_token_expire_minutes = 60
         expire = datetime.now(timezone.utc) + timedelta(minutes=access_token_expire_minutes)
     to_encode = data.copy()

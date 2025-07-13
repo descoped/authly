@@ -64,12 +64,13 @@ class UserRepository(BaseRepository[UserModel, UUID]):
         if limit is None:
             try:
                 from authly import get_config
+
                 config = get_config()
                 limit = config.default_page_size
             except RuntimeError:
                 # Fallback for tests
                 limit = 100
-                
+
         # noinspection SqlDialectInspection,SqlNoDataSourceInspection
         query = SQL(
             """

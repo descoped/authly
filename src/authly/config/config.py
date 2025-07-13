@@ -63,10 +63,10 @@ class AuthlyConfig:
 
     @classmethod
     def load(
-        cls, 
-        secret_provider: SecretProvider, 
+        cls,
+        secret_provider: SecretProvider,
         database_provider: Optional[DatabaseProvider] = None,
-        secrets_path: Optional[Path] = None
+        secrets_path: Optional[Path] = None,
     ) -> "AuthlyConfig":
         """Load configuration from environment and secure storage.
 
@@ -234,95 +234,96 @@ class AuthlyConfig:
     def get_masked_database_url(self) -> str:
         """Get database URL with password masked for safe logging."""
         from authly.config.database_providers import DatabaseConfig
+
         db_config = DatabaseConfig(database_url=self._database_url)
         return db_config.get_masked_url()
 
     def validate(self) -> None:
         """Validate all configuration values."""
         from authly.config.database_providers import DatabaseConfig
-        
+
         # Validate database URL
         db_config = DatabaseConfig(database_url=self._database_url)
         db_config.validate()
-        
+
         # Validate token expiration values
         if self._access_token_expire_minutes <= 0:
             raise ValueError("Access token expiration must be positive")
-        
+
         if self._refresh_token_expire_days <= 0:
             raise ValueError("Refresh token expiration must be positive")
-        
+
         # Validate rate limiting values
         if self._rate_limit_max_requests <= 0:
             raise ValueError("Rate limit max requests must be positive")
-        
+
         if self._rate_limit_window_seconds <= 0:
             raise ValueError("Rate limit window seconds must be positive")
-        
+
         # Validate security constants
         if self._rsa_key_size < 2048:
             raise ValueError("RSA key size must be at least 2048 bits")
-        
+
         if self._token_hex_length < 16:
             raise ValueError("Token hex length must be at least 16")
-        
+
         if self._authorization_code_length < 16:
             raise ValueError("Authorization code length must be at least 16")
-        
+
         if self._client_secret_length < 16:
             raise ValueError("Client secret length must be at least 16")
-        
+
         # Validate operational values
         if self._default_page_size <= 0:
             raise ValueError("Default page size must be positive")
-        
+
         if self._max_page_size <= 0:
             raise ValueError("Max page size must be positive")
-        
+
         if self._default_page_size > self._max_page_size:
             raise ValueError("Default page size cannot exceed max page size")
-        
+
         if self._nonce_max_length <= 0:
             raise ValueError("Nonce max length must be positive")
-        
+
         if self._redirect_uri_max_length <= 0:
             raise ValueError("Redirect URI max length must be positive")
-        
+
         if self._jwks_cache_max_age_seconds < 0:
             raise ValueError("JWKS cache max age must be non-negative")
-        
+
         if self._hsts_max_age_seconds < 0:
             raise ValueError("HSTS max age must be non-negative")
-        
+
         if self._db_cleanup_timeout_seconds <= 0:
             raise ValueError("DB cleanup timeout must be positive")
-        
+
         # Validate field validation constraints
         if self._username_min_length <= 0:
             raise ValueError("Username min length must be positive")
-        
+
         if self._username_max_length <= 0:
             raise ValueError("Username max length must be positive")
-        
+
         if self._username_min_length > self._username_max_length:
             raise ValueError("Username min length cannot exceed max length")
-        
+
         if self._password_min_length <= 0:
             raise ValueError("Password min length must be positive")
-        
+
         # Validate database configuration
         if self._postgres_port <= 0 or self._postgres_port > 65535:
             raise ValueError("Postgres port must be between 1 and 65535")
-        
+
         # Validate JWT algorithm
         supported_algorithms = ["HS256", "HS384", "HS512", "RS256", "RS384", "RS512"]
         if self._algorithm not in supported_algorithms:
             raise ValueError(f"Unsupported JWT algorithm: {self._algorithm}")
-        
+
         # Validate secrets are available
         if not self._secrets:
             raise ValueError("Secrets not initialized")
-        
+
         try:
             self.secret_key
             self.refresh_secret_key
