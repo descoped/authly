@@ -14,7 +14,7 @@ A **production-ready OAuth 2.1 + OpenID Connect 1.0 authorization server** built
 ## 🚀 **Production Ready Features**
 
 ✅ **Complete OAuth 2.1 + OIDC 1.0 Compliance** - Full RFC implementation with PKCE  
-✅ **439/439 Tests Passing** - 100% success rate with real integration testing  
+✅ **500+ Tests Passing** - 100% success rate with real integration testing  
 ✅ **Enterprise Security** - Two-layer admin system, rate limiting, audit logging  
 ✅ **Production Architecture** - Docker, monitoring, health checks, deployment guides  
 ✅ **Professional CLI** - Complete admin interface with API-first architecture  
@@ -230,7 +230,7 @@ uv run python -m authly admin scope create \
 ## 🧪 **Testing Excellence**
 
 ### **Test Coverage**
-- **439 Tests Total** - 100% passing (verified production quality)
+- **500+ Tests Total** - 100% passing (verified production quality)
 - **Real Integration Testing** - PostgreSQL testcontainers (no mocking)
 - **Complete Flow Testing** - End-to-end OAuth and OIDC flows
 - **Security Testing** - Authentication, authorization, and validation
