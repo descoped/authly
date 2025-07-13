@@ -50,9 +50,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
         # Get default port from config
         try:
-            config = authly.get_config()
             default_port = config.postgres_port
-        except RuntimeError:
+        except (AttributeError, RuntimeError):
             # Fallback for tests without full initialization
             default_port = 5432
 
