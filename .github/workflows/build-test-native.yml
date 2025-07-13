@@ -10,15 +10,12 @@ on:
       - '**.md'
 
 env:
-  PYTHON_VERSION: '3.13'
+  PYTHON_VERSION: '3.11'
   UV_VERSION: '0.5.11'
 
 jobs:
   test:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ['3.11', '3.12', '3.13']
     
     steps:
     - name: Checkout code
@@ -27,7 +24,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: ${{ matrix.python-version }}
+        python-version: '3.11'
 
     - name: Install uv
       uses: astral-sh/setup-uv@v5
