@@ -914,67 +914,81 @@ async def oidc_frontchannel_logout(
         # 3. Generate logout notifications for each client
         # 4. Return appropriate response
 
-        logout_response = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Front-Channel Logout</title>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1">
-        </head>
-        <body>
-            <h1>Logout Processing</h1>
-            <p>Processing logout request...</p>
+        # Sanitize user inputs to prevent XSS
+        import html
+        import json
+        
+        safe_iss = html.escape(iss or base_url, quote=True)
+        safe_sid = html.escape(sid or "unknown", quote=True)
+        
+        # Use JSON encoding for safe JavaScript variable injection
+        js_iss = json.dumps(safe_iss)
+        js_sid = json.dumps(safe_sid)
+        
+        logout_response = f"""<!DOCTYPE html>
+<html>
+<head>
+    <title>Front-Channel Logout</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'unsafe-inline';">
+</head>
+<body>
+    <h1>Logout Processing</h1>
+    <p>Processing logout request...</p>
+    
+    <script type="text/javascript">
+        (function() {{
+            'use strict';
             
-            <script type="text/javascript">
-                (function() {{
-                    'use strict';
+            // Safely injected variables (JSON encoded to prevent XSS)
+            var issuer = {js_iss};
+            var sessionId = {js_sid};
+            
+            // Front-channel logout processing
+            var logoutComplete = false;
+            
+            function processLogout() {{
+                try {{
+                    // In a full implementation, this would:
+                    // 1. Send logout notifications to all registered clients
+                    // 2. Clear local session state
+                    // 3. Coordinate cross-client logout
                     
-                    // Front-channel logout processing
-                    var logoutComplete = false;
+                    console.log('Processing front-channel logout');
+                    console.log('Issuer:', issuer);
+                    console.log('Session ID:', sessionId);
                     
-                    function processLogout() {{
-                        try {{
-                            // In a full implementation, this would:
-                            // 1. Send logout notifications to all registered clients
-                            // 2. Clear local session state
-                            // 3. Coordinate cross-client logout
-                            
-                            console.log('Processing front-channel logout');
-                            console.log('Issuer:', '{iss or base_url}');
-                            console.log('Session ID:', '{sid or "unknown"}');
-                            
-                            // Simulate logout processing
-                            setTimeout(function() {{
-                                logoutComplete = true;
-                                updateStatus('Logout completed successfully');
-                            }}, 1000);
-                            
-                        }} catch (error) {{
-                            console.error('Front-channel logout error:', error);
-                            updateStatus('Logout processing error');
-                        }}
-                    }}
+                    // Simulate logout processing
+                    setTimeout(function() {{
+                        logoutComplete = true;
+                        updateStatus('Logout completed successfully');
+                    }}, 1000);
                     
-                    function updateStatus(message) {{
-                        var statusElement = document.querySelector('p');
-                        if (statusElement) {{
-                            statusElement.textContent = message;
-                        }}
-                    }}
-                    
-                    // Start logout processing when DOM is ready
-                    if (document.readyState === 'loading') {{
-                        document.addEventListener('DOMContentLoaded', processLogout);
-                    }} else {{
-                        processLogout();
-                    }}
-                    
-                }})();
-            </script>
-        </body>
-        </html>
-        """
+                }} catch (error) {{
+                    console.error('Front-channel logout error:', error);
+                    updateStatus('Logout processing error');
+                }}
+            }}
+            
+            function updateStatus(message) {{
+                var statusElement = document.querySelector('p');
+                if (statusElement) {{
+                    statusElement.textContent = message;
+                }}
+            }}
+            
+            // Start logout processing when DOM is ready
+            if (document.readyState === 'loading') {{
+                document.addEventListener('DOMContentLoaded', processLogout);
+            }} else {{
+                processLogout();
+            }}
+            
+        }})();
+    </script>
+</body>
+</html>"""
 
         logger.info(f"OIDC front-channel logout processed for issuer: {iss}, session: {sid}")
 
