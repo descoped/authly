@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 from psycopg_toolkit import TransactionManager
 
 from authly import Authly
-from authly.api.oauth_router import oauth_router
+from authly.api.oauth_discovery_router import oauth_discovery_router
 from authly.oauth.discovery_models import OAuthServerMetadata
 from authly.oauth.discovery_service import DiscoveryService
 from authly.oauth.scope_repository import ScopeRepository
@@ -184,12 +184,12 @@ class TestDiscoveryEndpoint:
     def test_discovery_endpoint_basic(self):
         """Test basic discovery endpoint functionality."""
         app = FastAPI()
-        app.include_router(oauth_router)
+        app.include_router(oauth_discovery_router)
 
         client = TestClient(app)
 
         with client:
-            response = client.get("/oauth/.well-known/oauth-authorization-server")
+            response = client.get("/.well-known/oauth-authorization-server")
 
             assert response.status_code == 200
             data = response.json()
@@ -212,12 +212,12 @@ class TestDiscoveryEndpoint:
     def test_discovery_endpoint_content_type(self):
         """Test discovery endpoint returns JSON content type."""
         app = FastAPI()
-        app.include_router(oauth_router)
+        app.include_router(oauth_discovery_router)
 
         client = TestClient(app)
 
         with client:
-            response = client.get("/oauth/.well-known/oauth-authorization-server")
+            response = client.get("/.well-known/oauth-authorization-server")
 
             assert response.status_code == 200
             assert "application/json" in response.headers["content-type"]
@@ -242,12 +242,12 @@ class TestDiscoveryEndpoint:
 
         # Now test the endpoint
         app = FastAPI()
-        app.include_router(oauth_router)
+        app.include_router(oauth_discovery_router)
 
         client = TestClient(app)
 
         with client:
-            response = client.get("/oauth/.well-known/oauth-authorization-server")
+            response = client.get("/.well-known/oauth-authorization-server")
 
             assert response.status_code == 200
             data = response.json()
@@ -259,7 +259,7 @@ class TestDiscoveryEndpoint:
     def test_discovery_endpoint_url_building(self):
         """Test that discovery endpoint builds URLs correctly."""
         app = FastAPI()
-        app.include_router(oauth_router)
+        app.include_router(oauth_discovery_router)
 
         client = TestClient(app)
 
@@ -267,7 +267,7 @@ class TestDiscoveryEndpoint:
             # Test with different base URLs via headers
             headers = {"Host": "auth.example.com", "X-Forwarded-Proto": "https"}
 
-            response = client.get("/oauth/.well-known/oauth-authorization-server", headers=headers)
+            response = client.get("/.well-known/oauth-authorization-server", headers=headers)
 
             assert response.status_code == 200
             data = response.json()
@@ -279,13 +279,13 @@ class TestDiscoveryEndpoint:
     def test_discovery_endpoint_error_handling(self):
         """Test discovery endpoint error handling."""
         app = FastAPI()
-        app.include_router(oauth_router)
+        app.include_router(oauth_discovery_router)
 
         client = TestClient(app)
 
         with client:
             # Should always return a valid response, even with errors
-            response = client.get("/oauth/.well-known/oauth-authorization-server")
+            response = client.get("/.well-known/oauth-authorization-server")
 
             # Should not fail completely
             assert response.status_code in [200, 500]

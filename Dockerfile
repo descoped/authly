@@ -37,6 +37,7 @@ ENV PYTHONPATH="/app/src"
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     libpq5 \
+    postgresql-client \
     curl \
     && rm -rf /var/lib/apt/lists/*
 

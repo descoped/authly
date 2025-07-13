@@ -14,6 +14,7 @@ from fastapi.openapi.utils import get_openapi
 from fastapi.staticfiles import StaticFiles
 
 from authly.api import auth_router, health_router, oauth_router, oidc_router, users_router
+from authly.api.oauth_discovery_router import oauth_discovery_router
 from authly.api.admin_middleware import setup_admin_middleware
 from authly.api.admin_router import admin_router
 from authly.api.password_change import router as password_change_router
@@ -75,6 +76,9 @@ def create_app(
 
     # Include OIDC router (no prefix - uses well-known paths)
     app.include_router(oidc_router)
+
+    # Include OAuth discovery router (no prefix - RFC 8414 compliance)
+    app.include_router(oauth_discovery_router)
 
     # Include admin router (no prefix - has its own /admin prefix)
     app.include_router(admin_router)

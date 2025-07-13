@@ -76,7 +76,7 @@ class TestOIDCIntegrationFlowsSimple:
         await oidc_response.expect_status(200)
 
         # OAuth discovery should be available
-        oauth_response = await oidc_server.client.get("/api/v1/oauth/.well-known/oauth-authorization-server")
+        oauth_response = await oidc_server.client.get("/.well-known/oauth-authorization-server")
         await oauth_response.expect_status(200)
 
         # JWKS should be available

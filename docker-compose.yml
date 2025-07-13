@@ -98,6 +98,8 @@ services:
       
       # Admin API
       AUTHLY_ADMIN_API_ENABLED: ${AUTHLY_ADMIN_API_ENABLED:-true}
+      AUTHLY_ADMIN_API_LOCALHOST_ONLY: ${AUTHLY_ADMIN_API_LOCALHOST_ONLY:-false}
+      AUTHLY_ADMIN_PASSWORD: ${AUTHLY_ADMIN_PASSWORD:-}
     ports:
       - "${AUTHLY_PORT:-8000}:8000"
     networks:

@@ -25,6 +25,7 @@ async def custom_test_server(
     from fastapi import FastAPI
 
     from authly.api import auth_router, health_router, oauth_router, oidc_router, users_router
+    from authly.api.oauth_discovery_router import oauth_discovery_router
     from authly.api.admin_middleware import setup_admin_middleware
     from authly.api.admin_router import admin_router
 
@@ -39,6 +40,7 @@ async def custom_test_server(
     app.include_router(users_router, prefix="/api/v1")
     app.include_router(oauth_router, prefix="/api/v1")
     app.include_router(oidc_router)  # OIDC router (no prefix - uses well-known paths)
+    app.include_router(oauth_discovery_router)  # OAuth discovery router (no prefix - RFC 8414 compliance)
     app.include_router(admin_router)
 
     # Create test server with the configured app

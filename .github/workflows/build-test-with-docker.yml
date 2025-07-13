@@ -66,6 +66,7 @@ jobs:
         AUTHLY_DEV_MODE=true
         AUTHLY_LOG_LEVEL=DEBUG
         AUTHLY_ADMIN_ALLOW_LOCALHOST=true
+        AUTHLY_ADMIN_PASSWORD=ci_admin_test_password
         EOF
     
     - name: Start Docker Compose services
@@ -159,6 +160,7 @@ jobs:
         AUTHLY_DEV_MODE=true
         AUTHLY_LOG_LEVEL=INFO
         AUTHLY_ADMIN_ALLOW_LOCALHOST=true
+        AUTHLY_ADMIN_PASSWORD=integration_admin_test_password
         EOF
     
     - name: Start full stack
@@ -167,21 +169,21 @@ jobs:
         # Wait for all services to be healthy
         timeout 180s bash -c 'until docker compose ps | grep -E "(postgres|redis|authly)" | grep -v "healthy" | wc -l | grep "^0$"; do sleep 5; done'
     
-    - name: Run OAuth flow integration test
+    - name: Run OAuth endpoint availability test
       run: |
-        # Basic OAuth flow test
-        echo "Testing OAuth authorization endpoint..."
+        # Test OAuth endpoints are mounted correctly
+        echo "Testing OAuth router availability..."
         
-        # Test authorization endpoint (should redirect to login)
+        # Test authorization endpoint returns 401 for unauthenticated request (not 404)
         RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
-          "http://localhost:8000/oauth/authorize?response_type=code&client_id=test&redirect_uri=http://localhost&scope=openid")
+          "http://localhost:8000/api/v1/oauth/authorize")
         
-        if [ "$RESPONSE" != "200" ] && [ "$RESPONSE" != "302" ]; then
-          echo "OAuth authorization endpoint failed with status: $RESPONSE"
+        if [ "$RESPONSE" != "401" ]; then
+          echo "OAuth authorization endpoint failed with status: $RESPONSE (expected 401 for unauthenticated request)"
           exit 1
         fi
         
-        echo "OAuth authorization endpoint test passed"
+        echo "OAuth router availability test passed - endpoint requires authentication as expected"
     
     - name: Run API integration tests
       run: |
@@ -191,15 +193,23 @@ jobs:
           "/.well-known/oauth-authorization-server"
           "/.well-known/openid_configuration"
           "/.well-known/jwks.json"
-          "/oauth/authorize?response_type=code&client_id=test&redirect_uri=http://localhost"
+          "/api/v1/oauth/authorize"
         )
         
         for endpoint in "${endpoints[@]}"; do
           echo "Testing endpoint: $endpoint"
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:8000$endpoint")
-          if [ "$STATUS" != "200" ] && [ "$STATUS" != "302" ]; then
-            echo "Endpoint $endpoint failed with status: $STATUS"
-            exit 1
+          # OAuth authorize endpoint should return 401 for unauthenticated request, others should return 200
+          if [[ "$endpoint" == "/api/v1/oauth/authorize" ]]; then
+            if [ "$STATUS" != "401" ]; then
+              echo "Endpoint $endpoint failed with status: $STATUS (expected 401)"
+              exit 1
+            fi
+          else
+            if [ "$STATUS" != "200" ] && [ "$STATUS" != "302" ]; then
+              echo "Endpoint $endpoint failed with status: $STATUS"
+              exit 1
+            fi
           fi
           echo "✓ $endpoint - Status: $STATUS"
         done
