@@ -917,14 +917,14 @@ async def oidc_frontchannel_logout(
         # Sanitize user inputs to prevent XSS
         import html
         import json
-        
+
         safe_iss = html.escape(iss or base_url, quote=True)
         safe_sid = html.escape(sid or "unknown", quote=True)
-        
+
         # Use JSON encoding for safe JavaScript variable injection
         js_iss = json.dumps(safe_iss)
         js_sid = json.dumps(safe_sid)
-        
+
         logout_response = f"""<!DOCTYPE html>
 <html>
 <head>
