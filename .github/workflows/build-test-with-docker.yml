@@ -78,8 +78,8 @@ jobs:
     - name: Start Authly application
       run: |
         docker compose up -d authly
-        # Wait for application to be healthy
-        timeout 120s bash -c 'until docker compose ps authly | grep "healthy"; do sleep 5; done'
+        # Wait for application to be healthy (longer timeout to account for health check timing)
+        timeout 180s bash -c 'until docker compose ps authly | grep "healthy"; do sleep 5; done'
     
     - name: Wait for services to be ready
       run: |
