@@ -124,7 +124,7 @@ async def oauth_discovery(
 
     This endpoint is publicly accessible and provides essential information
     for OAuth 2.1 clients to discover server capabilities.
-    
+
     RFC 8414 Compliance:
     - Accessible at /.well-known/oauth-authorization-server (root level)
     - No API versioning prefix applied to this discovery endpoint
