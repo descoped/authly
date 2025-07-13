@@ -14,9 +14,9 @@ from fastapi.openapi.utils import get_openapi
 from fastapi.staticfiles import StaticFiles
 
 from authly.api import auth_router, health_router, oauth_router, oidc_router, users_router
-from authly.api.oauth_discovery_router import oauth_discovery_router
 from authly.api.admin_middleware import setup_admin_middleware
 from authly.api.admin_router import admin_router
+from authly.api.oauth_discovery_router import oauth_discovery_router
 from authly.api.password_change import router as password_change_router
 from authly.config import AuthlyConfig
 

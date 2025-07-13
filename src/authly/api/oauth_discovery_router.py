@@ -5,13 +5,14 @@ These endpoints must be accessible without API versioning prefixes.
 """
 
 import logging
+
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 
 from authly import get_config
+from authly.api.oauth_router import get_discovery_service
 from authly.oauth.discovery_models import OAuthServerMetadata
 from authly.oauth.discovery_service import DiscoveryService
-from authly.api.oauth_router import get_discovery_service
 
 logger = logging.getLogger(__name__)
 
