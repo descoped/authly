@@ -48,20 +48,10 @@ jobs:
         AUTHLY_SECRET_KEY: test-secret-key-for-ci-only
         AUTHLY_ADMIN_USERNAME: admin
         AUTHLY_ADMIN_PASSWORD: admin123
-        AUTHLY_ADMIN_EMAIL: admin@example.com
+        AUTHLY_ADMIN_EMAIL: admin@localhost
         AUTHLY_ADMIN_ALLOW_LOCALHOST: true
       run: |
         uv run pytest -v --tb=short
-    
-    - name: Upload test results
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: test-results-py${{ matrix.python-version }}
-        path: |
-          .coverage
-          htmlcov/
-        retention-days: 7
 
   build:
     runs-on: ubuntu-latest
@@ -84,10 +74,3 @@ jobs:
     - name: Build package
       run: |
         uv build
-    
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: dist
-        path: dist/
-        retention-days: 7
