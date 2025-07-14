@@ -319,6 +319,7 @@ This session established a comprehensive memory system and cleaned up the enormo
 - Project memory, architecture documentation, and development history
 - AI collaboration patterns and implementation methodology
 - Complete evolution documentation from concept to production
+- Roadmap documentation for future concepts to be implemented
 - **NEVER REMOVE** - Contains irreplaceable institutional knowledge
 
 **📁 `ai_docs/`** - **Temporary AI Assistant Instructions**
@@ -366,6 +367,9 @@ This session established a comprehensive memory system and cleaned up the enormo
 - **`.claude/evolution/security-evolution/`** - Security audit and comprehensive validation
 - **`.claude/evolution/production-excellence/`** - Enterprise-grade deployment readiness
 - **`.claude/evolution/cross-references/`** - Architectural consistency analysis
+
+### Roadmap Documentation (`.claude/roadmap/`)
+- **Restriction** - Leave all documents in this directory untouched! Never remove them.
 
 ### AI Assistant Documentation (`ai_docs/`)
 - **`ai_docs/TODO.md`** - Current tasks and implementation priorities
