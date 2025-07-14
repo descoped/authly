@@ -1459,4 +1459,453 @@ This approach positions Authly uniquely in the identity market:
 4. **Standards Leadership** - Influence emerging DID/VC specifications
 5. **Competitive Moat** - First-mover advantage in hybrid identity
 
+## 🔐 **DID + Passkeys Integration: Modern UX Architecture**
+
+### **The Passwordless Evolution**
+
+**Key Insight:** DIDs and Passkeys are complementary technologies that together create the ideal modern authentication experience:
+
+```
+Password Era → Passkey Era → DID + Passkey Era
+```
+
+- **Passkeys**: Solve device-level authentication with biometrics
+- **DIDs**: Solve cross-platform identity portability
+- **Together**: Seamless, secure, user-controlled identity
+
+### **User Experience Challenges & Solutions**
+
+#### **Challenge: Multi-Device Key Management**
+```
+❌ Browser-only storage: "Lost my laptop, lost my identity"
+❌ Manual key backup: "Where did I save that recovery phrase?"
+❌ Complex UX: "Users shouldn't think about cryptographic keys"
+```
+
+#### **Solution: Password Manager Integration**
+```
+✅ Encrypted sync via Bitwarden/1Password
+✅ Biometric unlock on each device
+✅ Automatic cross-device availability
+✅ Professional key management UX
+```
+
+### **Technical Integration Architecture**
+
+#### **DID Creation with Passkey Infrastructure**
+```javascript
+class PasskeyDIDService {
+    async createDIDWithPasskey(userInfo) {
+        // 1. Create passkey credential (WebAuthn)
+        const passkey = await navigator.credentials.create({
+            publicKey: {
+                challenge: new Uint8Array(32),
+                rp: { name: "Authly" },
+                user: {
+                    id: userInfo.userId,
+                    name: userInfo.email,
+                    displayName: "Your Digital Identity"
+                },
+                pubKeyCredParams: [{ alg: -8, type: "public-key" }], // Ed25519
+                authenticatorSelection: {
+                    authenticatorAttachment: "cross-platform", // Enable sync
+                    userVerification: "required",
+                    residentKey: "required"
+                }
+            }
+        });
+        
+        // 2. Derive DID from passkey public key
+        const publicKey = extractPublicKey(passkey.response);
+        const did = createDIDKey(publicKey);
+        
+        // 3. Store association for seamless auth
+        await this.storePasskeyDIDMapping({
+            credentialId: passkey.id,
+            did: did,
+            userId: userInfo.userId
+        });
+        
+        return {
+            did: did,
+            credentialId: passkey.id,
+            canSyncAcrossDevices: true
+        };
+    }
+    
+    async authenticateWithDID(did, challenge) {
+        // Use existing passkey infrastructure for DID signing
+        const assertion = await navigator.credentials.get({
+            publicKey: {
+                challenge: challenge,
+                allowCredentials: [{
+                    id: await this.getCredentialIdForDID(did),
+                    type: "public-key"
+                }],
+                userVerification: "required" // Biometric prompt
+            }
+        });
+        
+        return {
+            did: did,
+            signature: assertion.response.signature,
+            authenticatorData: assertion.response.authenticatorData
+        };
+    }
+}
+```
+
+#### **Password Manager DID Support**
+```javascript
+// Bitwarden DID Extension Architecture
+class BitwardenDIDVault {
+    async storeDIDIdentity(didData) {
+        return await this.vault.createItem({
+            type: "did_identity",
+            name: `${didData.displayName} (Digital Identity)`,
+            fields: {
+                did: {
+                    value: didData.did,
+                    type: "text",
+                    readonly: true
+                },
+                displayName: {
+                    value: didData.displayName,
+                    type: "text"
+                },
+                privateKey: {
+                    value: didData.privateKey,
+                    type: "hidden", // Encrypted by Bitwarden
+                    sensitive: true
+                },
+                publicKey: {
+                    value: didData.publicKey,
+                    type: "text",
+                    readonly: true
+                },
+                credentialId: {
+                    value: didData.credentialId,
+                    type: "hidden"
+                },
+                supportedSites: {
+                    value: didData.websites,
+                    type: "array"
+                }
+            },
+            folders: ["Digital Identities"],
+            sync: true // Sync across all devices
+        });
+    }
+    
+    async getDIDForDomain(domain) {
+        // Auto-suggest DID for website (like password autofill)
+        const dids = await this.vault.searchByDomain(domain, "did_identity");
+        return dids.length > 0 ? dids[0] : null;
+    }
+    
+    async signWithDID(did, challenge, userVerification = true) {
+        // Bitwarden handles the crypto, user provides biometric/master password
+        if (userVerification) {
+            await this.vault.requestUserVerification();
+        }
+        
+        const identity = await this.vault.getDIDIdentity(did);
+        const signature = await this.cryptoService.signWithKey(
+            identity.privateKey,
+            challenge
+        );
+        
+        return signature;
+    }
+}
+
+// 1Password SSH-like DID Integration
+class OnePasswordDIDAgent {
+    async listDIDIdentities() {
+        // Similar to `ssh-add -l` but for DIDs
+        return await this.op.cli.list({
+            category: "DID_IDENTITY",
+            fields: ["did", "displayName", "websites"]
+        });
+    }
+    
+    async signChallenge(did, challenge) {
+        // Similar to SSH agent signing
+        return await this.op.cli.sign({
+            identity: did,
+            challenge: challenge,
+            requireTouch: true // Biometric confirmation
+        });
+    }
+}
+```
+
+#### **Cross-Device Synchronization Flow**
+```python
+class CrossDeviceDIDFlow:
+    """Seamless DID experience across devices"""
+    
+    async def setup_new_device(self, user_credentials):
+        """Set up DIDs on new device using password manager sync"""
+        
+        # 1. User authenticates to password manager
+        vault_session = await self.password_manager.authenticate(user_credentials)
+        
+        # 2. Download encrypted DID identities
+        did_identities = await vault_session.getDIDIdentities()
+        
+        # 3. Set up local WebAuthn credentials for each DID
+        local_credentials = []
+        for identity in did_identities:
+            # Create device-specific passkey linked to DID
+            credential = await self.create_local_credential(identity)
+            local_credentials.append(credential)
+        
+        # 4. Register device with identity provider
+        await self.register_device_with_authly(local_credentials)
+        
+        return SetupResult(
+            identities_restored=len(did_identities),
+            device_ready=True,
+            sync_enabled=True
+        )
+    
+    async def create_local_credential(self, did_identity):
+        """Create device-specific credential linked to synced DID"""
+        
+        # Create local passkey that can unlock the synced DID private key
+        credential = await navigator.credentials.create({
+            publicKey: {
+                challenge: generate_challenge(),
+                rp: { name: "DID Manager" },
+                user: {
+                    id: did_identity.did.encode(),
+                    name: did_identity.displayName,
+                    displayName: f"Device access for {did_identity.displayName}"
+                },
+                pubKeyCredParams: [{ alg: -8, type: "public-key" }],
+                authenticatorSelection: {
+                    authenticatorAttachment: "platform", # This device only
+                    userVerification: "required",
+                    residentKey: "required"
+                }
+            }
+        })
+        
+        # Link local credential to synced DID
+        await self.link_credential_to_did(credential.id, did_identity.did)
+        
+        return credential
+```
+
+### **User Experience Design**
+
+#### **Setup Flow (One-Time)**
+```yaml
+# Seamless onboarding experience
+DID_Setup_Flow:
+  step_1:
+    title: "Create Your Digital Identity"
+    description: "Set up passwordless login that works everywhere"
+    action: "Create Identity"
+    ui: passkey_creation_dialog
+    
+  step_2:
+    title: "Save to Password Manager"
+    description: "Your identity will sync across all your devices"
+    options:
+      - "Save to Bitwarden"
+      - "Save to 1Password" 
+      - "Save to iCloud Keychain"
+    auto_detect: true
+    
+  step_3:
+    title: "Ready to Go!"
+    description: "Use biometric login on any of your devices"
+    demonstration: quick_demo_video
+```
+
+#### **Daily Authentication Flow**
+```yaml
+# Frictionless daily usage
+DID_Auth_Flow:
+  step_1:
+    trigger: user_visits_site
+    ui: "Sign in with Digital Identity" # Instead of username/password
+    
+  step_2:
+    action: password_manager_detects_site
+    ui: autofill_suggestion # "Use identity from Bitwarden"
+    
+  step_3:
+    action: user_selects_identity
+    ui: biometric_prompt # Face ID, Touch ID, Windows Hello
+    
+  step_4:
+    result: instant_authentication
+    time: "<500ms total"
+```
+
+#### **Cross-Device Experience**
+```yaml
+# Seamless device switching
+Multi_Device_Flow:
+  scenario: "User gets new laptop"
+  
+  device_setup:
+    - install_password_manager
+    - login_with_master_password
+    - automatic_did_sync
+    - ready_to_use
+    
+  first_auth:
+    - visit_authly_enabled_site
+    - biometric_prompt_appears
+    - authenticate_instantly
+    - "Works exactly like primary device"
+```
+
+### **Privacy & Security Model**
+
+#### **Key Distribution Architecture**
+```python
+class DIDPrivacyModel:
+    """Privacy-preserving key management"""
+    
+    def __init__(self):
+        self.storage_layers = {
+            'device_local': SecureEnclave(),      # Hardware security
+            'password_manager': EncryptedVault(), # Cross-device sync
+            'backup_recovery': SecureShards(),    # Disaster recovery
+            'server_none': NoStorage()            # Server never sees keys
+        }
+    
+    async def store_did_key(self, did, private_key, user_preference):
+        """Store key according to user's privacy preference"""
+        
+        if user_preference == "maximum_privacy":
+            # Device-only storage, no sync
+            await self.storage_layers['device_local'].store(did, private_key)
+            
+        elif user_preference == "convenience":
+            # Password manager sync with recovery
+            await self.storage_layers['password_manager'].store(did, private_key)
+            await self.storage_layers['backup_recovery'].create_shards(private_key)
+            
+        # Server NEVER stores private keys regardless of preference
+        assert not self.storage_layers['server_none'].has_key(did)
+```
+
+#### **Trust Model**
+```yaml
+Trust_Relationships:
+  user_trusts:
+    - their_device_security # Hardware secure enclave
+    - password_manager_encryption # Bitwarden/1Password security
+    - their_biometric_data # Face ID, fingerprint
+    
+  user_does_not_trust:
+    - authly_server # Authly cannot access private keys
+    - network_connections # All auth is cryptographically verified
+    - third_party_services # Identity is self-sovereign
+    
+  verification_model:
+    - server_verifies_signatures # Public key cryptography
+    - user_controls_disclosure # Choose what to share
+    - cryptographic_proof # No need for server trust
+```
+
+### **Implementation Roadmap Addition**
+
+#### **Phase 1.5: Passkey Integration (Months 2-3)**
+```python
+# Add to existing Phase 1
+class PasskeyDIDIntegration:
+    """Integrate DID creation with WebAuthn/Passkey infrastructure"""
+    
+    async def enhance_user_registration(self, registration_request):
+        """Enhanced registration supporting both traditional and DID flows"""
+        
+        # Check if client supports WebAuthn/Passkeys
+        if registration_request.supports_webauthn:
+            # Offer DID creation with passkey
+            return await self.create_user_with_passkey_did(registration_request)
+        else:
+            # Fall back to traditional registration
+            return await self.create_traditional_user(registration_request)
+    
+    async def create_user_with_passkey_did(self, request):
+        """Create user account with integrated passkey-DID"""
+        
+        # 1. Traditional user creation
+        user = await self.create_user_account(request.email, request.user_info)
+        
+        # 2. Initiate passkey creation
+        passkey_options = self.generate_passkey_creation_options(user)
+        
+        # 3. Client creates passkey and derives DID
+        # (Handled client-side)
+        
+        # 4. Store passkey-DID association
+        await self.register_passkey_did(user, request.passkey_response)
+        
+        return UserCreationResult(
+            user=user,
+            authentication_methods=["password", "passkey", "did"],
+            setup_complete=True
+        )
+```
+
+#### **Phase 2.5: Password Manager APIs (Months 5-6)**
+```python
+# Add to existing Phase 2
+class PasswordManagerIntegration:
+    """APIs for password manager integration"""
+    
+    @router.get("/did/export/bitwarden")
+    async def export_for_bitwarden(self, user: User = Depends(authenticate)):
+        """Export DID in Bitwarden-compatible format"""
+        return BitwardenDIDItem(
+            type="did_identity",
+            name=f"{user.display_name} Digital Identity",
+            fields=self.create_bitwarden_fields(user.primary_did),
+            notes="Created by Authly - Sync across devices enabled"
+        )
+    
+    @router.post("/did/import/password-manager")
+    async def import_from_password_manager(self, import_data: DIDImportRequest):
+        """Import DID identity from password manager"""
+        
+        # Verify ownership through signature challenge
+        challenge = self.generate_challenge()
+        
+        return ChallengeResponse(
+            challenge=challenge,
+            instructions="Sign this challenge with your password manager",
+            expected_did=import_data.did
+        )
+```
+
+### **Success Metrics for Passkey Integration**
+
+#### **User Experience Metrics**
+- **Setup Time**: < 30 seconds from start to DID creation
+- **Authentication Speed**: < 2 seconds including biometric unlock
+- **Cross-Device Setup**: < 60 seconds on new device
+- **User Satisfaction**: > 90% prefer DID+Passkey over passwords
+
+#### **Technical Metrics**
+- **Passkey Adoption Rate**: % of users choosing passkey-DID vs traditional
+- **Multi-Device Usage**: % of users accessing from multiple devices
+- **Password Manager Integration**: % of users with successful sync
+- **Authentication Success Rate**: > 99.5% first-attempt success
+
+#### **Security Metrics**
+- **Private Key Exposure**: 0% (server never sees keys)
+- **Account Recovery Success**: > 95% via password manager backup
+- **Phishing Resistance**: 100% (cryptographic verification)
+- **Device Loss Recovery**: < 5 minutes via password manager sync
+
+This integration strategy positions Authly as the first OAuth provider to seamlessly combine DIDs with the modern passwordless ecosystem, creating a user experience that's both secure and delightful.
+
 This roadmap positions Authly at the forefront of the decentralized identity revolution while maintaining its core strength as a production-ready OAuth 2.1/OIDC authorization server. The gradual, use-case-driven approach ensures market relevance while building toward a decentralized future.
