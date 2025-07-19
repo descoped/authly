@@ -98,6 +98,21 @@ This document consolidates all completed implementation work from Authly's devel
 - ✅ **Complete specification coverage** for OIDC Core 1.0 + Session Management 1.0
 - ✅ **Integration testing** with real OAuth flows
 - ✅ **Advanced parameter handling** (max_age, prompt, ui_locales, login_hint, display, acr_values)
+
+### **7. RFC 8414 OAuth Discovery Compliance** ✅ **COMPLETED**
+**Task ID**: `rfc8414-oauth-discovery-compliance`  
+**Completion**: Pre-July 2025 (Verified July 19, 2025)
+
+**Standards Compliance Achievement**:
+- ✅ **OAuth discovery router separation** implemented (`oauth_discovery_router.py`)
+- ✅ **Root-level .well-known endpoints** - `/.well-known/oauth-authorization-server` accessible without API prefix
+- ✅ **RFC 8414 compliance** - Discovery metadata at standardized paths
+- ✅ **API versioning preserved** - Business endpoints remain under `/api/v1/oauth/`
+- ✅ **OIDC endpoints already compliant** - `/.well-known/openid_configuration` and `/.well-known/jwks.json`
+- ✅ **Comprehensive test coverage** - Multiple test files verify root-level endpoint access
+- ✅ **Docker pipeline compatibility** - All .well-known endpoints accessible for CI/CD validation
+
+**Architecture Impact**: Clean separation between standards-compliant discovery endpoints (root level) and versioned business endpoints (API prefix), maintaining both RFC compliance and API evolution capability.
 - ✅ **Error handling comprehensive** coverage
 - ✅ **Client-specific algorithm testing** (RS256/HS256)
 
