@@ -64,7 +64,7 @@ class TestOIDCDiscoveryService:
         # Verify OIDC-specific fields
         assert isinstance(metadata, OIDCServerMetadata)
         assert metadata.issuer == "https://test.example.com"
-        assert metadata.userinfo_endpoint == "https://test.example.com/api/v1/oidc/userinfo"
+        assert metadata.userinfo_endpoint == "https://test.example.com/oidc/userinfo"
         assert metadata.jwks_uri == "https://test.example.com/.well-known/jwks.json"
 
         # Verify OAuth fields are preserved
@@ -111,7 +111,7 @@ class TestOIDCDiscoveryService:
         # Verify basic structure
         assert isinstance(metadata, OIDCServerMetadata)
         assert metadata.issuer == "https://test.example.com"
-        assert metadata.userinfo_endpoint == "https://test.example.com/api/v1/oidc/userinfo"
+        assert metadata.userinfo_endpoint == "https://test.example.com/oidc/userinfo"
         assert metadata.jwks_uri == "https://test.example.com/.well-known/jwks.json"
 
         # Verify standard OIDC scopes
@@ -149,7 +149,7 @@ class TestOIDCDiscoveryService:
 
         # Verify custom issuer is used
         assert metadata.issuer == "https://auth.custom.com"
-        assert metadata.userinfo_endpoint == "https://auth.custom.com/api/v1/oidc/userinfo"
+        assert metadata.userinfo_endpoint == "https://auth.custom.com/oidc/userinfo"
         assert metadata.jwks_uri == "https://auth.custom.com/.well-known/jwks.json"
 
 
@@ -231,7 +231,7 @@ class TestOIDCDiscoveryIntegration:
         # Verify response
         assert isinstance(metadata, OIDCServerMetadata)
         assert metadata.issuer == "https://test.example.com"
-        assert metadata.userinfo_endpoint == "https://test.example.com/api/v1/oidc/userinfo"
+        assert metadata.userinfo_endpoint == "https://test.example.com/oidc/userinfo"
         assert "openid" in metadata.scopes_supported
         assert "profile" in metadata.scopes_supported
         assert "sub" in metadata.claims_supported
@@ -255,7 +255,7 @@ class TestOIDCDiscoveryIntegration:
         # Verify fallback response
         assert isinstance(metadata, OIDCServerMetadata)
         assert metadata.issuer == "https://test.example.com"
-        assert metadata.userinfo_endpoint == "https://test.example.com/api/v1/oidc/userinfo"
+        assert metadata.userinfo_endpoint == "https://test.example.com/oidc/userinfo"
         assert "openid" in metadata.scopes_supported
         assert "profile" in metadata.scopes_supported
 

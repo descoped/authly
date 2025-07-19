@@ -84,7 +84,7 @@ def get_base_url(request: Request) -> str:
                         "issuer": "https://auth.example.com",
                         "authorization_endpoint": "https://auth.example.com/api/v1/oauth/authorize",
                         "token_endpoint": "https://auth.example.com/api/v1/auth/token",
-                        "userinfo_endpoint": "https://auth.example.com/api/v1/oidc/userinfo",
+                        "userinfo_endpoint": "https://auth.example.com/oidc/userinfo",
                         "jwks_uri": "https://auth.example.com/.well-known/jwks.json",
                         "response_types_supported": ["code", "id_token", "code id_token"],
                         "id_token_signing_alg_values_supported": ["RS256", "HS256"],

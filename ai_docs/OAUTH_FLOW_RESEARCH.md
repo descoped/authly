@@ -21,7 +21,7 @@ Research findings for implementing end-to-end OAuth 2.1 and OpenID Connect flow 
 **Endpoint:** `/.well-known/openid_configuration`
 
 **Additional OIDC Features:**
-- **UserInfo Endpoint:** `/api/v1/oidc/userinfo`
+- **UserInfo Endpoint:** `/oidc/userinfo`
 - **End Session Endpoint:** `/api/v1/oidc/logout`
 - **Session Iframe:** `/api/v1/oidc/session/iframe`
 - **JWKS URI:** `/.well-known/jwks.json`
@@ -89,7 +89,7 @@ Research findings for implementing end-to-end OAuth 2.1 and OpenID Connect flow 
 ```
 
 ### 3. UserInfo Endpoint
-**URL:** `/api/v1/oidc/userinfo`
+**URL:** `/oidc/userinfo`
 **Method:** GET
 **Authentication:** Bearer token with `openid` scope required
 

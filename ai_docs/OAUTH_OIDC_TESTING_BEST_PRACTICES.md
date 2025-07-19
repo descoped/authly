@@ -11,7 +11,7 @@ This document captures key learnings, compliance findings, and testing strategie
 ### 1. UserInfo Endpoint Path Configuration
 
 **Issue Found**: Incorrect UserInfo endpoint path configuration
-- **Wrong**: `/api/v1/oidc/userinfo`
+- **Wrong**: `/oidc/userinfo`
 - **Correct**: `/oidc/userinfo`
 
 **Standard**: OIDC Core 1.0 Section 5.3
