@@ -10,8 +10,8 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.testclient import TestClient
 from psycopg_toolkit import TransactionManager
 
-from authly import Authly
 from authly.api.auth_dependencies import _parse_basic_auth_header, get_current_client
+from authly.core.resource_manager import AuthlyResourceManager
 from authly.oauth.client_repository import ClientRepository
 from authly.oauth.client_service import ClientService
 from authly.oauth.models import (
@@ -71,7 +71,9 @@ async def test_public_client_data():
 
 @pytest.fixture
 async def created_confidential_client(
-    initialize_authly: Authly, test_confidential_client_data: dict, transaction_manager: TransactionManager
+    initialize_authly: AuthlyResourceManager,
+    test_confidential_client_data: dict,
+    transaction_manager: TransactionManager,
 ):
     """Create a confidential client in the database for testing."""
     async with transaction_manager.transaction() as conn:
@@ -81,7 +83,7 @@ async def created_confidential_client(
 
 @pytest.fixture
 async def created_public_client(
-    initialize_authly: Authly, test_public_client_data: dict, transaction_manager: TransactionManager
+    initialize_authly: AuthlyResourceManager, test_public_client_data: dict, transaction_manager: TransactionManager
 ):
     """Create a public client in the database for testing."""
     async with transaction_manager.transaction() as conn:
@@ -91,7 +93,9 @@ async def created_public_client(
 
 @pytest.fixture
 async def created_post_client(
-    initialize_authly: Authly, test_confidential_client_post_data: dict, transaction_manager: TransactionManager
+    initialize_authly: AuthlyResourceManager,
+    test_confidential_client_post_data: dict,
+    transaction_manager: TransactionManager,
 ):
     """Create a confidential client with CLIENT_SECRET_POST auth method."""
     async with transaction_manager.transaction() as conn:
@@ -192,7 +196,7 @@ class TestGetCurrentClientDependency:
     @pytest.mark.asyncio
     async def test_http_basic_auth_confidential_client(
         self,
-        initialize_authly: Authly,
+        initialize_authly: AuthlyResourceManager,
         created_confidential_client,
         test_confidential_client_data: dict,
         transaction_manager: TransactionManager,
@@ -201,7 +205,8 @@ class TestGetCurrentClientDependency:
         async with transaction_manager.transaction() as conn:
             client_repo = ClientRepository(conn)
             scope_repo = ScopeRepository(conn)
-            client_service = ClientService(client_repo, scope_repo)
+            config = initialize_authly.get_config()
+            client_service = ClientService(client_repo, scope_repo, config)
 
             # Create simple mock request
             class MockRequest:
@@ -228,7 +233,7 @@ class TestGetCurrentClientDependency:
     @pytest.mark.asyncio
     async def test_http_basic_auth_public_client(
         self,
-        initialize_authly: Authly,
+        initialize_authly: AuthlyResourceManager,
         created_public_client,
         test_public_client_data: dict,
         transaction_manager: TransactionManager,
@@ -237,7 +242,8 @@ class TestGetCurrentClientDependency:
         async with transaction_manager.transaction() as conn:
             client_repo = ClientRepository(conn)
             scope_repo = ScopeRepository(conn)
-            client_service = ClientService(client_repo, scope_repo)
+            config = initialize_authly.get_config()
+            client_service = ClientService(client_repo, scope_repo, config)
 
             # Create simple mock request
             class MockRequest:
@@ -261,12 +267,15 @@ class TestGetCurrentClientDependency:
             assert authenticated_client.client_type == ClientType.PUBLIC
 
     @pytest.mark.asyncio
-    async def test_invalid_client_credentials(self, initialize_authly: Authly, transaction_manager: TransactionManager):
+    async def test_invalid_client_credentials(
+        self, initialize_authly: AuthlyResourceManager, transaction_manager: TransactionManager
+    ):
         """Test authentication failure with invalid credentials."""
         async with transaction_manager.transaction() as conn:
             client_repo = ClientRepository(conn)
             scope_repo = ScopeRepository(conn)
-            client_service = ClientService(client_repo, scope_repo)
+            config = initialize_authly.get_config()
+            client_service = ClientService(client_repo, scope_repo, config)
 
             # Create simple mock request
             class MockRequest:
@@ -289,12 +298,15 @@ class TestGetCurrentClientDependency:
             assert "Invalid client credentials" in exc_info.value.detail
 
     @pytest.mark.asyncio
-    async def test_missing_client_credentials(self, initialize_authly: Authly, transaction_manager: TransactionManager):
+    async def test_missing_client_credentials(
+        self, initialize_authly: AuthlyResourceManager, transaction_manager: TransactionManager
+    ):
         """Test authentication failure with missing credentials."""
         async with transaction_manager.transaction() as conn:
             client_repo = ClientRepository(conn)
             scope_repo = ScopeRepository(conn)
-            client_service = ClientService(client_repo, scope_repo)
+            config = initialize_authly.get_config()
+            client_service = ClientService(client_repo, scope_repo, config)
 
             # Create simple mock request
             class MockRequest:
@@ -313,7 +325,7 @@ class TestGetCurrentClientDependency:
     @pytest.mark.asyncio
     async def test_confidential_client_wrong_secret(
         self,
-        initialize_authly: Authly,
+        initialize_authly: AuthlyResourceManager,
         created_confidential_client,
         test_confidential_client_data: dict,
         transaction_manager: TransactionManager,
@@ -322,7 +334,8 @@ class TestGetCurrentClientDependency:
         async with transaction_manager.transaction() as conn:
             client_repo = ClientRepository(conn)
             scope_repo = ScopeRepository(conn)
-            client_service = ClientService(client_repo, scope_repo)
+            config = initialize_authly.get_config()
+            client_service = ClientService(client_repo, scope_repo, config)
 
             # Create simple mock request
             class MockRequest:
@@ -348,7 +361,7 @@ class TestGetCurrentClientDependency:
     @pytest.mark.asyncio
     async def test_public_client_with_secret_fails(
         self,
-        initialize_authly: Authly,
+        initialize_authly: AuthlyResourceManager,
         created_public_client,
         test_public_client_data: dict,
         transaction_manager: TransactionManager,
@@ -357,7 +370,8 @@ class TestGetCurrentClientDependency:
         async with transaction_manager.transaction() as conn:
             client_repo = ClientRepository(conn)
             scope_repo = ScopeRepository(conn)
-            client_service = ClientService(client_repo, scope_repo)
+            config = initialize_authly.get_config()
+            client_service = ClientService(client_repo, scope_repo, config)
 
             # Create simple mock request
             class MockRequest:
@@ -382,13 +396,17 @@ class TestGetCurrentClientDependency:
 
     @pytest.mark.asyncio
     async def test_inactive_client_fails(
-        self, initialize_authly: Authly, test_confidential_client_data: dict, transaction_manager: TransactionManager
+        self,
+        initialize_authly: AuthlyResourceManager,
+        test_confidential_client_data: dict,
+        transaction_manager: TransactionManager,
     ):
         """Test inactive client fails authentication."""
         async with transaction_manager.transaction() as conn:
             client_repo = ClientRepository(conn)
             scope_repo = ScopeRepository(conn)
-            client_service = ClientService(client_repo, scope_repo)
+            config = initialize_authly.get_config()
+            client_service = ClientService(client_repo, scope_repo, config)
 
             # Create inactive client
             inactive_client_data = test_confidential_client_data.copy()
@@ -425,7 +443,7 @@ class TestGetCurrentClientDependency:
     @pytest.mark.asyncio
     async def test_form_data_authentication(
         self,
-        initialize_authly: Authly,
+        initialize_authly: AuthlyResourceManager,
         created_post_client,
         test_confidential_client_post_data: dict,
         transaction_manager: TransactionManager,
@@ -434,7 +452,8 @@ class TestGetCurrentClientDependency:
         async with transaction_manager.transaction() as conn:
             client_repo = ClientRepository(conn)
             scope_repo = ScopeRepository(conn)
-            client_service = ClientService(client_repo, scope_repo)
+            config = initialize_authly.get_config()
+            client_service = ClientService(client_repo, scope_repo, config)
 
             # Create mock request with form data
             class MockFormData:

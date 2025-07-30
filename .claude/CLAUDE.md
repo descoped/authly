@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Current Implementation Status
 
-**✅ COMPLETED (100% Test Success - 551/551 tests passing):**
+**✅ COMPLETED (100% Test Success - 510/510 tests passing):**
 - Complete OAuth 2.1 implementation with PKCE support
 - Admin API with two-layer security model (intrinsic authority + scoped permissions)
 - Bootstrap system solving IAM chicken-and-egg paradox
@@ -26,7 +26,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Enhanced enterprise integrations
 
 ### Core Technologies
-- **Python 3.13+**: Modern async/await, type annotations, dataclasses
+- **Python 3.11+**: Modern async/await, type annotations, dataclasses
 - **FastAPI**: High-performance async web framework with automatic OpenAPI
 - **PostgreSQL**: Advanced features with `psycopg3`, UUID primary keys
 - **Pydantic v2**: Modern data validation with constraints and serialization
@@ -78,6 +78,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 - `examples/embeded.py`: Powerful script to run entire service with database container
 - Comprehensive test suite with realistic database integration testing
 - **See `.claude/external-libraries.md` for detailed testing patterns and library usage**
+- **Current Status**: 510 tests passing (100% success rate) with comprehensive OAuth 2.1 + OIDC 1.0 coverage
 
 ## Architecture Overview
 
@@ -87,12 +88,14 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 **See `.claude/codebase-structure-current.md` for complete project structure with metrics.**
 
+**Current Project Status**: Version 0.5.1 with complete OAuth 2.1 + OIDC Core 1.0 implementation and 510 tests passing.
+
 Key architectural components:
 - **Package-by-Feature**: OAuth, users, tokens, admin as self-contained packages
 - **Layered Architecture**: API → Service → Repository → Database
 - **Pluggable Components**: Abstract base classes for flexible backends
 - **Security-First**: Two-layer admin security, JWT with JTI tracking
-- **Real Integration Testing**: 551 tests with PostgreSQL testcontainers (15 OIDC test files with 221 OIDC-specific tests)
+- **Real Integration Testing**: 510 tests with PostgreSQL testcontainers across 49 test files with comprehensive OIDC coverage
 
 ### Core Components
 
@@ -170,7 +173,7 @@ Core patterns:
 - **Transaction Rollback**: Isolated test transactions for database tests
 - **Type Safety**: Proper typing in test functions and fixtures
 
-**Test Excellence Achievement**: 551 tests passing (100% success rate)
+**Test Excellence Achievement**: 510 tests passing (100% success rate)
 
 **External Testing Libraries:**
 See `.claude/external-libraries.md` for detailed documentation on:
@@ -179,7 +182,7 @@ See `.claude/external-libraries.md` for detailed documentation on:
 
 ## OAuth 2.1 + OIDC 1.0 Implementation - COMPLETED ✅
 
-**Current Status**: Complete OAuth 2.1 + OIDC Core 1.0 + Session Management 1.0 implementation with 100% test coverage (551 tests passing)
+**Current Status**: Complete OAuth 2.1 + OIDC Core 1.0 + Session Management 1.0 implementation with 100% test coverage (510 tests passing)
 
 ### ✅ FULLY IMPLEMENTED FEATURES
 
@@ -225,7 +228,7 @@ See `.claude/external-libraries.md` for detailed documentation on:
 
 ### 🧪 TEST EXCELLENCE ACHIEVED
 
-**551 Tests Passing (100% Success Rate):**
+**510 Tests Passing (100% Success Rate):**
 - ✅ Real integration testing with PostgreSQL testcontainers
 - ✅ No mocking - authentic database and HTTP testing
 - ✅ Systematic test isolation with transaction management
@@ -234,6 +237,7 @@ See `.claude/external-libraries.md` for detailed documentation on:
 - ✅ Session management endpoint testing
 - ✅ OIDC End Session and logout coordination testing
 - ✅ Complete OIDC Core 1.0 + Session Management 1.0 specification compliance
+- ✅ 49 test files with comprehensive integration testing
 - ✅ Admin API comprehensive testing
 - ✅ Security and error handling testing
 - ✅ Performance and scalability testing

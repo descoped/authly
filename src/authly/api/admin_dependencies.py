@@ -15,8 +15,8 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from psycopg import AsyncConnection
 
-from authly import Authly
 from authly.api.users_dependencies import get_current_user
+from authly.core.dependencies import get_config
 from authly.users.models import UserModel
 
 logger = logging.getLogger(__name__)
@@ -84,6 +84,7 @@ def require_admin_scope(required_scope: str):
     async def validate_admin_scope(
         admin_user: UserModel = Depends(require_admin_user),
         credentials: HTTPAuthorizationCredentials = Depends(admin_bearer),
+        config: "AuthlyConfig" = Depends(get_config),
     ) -> UserModel:
         """
         Validate admin scope permissions.
@@ -109,10 +110,6 @@ def require_admin_scope(required_scope: str):
             )
 
         try:
-            # Get configuration for JWT validation
-            authly = Authly.get_instance()
-            config = authly.get_config()
-
             # Decode and validate JWT token
             payload = jwt.decode(credentials.credentials, config.secret_key, algorithms=[config.algorithm])
 

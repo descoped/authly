@@ -1,7 +1,9 @@
 # Tech Note: Transitioning from Username to Email as Primary User Identifier
 
-**Date:** 2025-07-12
-**Status:** Proposal
+**Date:** 2025-07-12  
+**Status:** Planning Document  
+**Category:** Future Enhancement Proposal  
+**Implementation Status:** Not Started
 
 ## 1. Executive Summary
 

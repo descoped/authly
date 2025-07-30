@@ -13,9 +13,9 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from authly import get_config
 from authly.api.auth_dependencies import get_authorization_service, get_scope_repository
 from authly.api.users_dependencies import get_current_user
+from authly.core.dependencies import get_config
 from authly.oauth.authorization_service import AuthorizationService
 from authly.oauth.discovery_models import OAuthServerMetadata
 from authly.oauth.discovery_service import DiscoveryService

@@ -16,7 +16,7 @@ from fastapi import status
 from fastapi_testing import AsyncTestServer
 from psycopg_toolkit import TransactionManager
 
-from authly import Authly
+from authly.core.resource_manager import AuthlyResourceManager
 from authly.oauth.authorization_code_repository import AuthorizationCodeRepository
 from authly.oauth.authorization_service import AuthorizationService
 from authly.oauth.client_repository import ClientRepository
@@ -50,7 +50,7 @@ class TestAuthorizationService:
 
     @pytest.mark.asyncio
     async def test_validate_authorization_request_success(
-        self, initialize_authly: Authly, transaction_manager: TransactionManager
+        self, initialize_authly: AuthlyResourceManager, transaction_manager: TransactionManager
     ):
         """Test successful authorization request validation."""
         async with transaction_manager.transaction() as conn:
@@ -103,7 +103,7 @@ class TestAuthorizationService:
 
     @pytest.mark.asyncio
     async def test_validate_authorization_request_invalid_client(
-        self, initialize_authly: Authly, transaction_manager: TransactionManager
+        self, initialize_authly: AuthlyResourceManager, transaction_manager: TransactionManager
     ):
         """Test authorization request validation with invalid client."""
         async with transaction_manager.transaction() as conn:
@@ -135,7 +135,7 @@ class TestAuthorizationService:
 
     @pytest.mark.asyncio
     async def test_validate_authorization_request_invalid_redirect_uri(
-        self, initialize_authly: Authly, transaction_manager: TransactionManager
+        self, initialize_authly: AuthlyResourceManager, transaction_manager: TransactionManager
     ):
         """Test authorization request validation with invalid redirect URI."""
         async with transaction_manager.transaction() as conn:
@@ -178,7 +178,7 @@ class TestAuthorizationService:
 
     @pytest.mark.asyncio
     async def test_generate_authorization_code_success(
-        self, initialize_authly: Authly, transaction_manager: TransactionManager
+        self, initialize_authly: AuthlyResourceManager, transaction_manager: TransactionManager
     ):
         """Test successful authorization code generation."""
         async with transaction_manager.transaction() as conn:
@@ -244,7 +244,7 @@ class TestAuthorizationService:
 
     @pytest.mark.asyncio
     async def test_exchange_authorization_code_success(
-        self, initialize_authly: Authly, transaction_manager: TransactionManager
+        self, initialize_authly: AuthlyResourceManager, transaction_manager: TransactionManager
     ):
         """Test successful authorization code exchange."""
         async with transaction_manager.transaction() as conn:
@@ -307,7 +307,7 @@ class TestAuthorizationService:
             assert code_data is not None
             assert error_msg is None
             assert code_data["user_id"] == created_user.id
-            assert code_data["client_id"] == created_client.id
+            assert code_data["client_id"] == created_client.client_id  # String client_id, not UUID
             assert code_data["scope"] == "read write"
 
             # Verify code was marked as used
@@ -316,7 +316,7 @@ class TestAuthorizationService:
 
     @pytest.mark.asyncio
     async def test_exchange_authorization_code_invalid_pkce(
-        self, initialize_authly: Authly, transaction_manager: TransactionManager
+        self, initialize_authly: AuthlyResourceManager, transaction_manager: TransactionManager
     ):
         """Test authorization code exchange with invalid PKCE verifier."""
         async with transaction_manager.transaction() as conn:

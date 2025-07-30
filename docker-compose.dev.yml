@@ -28,19 +28,22 @@ services:
       dockerfile: Dockerfile
       target: production
     environment:
+      # Resource Manager Configuration (Production mode for container stability)
+      AUTHLY_MODE: "production"
+      AUTHLY_BOOTSTRAP_ENABLED: "true"
+      
       # Development Database
       DATABASE_URL: "postgresql://authly:authly_dev_password@postgres:5432/authly"
       
-      # Development Redis
+      # Development Redis (optional)
       REDIS_URL: "redis://:redis_dev_password@redis:6379/0"
       
       # Development JWT Secrets (INSECURE - for development only)
       JWT_SECRET_KEY: "dev-secret-key-do-not-use-in-production"
       JWT_REFRESH_SECRET_KEY: "dev-refresh-secret-key-do-not-use-in-production"
       
-      # Development Mode
-      AUTHLY_BOOTSTRAP_DEV_MODE: "true"
-      AUTHLY_DEV_MODE: "true"
+      # Development Logging and Debug Settings
+      LOG_LEVEL: "DEBUG"
       AUTHLY_LOG_LEVEL: "DEBUG"
       
       # Development URLs
@@ -51,8 +54,9 @@ services:
       RATE_LIMIT_MAX_REQUESTS: "1000"
       RATE_LIMIT_WINDOW_SECONDS: "60"
       
-      # Enable admin API
+      # Enable admin API with relaxed restrictions
       AUTHLY_ADMIN_API_ENABLED: "true"
+      AUTHLY_ADMIN_API_LOCALHOST_ONLY: "false"
     ports:
       - "8000:8000"
     volumes:
@@ -61,7 +65,7 @@ services:
       - ./docker:/app/docker:ro
       # Development logs
       - authly_dev_logs:/app/logs
-    command: ["python", "-m", "authly", "serve"]
+    command: ["python", "-m", "authly", "serve", "--host", "0.0.0.0", "--port", "8000"]
 
   # Development Database Admin (pgAdmin)
   pgadmin:

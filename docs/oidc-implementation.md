@@ -146,7 +146,7 @@ POST /api/v1/auth/token
 
 ### **UserInfo Endpoint**
 ```
-GET /api/v1/oidc/userinfo
+GET /oidc/userinfo
 Authorization: Bearer {access_token}
 ```
 **Purpose**: Retrieve user claims based on granted scopes  
@@ -1033,7 +1033,7 @@ async function retryRequest(requestFn, maxRetries = 3) {
 
 // Usage
 const userInfo = await retryRequest(() => 
-  fetch('/api/v1/oidc/userinfo', {
+  fetch('/oidc/userinfo', {
     headers: { 'Authorization': `Bearer ${accessToken}` }
   })
 );

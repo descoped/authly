@@ -8,6 +8,7 @@ from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPBasic, HTTPBasicCredentials, OAuth2PasswordBearer
 
 from authly.api.rate_limiter import RateLimiter
+from authly.core.dependencies import get_config, get_database_connection
 
 logger = logging.getLogger(__name__)
 
@@ -24,17 +25,26 @@ class DeferredOAuth2PasswordBearer:
         self._lock = Lock()
         self._init_error: Optional[Exception] = None
 
-    def get_token_url(self) -> str:
-        from authly import get_config
-
+    def get_token_url(self, request: Request = None) -> str:
+        """Get the token URL."""
         try:
-            config = get_config()
-            return f"{config.fastapi_api_version_prefix}/auth/token"
+            # Try to get from the global resource manager instance
+            from authly.core.dependencies import _resource_manager_instance
+            
+            if _resource_manager_instance is not None:
+                config = _resource_manager_instance.get_config()
+                return f"{config.fastapi_api_version_prefix}/auth/token"
+            else:
+                # Fallback to direct environment variable reading
+                import os
+
+                api_prefix = os.getenv("AUTHLY_API_VERSION_PREFIX", "/api/v1")
+                return f"{api_prefix}/auth/token"
         except Exception as e:
             self._init_error = e
             raise
 
-    async def initialize(self) -> OAuth2State:
+    async def initialize(self, request: Request = None) -> OAuth2State:
         """Thread-safe, retry-safe initialization"""
         if self._init_error:
             self._init_error = None
@@ -42,7 +52,7 @@ class DeferredOAuth2PasswordBearer:
         async with self._lock:
             if self._state is None:
                 try:
-                    token_url = self.get_token_url()
+                    token_url = self.get_token_url(request)
                     oauth = OAuth2PasswordBearer(tokenUrl=token_url, auto_error=True)
                     self._state = OAuth2State(oauth=oauth, token_url=token_url)
                 except Exception as e:
@@ -56,7 +66,7 @@ class DeferredOAuth2PasswordBearer:
         This is the method that FastAPI will call as a dependency.
         It needs to return the token string, not the OAuth2PasswordBearer instance.
         """
-        state = await self.initialize()
+        state = await self.initialize(request)
         return await state.oauth(request)
 
 
@@ -71,53 +81,40 @@ def get_rate_limiter():
     return RateLimiter()
 
 
-async def get_client_repository(db_connection=Depends(lambda: None)) -> "ClientRepository":
+async def get_client_repository(db_connection=Depends(get_database_connection)) -> "ClientRepository":
     """
     Get an instance of the ClientRepository.
 
     Dependencies:
-        - Database connection from authly_db_connection
+        - Database connection from resource manager
     """
-    from authly import authly_db_connection
     from authly.oauth.client_repository import ClientRepository
-
-    if db_connection is None:
-        async for connection in authly_db_connection():
-            return ClientRepository(connection)
 
     return ClientRepository(db_connection)
 
 
-async def get_scope_repository(db_connection=Depends(lambda: None)) -> "ScopeRepository":
+async def get_scope_repository(db_connection=Depends(get_database_connection)) -> "ScopeRepository":
     """
     Get an instance of the ScopeRepository.
 
     Dependencies:
-        - Database connection from authly_db_connection
+        - Database connection from resource manager
     """
-    from authly import authly_db_connection
     from authly.oauth.scope_repository import ScopeRepository
-
-    if db_connection is None:
-        async for connection in authly_db_connection():
-            return ScopeRepository(connection)
 
     return ScopeRepository(db_connection)
 
 
-async def get_authorization_code_repository(db_connection=Depends(lambda: None)) -> "AuthorizationCodeRepository":
+async def get_authorization_code_repository(
+    db_connection=Depends(get_database_connection),
+) -> "AuthorizationCodeRepository":
     """
     Get an instance of the AuthorizationCodeRepository.
 
     Dependencies:
-        - Database connection from authly_db_connection
+        - Database connection from resource manager
     """
-    from authly import authly_db_connection
     from authly.oauth.authorization_code_repository import AuthorizationCodeRepository
-
-    if db_connection is None:
-        async for connection in authly_db_connection():
-            return AuthorizationCodeRepository(connection)
 
     return AuthorizationCodeRepository(db_connection)
 
@@ -143,6 +140,7 @@ async def get_authorization_service(
 async def get_client_service(
     client_repo: "ClientRepository" = Depends(get_client_repository),
     scope_repo: "ScopeRepository" = Depends(get_scope_repository),
+    config: "AuthlyConfig" = Depends(get_config),
 ) -> "ClientService":
     """
     Get an instance of the ClientService.
@@ -150,10 +148,32 @@ async def get_client_service(
     Dependencies:
         - Client repository from get_client_repository
         - Scope repository from get_scope_repository
+        - Configuration from get_config
     """
     from authly.oauth.client_service import ClientService
 
-    return ClientService(client_repo, scope_repo)
+    return ClientService(client_repo, scope_repo, config)
+
+
+async def get_token_service_with_client(
+    db_connection=Depends(get_database_connection),
+    config: "AuthlyConfig" = Depends(get_config),
+) -> "TokenService":
+    """
+    Get TokenService instance with client repository for ID token generation.
+
+    Dependencies:
+        - Database connection from resource manager
+        - Configuration from get_config
+    """
+    from authly.oauth.client_repository import ClientRepository
+    from authly.tokens.repository import TokenRepository
+    from authly.tokens.service import TokenService
+
+    token_repo = TokenRepository(db_connection)
+    client_repo = ClientRepository(db_connection)
+
+    return TokenService(token_repo, config, client_repo)
 
 
 def _parse_basic_auth_header(authorization: str) -> Tuple[str, Optional[str]]:

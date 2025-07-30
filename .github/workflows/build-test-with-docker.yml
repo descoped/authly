@@ -53,18 +53,34 @@ jobs:
     - name: Load Docker image
       run: |
         docker load < authly-image.tar.gz
-        docker tag authly:ci-test authly:latest
+        docker tag authly:ci-test authly-authly:latest
     
     - name: Create environment file
       run: |
         cat << EOF > .env
+        # Resource Manager Configuration
+        AUTHLY_MODE=production
+        AUTHLY_BOOTSTRAP_ENABLED=true
+        
+        # Database Configuration
         POSTGRES_PASSWORD=ci_test_password
+        DATABASE_URL=postgresql://authly:ci_test_password@postgres:5432/authly
+        
+        # Redis Configuration (optional)
         REDIS_PASSWORD=ci_redis_password
+        REDIS_URL=redis://:ci_redis_password@redis:6379/0
+        
+        # JWT Configuration
         JWT_SECRET_KEY=ci-test-secret-key-256-bit-long-for-jwt-tokens
         JWT_REFRESH_SECRET_KEY=ci-test-refresh-secret-key-256-bit-long
-        AUTHLY_BOOTSTRAP_DEV_MODE=true
-        AUTHLY_DEV_MODE=true
+        
+        # Logging Configuration
+        LOG_LEVEL=DEBUG
         AUTHLY_LOG_LEVEL=DEBUG
+        
+        # Admin Configuration
+        AUTHLY_ADMIN_API_ENABLED=true
+        AUTHLY_ADMIN_API_LOCALHOST_ONLY=false
         AUTHLY_ADMIN_ALLOW_LOCALHOST=true
         AUTHLY_ADMIN_PASSWORD=ci_admin_test_password
         EOF
@@ -142,7 +158,7 @@ jobs:
     - name: Load Docker image
       run: |
         docker load < authly-image.tar.gz
-        docker tag authly:ci-test authly:latest
+        docker tag authly:ci-test authly-authly:latest
     
     - name: Install curl and test tools
       run: |
@@ -152,14 +168,29 @@ jobs:
     - name: Create environment file
       run: |
         cat << EOF > .env
+        # Resource Manager Configuration
+        AUTHLY_MODE=production
+        AUTHLY_BOOTSTRAP_ENABLED=true
+        
+        # Database Configuration
         POSTGRES_PASSWORD=integration_test_password
+        DATABASE_URL=postgresql://authly:integration_test_password@postgres:5432/authly
+        
+        # Redis Configuration
         REDIS_PASSWORD=integration_redis_password
+        REDIS_URL=redis://:integration_redis_password@redis:6379/0
+        
+        # JWT Configuration
         JWT_SECRET_KEY=integration-test-secret-key-256-bit-long-for-jwt
         JWT_REFRESH_SECRET_KEY=integration-test-refresh-secret-key-256-bit-long
-        AUTHLY_BOOTSTRAP_DEV_MODE=true
-        AUTHLY_DEV_MODE=true
+        
+        # Logging Configuration
+        LOG_LEVEL=INFO
         AUTHLY_LOG_LEVEL=INFO
-        AUTHLY_ADMIN_ALLOW_LOCALHOST=true
+        
+        # Admin Configuration
+        AUTHLY_ADMIN_API_ENABLED=true
+        AUTHLY_ADMIN_API_LOCALHOST_ONLY=false
         AUTHLY_ADMIN_PASSWORD=integration_admin_test_password
         EOF
     

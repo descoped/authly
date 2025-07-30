@@ -72,15 +72,7 @@ class AuthorizationCodeRepository(BaseRepository[OAuthAuthorizationCodeModel, UU
         """
         try:
             # Generate cryptographically secure authorization code
-            try:
-                from authly import get_config
-
-                config = get_config()
-                auth_code_length = config.authorization_code_length
-            except RuntimeError:
-                # Fallback for tests without full Authly initialization
-                auth_code_length = 32
-            code = secrets.token_urlsafe(auth_code_length)
+            code = secrets.token_urlsafe(32)
 
             # Calculate expiration time
             now = datetime.now(timezone.utc)

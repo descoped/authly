@@ -1,45 +1,35 @@
-import logging
-from typing import AsyncGenerator
+"""
+Authly - Modern OAuth 2.1 and OpenID Connect Authentication Service
 
-from psycopg import AsyncConnection, AsyncTransaction
+This package provides a clean, dependency-injection based authentication service
+built on FastAPI and modern Python patterns.
 
-from authly.authly import Authly
+Core Components:
+- AuthlyResourceManager: Manages database connections and configuration
+- FastAPI dependencies: Provide services through dependency injection
+- Clean service layer: No global state or singleton patterns
+
+Usage:
+```python
+from authly.core.resource_manager import AuthlyResourceManager
+from authly.core.dependencies import create_resource_manager_provider, get_resource_manager
+
+# Initialize resource manager
+resource_manager = AuthlyResourceManager(config)
+
+# Use with FastAPI (in lifespan context)
+provider = create_resource_manager_provider(resource_manager)
+app.dependency_overrides[get_resource_manager] = provider
+```
+"""
+
+# Clean exports - only essential types for external use
 from authly.config.config import AuthlyConfig
+from authly.core.resource_manager import AuthlyResourceManager
 
 __all__ = [
-    "Authly",
-    "authly_db_connection",
-    "authly_db_transaction",
-    "get_config",
+    "AuthlyConfig",
+    "AuthlyResourceManager",
 ]
 
-logger = logging.getLogger(__name__)
-
-
-def get_config() -> AuthlyConfig:
-    """Get current configuration."""
-    return Authly.get_instance().get_config()  # to omit reading a private variable on instance
-
-
-async def authly_db_connection() -> AsyncGenerator[AsyncConnection, None]:
-    """Get a database connection as an async generator.
-
-    Yields:
-        AsyncConnection: Database connection from the pool in autocommit mode
-    """
-    pool = Authly.get_instance().get_pool()
-    async with pool.connection() as conn:
-        # Set autocommit mode for OAuth flows - data needs to be immediately visible
-        await conn.set_autocommit(True)
-        yield conn
-
-
-async def authly_db_transaction() -> AsyncGenerator[AsyncTransaction, None]:
-    """Get a database transaction as an async generator.
-
-    Yields:
-        AsyncTransaction: Transaction that is automatically committed or rolled back
-    """
-    async for conn in authly_db_connection():
-        async with conn.transaction() as transaction:
-            yield transaction
+__version__ = "0.2.0"

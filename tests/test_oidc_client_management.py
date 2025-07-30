@@ -15,6 +15,7 @@ import pytest
 from fastapi_testing import AsyncTestServer
 from psycopg_toolkit import TransactionManager
 
+from authly.core.resource_manager import AuthlyResourceManager
 from authly.oauth.client_repository import ClientRepository
 from authly.oauth.client_service import ClientService
 from authly.oauth.models import (
@@ -30,12 +31,15 @@ class TestOIDCClientCreation:
     """Test OIDC client creation and validation"""
 
     @pytest.mark.asyncio
-    async def test_create_oidc_client_with_openid_scope(self, transaction_manager: TransactionManager):
+    async def test_create_oidc_client_with_openid_scope(
+        self, transaction_manager: TransactionManager, initialize_authly: AuthlyResourceManager
+    ):
         """Test creating an OIDC client with openid scope"""
         async with transaction_manager.transaction() as conn:
             client_repo = ClientRepository(conn)
             scope_repo = ScopeRepository(conn)
-            client_service = ClientService(client_repo, scope_repo)
+            config = initialize_authly.get_config()
+            client_service = ClientService(client_repo, scope_repo, config)
 
             # Create OIDC client with openid scope
             request = OAuthClientCreateRequest(
@@ -71,12 +75,15 @@ class TestOIDCClientCreation:
             assert client.contacts == ["admin@example.com"]
 
     @pytest.mark.asyncio
-    async def test_create_oauth_client_without_openid_scope(self, transaction_manager: TransactionManager):
+    async def test_create_oauth_client_without_openid_scope(
+        self, transaction_manager: TransactionManager, initialize_authly: AuthlyResourceManager
+    ):
         """Test creating a regular OAuth client without openid scope"""
         async with transaction_manager.transaction() as conn:
             client_repo = ClientRepository(conn)
             scope_repo = ScopeRepository(conn)
-            client_service = ClientService(client_repo, scope_repo)
+            config = initialize_authly.get_config()
+            client_service = ClientService(client_repo, scope_repo, config)
 
             # Create OAuth client without openid scope
             request = OAuthClientCreateRequest(
@@ -101,12 +108,15 @@ class TestOIDCClientCreation:
             assert client.sector_identifier_uri == "https://example.com/sector"
 
     @pytest.mark.asyncio
-    async def test_oidc_client_validation(self, transaction_manager: TransactionManager):
+    async def test_oidc_client_validation(
+        self, transaction_manager: TransactionManager, initialize_authly: AuthlyResourceManager
+    ):
         """Test OIDC client validation"""
         async with transaction_manager.transaction() as conn:
             client_repo = ClientRepository(conn)
             scope_repo = ScopeRepository(conn)
-            client_service = ClientService(client_repo, scope_repo)
+            config = initialize_authly.get_config()
+            client_service = ClientService(client_repo, scope_repo, config)
 
             # Test validation: pairwise subject type requires sector_identifier_uri
             request = OAuthClientCreateRequest(
@@ -124,12 +134,15 @@ class TestOIDCClientCreation:
             assert "sector_identifier_uri is required" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_oidc_client_default_values(self, transaction_manager: TransactionManager):
+    async def test_oidc_client_default_values(
+        self, transaction_manager: TransactionManager, initialize_authly: AuthlyResourceManager
+    ):
         """Test OIDC client default values"""
         async with transaction_manager.transaction() as conn:
             client_repo = ClientRepository(conn)
             scope_repo = ScopeRepository(conn)
-            client_service = ClientService(client_repo, scope_repo)
+            config = initialize_authly.get_config()
+            client_service = ClientService(client_repo, scope_repo, config)
 
             # Create client with minimal OIDC settings
             request = OAuthClientCreateRequest(
@@ -175,12 +188,15 @@ class TestOIDCClientValidation:
     """Test OIDC client validation functionality"""
 
     @pytest.mark.asyncio
-    async def test_validate_request_uris_https_only(self, transaction_manager: TransactionManager):
+    async def test_validate_request_uris_https_only(
+        self, transaction_manager: TransactionManager, initialize_authly: AuthlyResourceManager
+    ):
         """Test that request_uris must use HTTPS"""
         async with transaction_manager.transaction() as conn:
             client_repo = ClientRepository(conn)
             scope_repo = ScopeRepository(conn)
-            client_service = ClientService(client_repo, scope_repo)
+            config = initialize_authly.get_config()
+            client_service = ClientService(client_repo, scope_repo, config)
 
             # Test with non-HTTPS request_uri
             request = OAuthClientCreateRequest(
@@ -197,12 +213,15 @@ class TestOIDCClientValidation:
             assert "request_uris must use HTTPS" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_validate_contacts_email_format(self, transaction_manager: TransactionManager):
+    async def test_validate_contacts_email_format(
+        self, transaction_manager: TransactionManager, initialize_authly: AuthlyResourceManager
+    ):
         """Test that contacts must be valid email addresses"""
         async with transaction_manager.transaction() as conn:
             client_repo = ClientRepository(conn)
             scope_repo = ScopeRepository(conn)
-            client_service = ClientService(client_repo, scope_repo)
+            config = initialize_authly.get_config()
+            client_service = ClientService(client_repo, scope_repo, config)
 
             # Test with invalid email format
             request = OAuthClientCreateRequest(
@@ -219,12 +238,15 @@ class TestOIDCClientValidation:
             assert "Invalid contact email format" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_validate_default_max_age_non_negative(self, transaction_manager: TransactionManager):
+    async def test_validate_default_max_age_non_negative(
+        self, transaction_manager: TransactionManager, initialize_authly: AuthlyResourceManager
+    ):
         """Test that default_max_age must be non-negative"""
         async with transaction_manager.transaction() as conn:
             client_repo = ClientRepository(conn)
             scope_repo = ScopeRepository(conn)
-            client_service = ClientService(client_repo, scope_repo)
+            config = initialize_authly.get_config()
+            client_service = ClientService(client_repo, scope_repo, config)
 
             # Test with negative default_max_age
             request = OAuthClientCreateRequest(
@@ -241,12 +263,15 @@ class TestOIDCClientValidation:
             assert "default_max_age must be non-negative" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_validate_application_type(self, transaction_manager: TransactionManager):
+    async def test_validate_application_type(
+        self, transaction_manager: TransactionManager, initialize_authly: AuthlyResourceManager
+    ):
         """Test that application_type must be valid"""
         async with transaction_manager.transaction() as conn:
             client_repo = ClientRepository(conn)
             scope_repo = ScopeRepository(conn)
-            client_service = ClientService(client_repo, scope_repo)
+            config = initialize_authly.get_config()
+            client_service = ClientService(client_repo, scope_repo, config)
 
             # Test with invalid application_type
             request = OAuthClientCreateRequest(
@@ -267,12 +292,15 @@ class TestOIDCClientModel:
     """Test OIDC client model functionality"""
 
     @pytest.mark.asyncio
-    async def test_is_oidc_client_detection(self, transaction_manager: TransactionManager):
+    async def test_is_oidc_client_detection(
+        self, transaction_manager: TransactionManager, initialize_authly: AuthlyResourceManager
+    ):
         """Test OIDC client detection"""
         async with transaction_manager.transaction() as conn:
             client_repo = ClientRepository(conn)
             scope_repo = ScopeRepository(conn)
-            client_service = ClientService(client_repo, scope_repo)
+            config = initialize_authly.get_config()
+            client_service = ClientService(client_repo, scope_repo, config)
 
             # Create OIDC client
             oidc_request = OAuthClientCreateRequest(
@@ -303,12 +331,15 @@ class TestOIDCClientModel:
             assert oauth_client.get_oidc_scopes() == []
 
     @pytest.mark.asyncio
-    async def test_get_oidc_scopes_filtering(self, transaction_manager: TransactionManager):
+    async def test_get_oidc_scopes_filtering(
+        self, transaction_manager: TransactionManager, initialize_authly: AuthlyResourceManager
+    ):
         """Test OIDC scope filtering"""
         async with transaction_manager.transaction() as conn:
             client_repo = ClientRepository(conn)
             scope_repo = ScopeRepository(conn)
-            client_service = ClientService(client_repo, scope_repo)
+            config = initialize_authly.get_config()
+            client_service = ClientService(client_repo, scope_repo, config)
 
             # Create client with mixed scopes
             request = OAuthClientCreateRequest(

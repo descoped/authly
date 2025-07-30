@@ -6,7 +6,7 @@ from typing import Optional
 import bcrypt
 from jose import JWTError, jwt
 
-from authly import get_config
+from authly.config import AuthlyConfig
 
 logger = logging.getLogger(__name__)
 
@@ -25,44 +25,49 @@ def get_password_hash(password: str) -> str:
 
 
 def create_access_token(
-    data: dict, secret_key: str, algorithm: str = "HS256", expires_delta: Optional[int] = None
+    data: dict, secret_key: str, config: AuthlyConfig, algorithm: str = "HS256", expires_delta: Optional[int] = None
 ) -> str:
+    """Create access token with required configuration.
+
+    Args:
+        data: Token payload data
+        secret_key: Secret key for signing
+        algorithm: JWT algorithm
+        expires_delta: Optional expiration override in minutes
+        config: Required configuration object
+
+    Returns:
+        JWT access token string
+    """
     if expires_delta:
         expire = datetime.now(timezone.utc) + timedelta(minutes=expires_delta)
     else:
-        try:
-            from authly import get_config
+        expire = datetime.now(timezone.utc) + timedelta(minutes=config.access_token_expire_minutes)
 
-            config = get_config()
-            access_token_expire_minutes = config.access_token_expire_minutes
-        except RuntimeError:
-            # Fallback for tests without full Authly initialization
-            access_token_expire_minutes = 60
-        expire = datetime.now(timezone.utc) + timedelta(minutes=access_token_expire_minutes)
     to_encode = data.copy()
     to_encode.update({"exp": int(expire.timestamp())})
     return jwt.encode(to_encode, secret_key, algorithm=algorithm)
 
 
-def create_refresh_token(user_id: str, secret_key: str, jti: Optional[str] = None) -> str:
+def create_refresh_token(user_id: str, secret_key: str, config: AuthlyConfig, jti: Optional[str] = None) -> str:
     """
     Create a refresh token with a unique JTI (JWT ID) claim.
 
     Args:
-        user_id (str): The user identifier to include in the token.
-        secret_key (str): The secret key used for signing the token.
-        jti (Optional[str]): Optionally provide a JTI. If not provided, a new one is generated.
+        user_id: The user identifier to include in the token
+        secret_key: The secret key used for signing the token
+        config: Required configuration object
+        jti: Optionally provide a JTI. If not provided, a new one is generated
 
     Returns:
-        str: A JWT refresh token.
+        JWT refresh token string
     """
     # Generate a new JTI if one is not provided
     if jti is None:
-        config = get_config()
         token_jti = secrets.token_hex(config.token_hex_length)
     else:
         token_jti = jti
-    config = get_config()
+
     expire = datetime.now(timezone.utc) + timedelta(days=config.refresh_token_expire_days)
     payload = {"sub": user_id, "type": "refresh", "jti": token_jti, "exp": int(expire.timestamp())}
 

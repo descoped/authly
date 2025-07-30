@@ -6,8 +6,9 @@ from fastapi import APIRouter
 from fastapi_testing import AsyncTestServer
 from psycopg import AsyncTransaction
 
-from authly import Authly, AuthlyConfig
 from authly.api import health_router
+from authly.config.config import AuthlyConfig
+from authly.core.resource_manager import AuthlyResourceManager
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +23,7 @@ class PingRouter:
 
 
 @pytest.mark.asyncio
-async def test_authly_initialization(initialize_authly: Authly):
+async def test_authly_initialization(initialize_authly):
     # Use initialize_authly directly since it's now the Authly instance
     assert initialize_authly.get_config() is not None
 

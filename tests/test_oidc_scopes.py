@@ -6,6 +6,7 @@ This module tests the OpenID Connect scopes and claims mapping functionality.
 
 import pytest
 
+from authly.core.resource_manager import AuthlyResourceManager
 from authly.oidc.scopes import (
     OIDC_SCOPES,
     OIDCClaimsMapping,
@@ -161,25 +162,29 @@ class TestOIDCValidation:
         assert flow is None
         assert len(errors) > 0
 
-    def test_validate_nonce(self):
+    def test_validate_nonce(self, initialize_authly: AuthlyResourceManager):
         """Test nonce validation."""
+        config = initialize_authly.get_config()
+
         # Test nonce required for implicit flow
-        errors = OIDCValidator.validate_nonce(None, "id_token")
+        errors = OIDCValidator.validate_nonce(None, "id_token", config)
         assert len(errors) > 0
 
         # Test nonce not required for authorization code flow
-        errors = OIDCValidator.validate_nonce(None, "code")
+        errors = OIDCValidator.validate_nonce(None, "code", config)
         assert len(errors) == 0
 
         # Test valid nonce
-        errors = OIDCValidator.validate_nonce("valid_nonce", "id_token")
+        errors = OIDCValidator.validate_nonce("valid_nonce", "id_token", config)
         assert len(errors) == 0
 
-    def test_validate_oidc_request_parameters(self):
+    def test_validate_oidc_request_parameters(self, initialize_authly: AuthlyResourceManager):
         """Test comprehensive OIDC request parameter validation."""
+        config = initialize_authly.get_config()
+
         # Test valid OIDC request
         result = OIDCValidator.validate_oidc_request_parameters(
-            scopes=["openid", "profile"], response_type="code", nonce="test_nonce"
+            scopes=["openid", "profile"], response_type="code", config=config, nonce="test_nonce"
         )
 
         assert result.is_valid is True

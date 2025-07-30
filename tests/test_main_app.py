@@ -16,9 +16,9 @@ from fastapi import FastAPI
 from fastapi_testing import AsyncTestServer
 from psycopg_toolkit import TransactionManager
 
-from authly import Authly
 from authly.auth.core import get_password_hash
 from authly.bootstrap.admin_seeding import bootstrap_admin_system
+from authly.core.resource_manager import AuthlyResourceManager
 from authly.main import create_app, setup_logging
 from authly.tokens import TokenRepository, TokenService
 from authly.users.models import UserModel
@@ -154,7 +154,7 @@ class TestMainApplicationLifecycle:
     """Test main application lifecycle management."""
 
     @pytest.mark.asyncio
-    async def test_lifespan_startup_sequence(self, initialize_authly: Authly):
+    async def test_lifespan_startup_sequence(self, initialize_authly: AuthlyResourceManager):
         """Test application startup sequence with mocked components."""
         # This tests the lifespan function behavior
         # In real tests, the lifespan is handled by fixtures
@@ -172,7 +172,7 @@ class TestMainApplicationLifecycle:
 
     @pytest.mark.asyncio
     async def test_bootstrap_integration_in_main_app(
-        self, transaction_manager: TransactionManager, initialize_authly: Authly
+        self, transaction_manager: TransactionManager, initialize_authly: AuthlyResourceManager
     ):
         """Test that bootstrap system integrates with main app lifecycle."""
         # Test bootstrap manually (in production, this happens during startup)
@@ -299,7 +299,10 @@ class TestMainApplicationEndToEnd:
 
     @pytest.mark.asyncio
     async def test_complete_admin_workflow(
-        self, test_server: AsyncTestServer, transaction_manager: TransactionManager, initialize_authly: Authly
+        self,
+        test_server: AsyncTestServer,
+        transaction_manager: TransactionManager,
+        initialize_authly: AuthlyResourceManager,
     ):
         """Test complete admin workflow through main app."""
         app = create_app()
@@ -326,8 +329,9 @@ class TestMainApplicationEndToEnd:
                 user_repo = UserRepository(conn)
                 admin_user = await user_repo.get_by_id(results["admin_user_id"])
 
+                config = initialize_authly.get_config()
                 token_repo = TokenRepository(conn)
-                token_service = TokenService(token_repo)
+                token_service = TokenService(token_repo, config, None)
 
                 admin_scopes = ["admin:clients:read", "admin:system:read"]
 
@@ -354,7 +358,10 @@ class TestMainApplicationEndToEnd:
 
     @pytest.mark.asyncio
     async def test_regular_api_and_admin_api_coexistence(
-        self, test_server: AsyncTestServer, transaction_manager: TransactionManager, initialize_authly: Authly
+        self,
+        test_server: AsyncTestServer,
+        transaction_manager: TransactionManager,
+        initialize_authly: AuthlyResourceManager,
     ):
         """Test that regular API and admin API work together."""
         app = create_app()
@@ -390,8 +397,9 @@ class TestMainApplicationEndToEnd:
             created_user = await user_repo.create(regular_user)
 
             # Create regular user token
+            config = initialize_authly.get_config()
             token_repo = TokenRepository(conn)
-            token_service = TokenService(token_repo)
+            token_service = TokenService(token_repo, config, None)
 
             token_pair = await token_service.create_token_pair(user=created_user, scope="read write")
 

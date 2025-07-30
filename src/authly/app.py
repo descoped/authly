@@ -150,9 +150,7 @@ def create_embedded_app(config: AuthlyConfig, database_url: str, seed: bool = Fa
         api_prefix=config.fastapi_api_version_prefix,
     )
 
-    # Store configuration for later use
-    app.state.config = config
-    app.state.database_url = database_url
-    app.state.seed = seed
+    # Configuration will be available through resource manager dependency injection
+    # No direct app.state storage needed - use get_resource_manager() dependency
 
     return app

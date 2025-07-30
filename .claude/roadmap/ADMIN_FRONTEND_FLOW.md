@@ -1,5 +1,10 @@
 ### **UI/UX Plan for Authly Admin Frontend**
 
+**Date:** 2025-07-12  
+**Status:** UI/UX Planning Document  
+**Category:** Frontend Implementation Guide  
+**Implementation Status:** Not Started
+
 This plan organizes the user interface around the available API endpoints, focusing on a logical and secure workflow for administrators.
 
 ---

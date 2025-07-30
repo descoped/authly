@@ -1,4 +1,10 @@
-from fixtures.testing.lifespan import custom_test_server, test_server
+from fixtures.testing.lifespan import (
+    custom_test_server,
+    hybrid_test_server,
+    resource_manager_server,
+    resource_manager_test_server,
+    test_server,
+)
 from fixtures.testing.postgres import (
     _database_instance,
     _db_callbacks,
@@ -13,6 +19,7 @@ from fixtures.testing.postgres import (
 )
 
 __all__ = [
+    # PostgreSQL fixtures
     "postgres_container",
     "db_pool",
     "db_connection",
@@ -23,8 +30,13 @@ __all__ = [
     "_db_settings",
     "register_db_init_callback",
     "_db_callbacks",
+    # FastAPI test server fixtures (legacy)
     "custom_test_server",
     "test_server",
+    # FastAPI test server fixtures (resource manager)
+    "resource_manager_test_server",
+    "resource_manager_server",
+    "hybrid_test_server",
 ]
 
 

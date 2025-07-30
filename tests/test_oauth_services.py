@@ -8,7 +8,7 @@ import pytest
 from fastapi import HTTPException
 from psycopg_toolkit import TransactionManager
 
-from authly import Authly
+from authly.core.resource_manager import AuthlyResourceManager
 from authly.oauth.authorization_code_repository import AuthorizationCodeRepository
 from authly.oauth.client_repository import ClientRepository
 from authly.oauth.client_service import ClientService
@@ -95,7 +95,7 @@ class TestClientService:
     @pytest.mark.asyncio
     async def test_create_confidential_client(
         self,
-        initialize_authly: Authly,
+        initialize_authly: AuthlyResourceManager,
         test_client_request: OAuthClientCreateRequest,
         transaction_manager: TransactionManager,
     ):
@@ -103,7 +103,8 @@ class TestClientService:
         async with transaction_manager.transaction() as conn:
             client_repo = ClientRepository(conn)
             scope_repo = ScopeRepository(conn)
-            client_service = ClientService(client_repo, scope_repo)
+            config = initialize_authly.get_config()
+            client_service = ClientService(client_repo, scope_repo, config)
 
             credentials_response = await client_service.create_client(test_client_request)
 
@@ -125,7 +126,7 @@ class TestClientService:
     @pytest.mark.asyncio
     async def test_create_public_client(
         self,
-        initialize_authly: Authly,
+        initialize_authly: AuthlyResourceManager,
         test_public_client_request: OAuthClientCreateRequest,
         transaction_manager: TransactionManager,
     ):
@@ -133,7 +134,8 @@ class TestClientService:
         async with transaction_manager.transaction() as conn:
             client_repo = ClientRepository(conn)
             scope_repo = ScopeRepository(conn)
-            client_service = ClientService(client_repo, scope_repo)
+            config = initialize_authly.get_config()
+            client_service = ClientService(client_repo, scope_repo, config)
 
             created_client = await client_service.create_client(test_public_client_request)
 
@@ -145,7 +147,7 @@ class TestClientService:
     @pytest.mark.asyncio
     async def test_create_client_with_invalid_redirect_uri(
         self,
-        initialize_authly: Authly,
+        initialize_authly: AuthlyResourceManager,
         test_client_request: OAuthClientCreateRequest,
         transaction_manager: TransactionManager,
     ):
@@ -153,7 +155,8 @@ class TestClientService:
         async with transaction_manager.transaction() as conn:
             client_repo = ClientRepository(conn)
             scope_repo = ScopeRepository(conn)
-            client_service = ClientService(client_repo, scope_repo)
+            config = initialize_authly.get_config()
+            client_service = ClientService(client_repo, scope_repo, config)
 
             # Test with invalid redirect URI
             invalid_request = OAuthClientCreateRequest(
@@ -172,7 +175,7 @@ class TestClientService:
     @pytest.mark.asyncio
     async def test_create_client_with_localhost_redirect_uri(
         self,
-        initialize_authly: Authly,
+        initialize_authly: AuthlyResourceManager,
         test_client_request: OAuthClientCreateRequest,
         transaction_manager: TransactionManager,
     ):
@@ -180,7 +183,8 @@ class TestClientService:
         async with transaction_manager.transaction() as conn:
             client_repo = ClientRepository(conn)
             scope_repo = ScopeRepository(conn)
-            client_service = ClientService(client_repo, scope_repo)
+            config = initialize_authly.get_config()
+            client_service = ClientService(client_repo, scope_repo, config)
 
             # Test with localhost redirect URI
             localhost_request = OAuthClientCreateRequest(
@@ -197,7 +201,7 @@ class TestClientService:
     @pytest.mark.asyncio
     async def test_create_client_duplicate_client_id(
         self,
-        initialize_authly: Authly,
+        initialize_authly: AuthlyResourceManager,
         test_client_request: OAuthClientCreateRequest,
         transaction_manager: TransactionManager,
     ):
@@ -205,7 +209,8 @@ class TestClientService:
         async with transaction_manager.transaction() as conn:
             client_repo = ClientRepository(conn)
             scope_repo = ScopeRepository(conn)
-            client_service = ClientService(client_repo, scope_repo)
+            config = initialize_authly.get_config()
+            client_service = ClientService(client_repo, scope_repo, config)
 
             # Create first client
             first_response = await client_service.create_client(test_client_request)
@@ -219,7 +224,7 @@ class TestClientService:
     @pytest.mark.asyncio
     async def test_authenticate_client_with_valid_credentials(
         self,
-        initialize_authly: Authly,
+        initialize_authly: AuthlyResourceManager,
         test_client_request: OAuthClientCreateRequest,
         transaction_manager: TransactionManager,
     ):
@@ -227,7 +232,8 @@ class TestClientService:
         async with transaction_manager.transaction() as conn:
             client_repo = ClientRepository(conn)
             scope_repo = ScopeRepository(conn)
-            client_service = ClientService(client_repo, scope_repo)
+            config = initialize_authly.get_config()
+            client_service = ClientService(client_repo, scope_repo, config)
 
             # Create client
             credentials_response = await client_service.create_client(test_client_request)
@@ -243,7 +249,7 @@ class TestClientService:
     @pytest.mark.asyncio
     async def test_authenticate_client_with_invalid_credentials(
         self,
-        initialize_authly: Authly,
+        initialize_authly: AuthlyResourceManager,
         test_client_request: OAuthClientCreateRequest,
         transaction_manager: TransactionManager,
     ):
@@ -251,7 +257,8 @@ class TestClientService:
         async with transaction_manager.transaction() as conn:
             client_repo = ClientRepository(conn)
             scope_repo = ScopeRepository(conn)
-            client_service = ClientService(client_repo, scope_repo)
+            config = initialize_authly.get_config()
+            client_service = ClientService(client_repo, scope_repo, config)
 
             # Create client
             credentials_response = await client_service.create_client(test_client_request)
@@ -265,13 +272,14 @@ class TestClientService:
 
     @pytest.mark.asyncio
     async def test_authenticate_nonexistent_client(
-        self, initialize_authly: Authly, transaction_manager: TransactionManager
+        self, initialize_authly: AuthlyResourceManager, transaction_manager: TransactionManager
     ):
         """Test authentication of non-existent client."""
         async with transaction_manager.transaction() as conn:
             client_repo = ClientRepository(conn)
             scope_repo = ScopeRepository(conn)
-            client_service = ClientService(client_repo, scope_repo)
+            config = initialize_authly.get_config()
+            client_service = ClientService(client_repo, scope_repo, config)
 
             # Try to authenticate non-existent client
             authenticated_client = await client_service.authenticate_client("nonexistent_client", "any_secret")
@@ -281,7 +289,7 @@ class TestClientService:
     @pytest.mark.asyncio
     async def test_authenticate_public_client(
         self,
-        initialize_authly: Authly,
+        initialize_authly: AuthlyResourceManager,
         test_public_client_request: OAuthClientCreateRequest,
         transaction_manager: TransactionManager,
     ):
@@ -289,7 +297,8 @@ class TestClientService:
         async with transaction_manager.transaction() as conn:
             client_repo = ClientRepository(conn)
             scope_repo = ScopeRepository(conn)
-            client_service = ClientService(client_repo, scope_repo)
+            config = initialize_authly.get_config()
+            client_service = ClientService(client_repo, scope_repo, config)
 
             # Create public client
             credentials_response = await client_service.create_client(test_public_client_request)
@@ -307,7 +316,7 @@ class TestClientService:
     @pytest.mark.asyncio
     async def test_validate_redirect_uri_exact_match(
         self,
-        initialize_authly: Authly,
+        initialize_authly: AuthlyResourceManager,
         test_client_request: OAuthClientCreateRequest,
         transaction_manager: TransactionManager,
     ):
@@ -315,7 +324,8 @@ class TestClientService:
         async with transaction_manager.transaction() as conn:
             client_repo = ClientRepository(conn)
             scope_repo = ScopeRepository(conn)
-            client_service = ClientService(client_repo, scope_repo)
+            config = initialize_authly.get_config()
+            client_service = ClientService(client_repo, scope_repo, config)
 
             # Create client
             credentials_response = await client_service.create_client(test_client_request)
@@ -334,7 +344,7 @@ class TestClientService:
     @pytest.mark.asyncio
     async def test_update_client_info(
         self,
-        initialize_authly: Authly,
+        initialize_authly: AuthlyResourceManager,
         test_client_request: OAuthClientCreateRequest,
         transaction_manager: TransactionManager,
     ):
@@ -342,7 +352,8 @@ class TestClientService:
         async with transaction_manager.transaction() as conn:
             client_repo = ClientRepository(conn)
             scope_repo = ScopeRepository(conn)
-            client_service = ClientService(client_repo, scope_repo)
+            config = initialize_authly.get_config()
+            client_service = ClientService(client_repo, scope_repo, config)
 
             # Create client
             credentials_response = await client_service.create_client(test_client_request)
@@ -361,7 +372,7 @@ class TestClientService:
     @pytest.mark.asyncio
     async def test_update_client_with_invalid_redirect_uri(
         self,
-        initialize_authly: Authly,
+        initialize_authly: AuthlyResourceManager,
         test_client_request: OAuthClientCreateRequest,
         transaction_manager: TransactionManager,
     ):
@@ -369,7 +380,8 @@ class TestClientService:
         async with transaction_manager.transaction() as conn:
             client_repo = ClientRepository(conn)
             scope_repo = ScopeRepository(conn)
-            client_service = ClientService(client_repo, scope_repo)
+            config = initialize_authly.get_config()
+            client_service = ClientService(client_repo, scope_repo, config)
 
             # Create client
             credentials_response = await client_service.create_client(test_client_request)
@@ -387,7 +399,7 @@ class TestClientService:
     @pytest.mark.asyncio
     async def test_deactivate_client(
         self,
-        initialize_authly: Authly,
+        initialize_authly: AuthlyResourceManager,
         test_client_request: OAuthClientCreateRequest,
         transaction_manager: TransactionManager,
     ):
@@ -395,7 +407,8 @@ class TestClientService:
         async with transaction_manager.transaction() as conn:
             client_repo = ClientRepository(conn)
             scope_repo = ScopeRepository(conn)
-            client_service = ClientService(client_repo, scope_repo)
+            config = initialize_authly.get_config()
+            client_service = ClientService(client_repo, scope_repo, config)
 
             # Create client
             credentials_response = await client_service.create_client(test_client_request)
@@ -414,7 +427,7 @@ class TestScopeService:
 
     @pytest.mark.asyncio
     async def test_create_scope(
-        self, initialize_authly: Authly, test_scope_data: dict, transaction_manager: TransactionManager
+        self, initialize_authly: AuthlyResourceManager, test_scope_data: dict, transaction_manager: TransactionManager
     ):
         """Test creating an OAuth scope."""
         async with transaction_manager.transaction() as conn:
@@ -435,7 +448,7 @@ class TestScopeService:
 
     @pytest.mark.asyncio
     async def test_create_scope_with_invalid_name(
-        self, initialize_authly: Authly, transaction_manager: TransactionManager
+        self, initialize_authly: AuthlyResourceManager, transaction_manager: TransactionManager
     ):
         """Test creating scope with invalid name."""
         async with transaction_manager.transaction() as conn:
@@ -451,7 +464,7 @@ class TestScopeService:
 
     @pytest.mark.asyncio
     async def test_create_duplicate_scope(
-        self, initialize_authly: Authly, test_scope_data: dict, transaction_manager: TransactionManager
+        self, initialize_authly: AuthlyResourceManager, test_scope_data: dict, transaction_manager: TransactionManager
     ):
         """Test creating duplicate scope."""
         async with transaction_manager.transaction() as conn:
@@ -470,7 +483,7 @@ class TestScopeService:
 
     @pytest.mark.asyncio
     async def test_update_scope(
-        self, initialize_authly: Authly, test_scope_data: dict, transaction_manager: TransactionManager
+        self, initialize_authly: AuthlyResourceManager, test_scope_data: dict, transaction_manager: TransactionManager
     ):
         """Test updating scope information."""
         async with transaction_manager.transaction() as conn:
@@ -495,7 +508,7 @@ class TestScopeService:
 
     @pytest.mark.asyncio
     async def test_update_scope_non_admin(
-        self, initialize_authly: Authly, test_scope_data: dict, transaction_manager: TransactionManager
+        self, initialize_authly: AuthlyResourceManager, test_scope_data: dict, transaction_manager: TransactionManager
     ):
         """Test updating scope as non-admin (should fail)."""
         async with transaction_manager.transaction() as conn:
@@ -517,7 +530,7 @@ class TestScopeService:
     @pytest.mark.asyncio
     async def test_validate_requested_scopes(
         self,
-        initialize_authly: Authly,
+        initialize_authly: AuthlyResourceManager,
         test_client_request: OAuthClientCreateRequest,
         transaction_manager: TransactionManager,
     ):
@@ -528,7 +541,8 @@ class TestScopeService:
             scope_service = ScopeService(scope_repo)
 
             # Create client
-            client_service = ClientService(client_repo, scope_repo)
+            config = initialize_authly.get_config()
+            client_service = ClientService(client_repo, scope_repo, config)
             credentials_response = await client_service.create_client(test_client_request)
 
             # Get the created client model
@@ -554,7 +568,7 @@ class TestScopeService:
     @pytest.mark.asyncio
     async def test_validate_requested_scopes_unauthorized(
         self,
-        initialize_authly: Authly,
+        initialize_authly: AuthlyResourceManager,
         test_client_request: OAuthClientCreateRequest,
         transaction_manager: TransactionManager,
     ):
@@ -565,7 +579,8 @@ class TestScopeService:
             scope_service = ScopeService(scope_repo)
 
             # Create client
-            client_service = ClientService(client_repo, scope_repo)
+            config = initialize_authly.get_config()
+            client_service = ClientService(client_repo, scope_repo, config)
             credentials_response = await client_service.create_client(test_client_request)
 
             # Get the created client model
@@ -591,7 +606,7 @@ class TestScopeService:
     @pytest.mark.asyncio
     async def test_validate_requested_scopes_invalid(
         self,
-        initialize_authly: Authly,
+        initialize_authly: AuthlyResourceManager,
         test_client_request: OAuthClientCreateRequest,
         transaction_manager: TransactionManager,
     ):
@@ -602,7 +617,8 @@ class TestScopeService:
             scope_service = ScopeService(scope_repo)
 
             # Create client
-            client_service = ClientService(client_repo, scope_repo)
+            config = initialize_authly.get_config()
+            client_service = ClientService(client_repo, scope_repo, config)
             credentials_response = await client_service.create_client(test_client_request)
 
             # Get the created client model
@@ -617,7 +633,7 @@ class TestScopeService:
 
     @pytest.mark.asyncio
     async def test_associate_token_with_scopes(
-        self, initialize_authly: Authly, transaction_manager: TransactionManager
+        self, initialize_authly: AuthlyResourceManager, transaction_manager: TransactionManager
     ):
         """Test associating a token with scopes."""
         async with transaction_manager.transaction() as conn:
@@ -671,7 +687,9 @@ class TestScopeService:
             assert write_scope.scope_name in token_scopes
 
     @pytest.mark.asyncio
-    async def test_check_token_has_scope(self, initialize_authly: Authly, transaction_manager: TransactionManager):
+    async def test_check_token_has_scope(
+        self, initialize_authly: AuthlyResourceManager, transaction_manager: TransactionManager
+    ):
         """Test checking if a token has a specific scope."""
         async with transaction_manager.transaction() as conn:
             scope_repo = ScopeRepository(conn)
@@ -725,7 +743,9 @@ class TestScopeService:
             assert has_write is False
 
     @pytest.mark.asyncio
-    async def test_check_token_has_any_scope(self, initialize_authly: Authly, transaction_manager: TransactionManager):
+    async def test_check_token_has_any_scope(
+        self, initialize_authly: AuthlyResourceManager, transaction_manager: TransactionManager
+    ):
         """Test checking if a token has any of the required scopes."""
         async with transaction_manager.transaction() as conn:
             scope_repo = ScopeRepository(conn)
@@ -785,7 +805,9 @@ class TestScopeService:
             assert has_any is False
 
     @pytest.mark.asyncio
-    async def test_check_token_has_all_scopes(self, initialize_authly: Authly, transaction_manager: TransactionManager):
+    async def test_check_token_has_all_scopes(
+        self, initialize_authly: AuthlyResourceManager, transaction_manager: TransactionManager
+    ):
         """Test checking if a token has all required scopes."""
         async with transaction_manager.transaction() as conn:
             scope_repo = ScopeRepository(conn)
@@ -846,7 +868,9 @@ class TestScopeService:
             assert has_all is False
 
     @pytest.mark.asyncio
-    async def test_reduce_scopes_to_granted(self, initialize_authly: Authly, transaction_manager: TransactionManager):
+    async def test_reduce_scopes_to_granted(
+        self, initialize_authly: AuthlyResourceManager, transaction_manager: TransactionManager
+    ):
         """Test reducing requested scopes to granted scopes."""
         async with transaction_manager.transaction() as conn:
             scope_repo = ScopeRepository(conn)
@@ -878,7 +902,7 @@ class TestScopeService:
             assert "invalid_scope" not in final_scopes
 
     @pytest.mark.asyncio
-    async def test_list_scopes(self, initialize_authly: Authly, transaction_manager: TransactionManager):
+    async def test_list_scopes(self, initialize_authly: AuthlyResourceManager, transaction_manager: TransactionManager):
         """Test listing OAuth scopes with pagination."""
         async with transaction_manager.transaction() as conn:
             scope_repo = ScopeRepository(conn)
@@ -904,7 +928,9 @@ class TestScopeService:
             assert len(small_list) <= 3
 
     @pytest.mark.asyncio
-    async def test_get_default_scopes(self, initialize_authly: Authly, transaction_manager: TransactionManager):
+    async def test_get_default_scopes(
+        self, initialize_authly: AuthlyResourceManager, transaction_manager: TransactionManager
+    ):
         """Test getting default scopes."""
         async with transaction_manager.transaction() as conn:
             scope_repo = ScopeRepository(conn)

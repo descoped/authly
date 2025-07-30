@@ -8,6 +8,7 @@ from uuid import UUID
 from fastapi import HTTPException, status
 
 from authly.auth.core import get_password_hash, verify_password
+from authly.config import AuthlyConfig
 from authly.oauth.client_repository import ClientRepository
 from authly.oauth.models import (
     ClientType,
@@ -34,9 +35,10 @@ class ClientService:
     and scope assignment following OAuth 2.1 security requirements.
     """
 
-    def __init__(self, client_repo: ClientRepository, scope_repo: ScopeRepository):
+    def __init__(self, client_repo: ClientRepository, scope_repo: ScopeRepository, config: AuthlyConfig):
         self._client_repo = client_repo
         self._scope_repo = scope_repo
+        self._config = config
 
     async def create_client(self, request: OAuthClientCreateRequest) -> OAuthClientCredentialsResponse:
         """
@@ -65,10 +67,7 @@ class ClientService:
 
             if request.client_type == ClientType.CONFIDENTIAL:
                 try:
-                    from authly import get_config
-
-                    config = get_config()
-                    client_secret_length = config.client_secret_length
+                    client_secret_length = self._config.client_secret_length
                 except RuntimeError:
                     # Fallback for tests without full Authly initialization
                     client_secret_length = 32
@@ -452,10 +451,7 @@ class ClientService:
         for uri in redirect_uris:
             # Basic URI validation
             try:
-                from authly import get_config
-
-                config = get_config()
-                redirect_uri_max_length = config.redirect_uri_max_length
+                redirect_uri_max_length = self._config.redirect_uri_max_length
             except RuntimeError:
                 # Fallback for tests
                 redirect_uri_max_length = 2000

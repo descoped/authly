@@ -17,7 +17,7 @@ from fastapi import status
 from fastapi_testing import AsyncTestServer
 from psycopg_toolkit import TransactionManager
 
-from authly import Authly
+# Legacy Authly import removed - using AuthlyResourceManager
 from authly.api.admin_middleware import setup_admin_middleware
 from authly.api.admin_router import admin_router
 from authly.auth.core import get_password_hash
@@ -85,7 +85,7 @@ async def test_regular_user(transaction_manager: TransactionManager) -> UserMode
 
 @pytest.fixture()
 async def admin_token_with_scopes(
-    initialize_authly: Authly, test_admin_user: UserModel, transaction_manager: TransactionManager
+    initialize_authly, test_admin_user: UserModel, transaction_manager: TransactionManager
 ) -> str:
     """Create admin token with all required admin scopes."""
     async with transaction_manager.transaction() as conn:
@@ -111,8 +111,9 @@ async def admin_token_with_scopes(
                 pass
 
         # Create token with admin scopes
+        config = initialize_authly.get_config()
         token_repo = TokenRepository(conn)
-        token_service = TokenService(token_repo)
+        token_service = TokenService(token_repo, config, None)
 
         admin_scopes = [
             "admin:clients:read",
@@ -121,8 +122,6 @@ async def admin_token_with_scopes(
             "admin:scopes:write",
             "admin:system:read",
         ]
-
-        config = initialize_authly.get_config()
         # Create admin scopes as a single scope string
         admin_scope_string = " ".join(admin_scopes)
         token_pair = await token_service.create_token_pair(user=test_admin_user, scope=admin_scope_string)
@@ -132,12 +131,13 @@ async def admin_token_with_scopes(
 
 @pytest.fixture()
 async def regular_user_token(
-    initialize_authly: Authly, test_regular_user: UserModel, transaction_manager: TransactionManager
+    initialize_authly, test_regular_user: UserModel, transaction_manager: TransactionManager
 ) -> str:
     """Create token for regular user without admin scopes."""
     async with transaction_manager.transaction() as conn:
+        config = initialize_authly.get_config()
         token_repo = TokenRepository(conn)
-        token_service = TokenService(token_repo)
+        token_service = TokenService(token_repo, config, None)
 
         token_pair = await token_service.create_token_pair(
             user=test_regular_user,
@@ -148,7 +148,7 @@ async def regular_user_token(
 
 
 @pytest.fixture()
-async def test_oauth_client(transaction_manager: TransactionManager) -> Dict:
+async def test_oauth_client(initialize_authly, transaction_manager: TransactionManager) -> Dict:
     """Create a test OAuth client in the database."""
     async with transaction_manager.transaction() as conn:
         client_repo = ClientRepository(conn)
@@ -181,7 +181,9 @@ async def test_oauth_client(transaction_manager: TransactionManager) -> Dict:
         # Create client using repository directly for test setup
         from authly.oauth.client_service import ClientService
 
-        client_service = ClientService(client_repo, scope_repo)
+        config = initialize_authly.get_config()
+
+        client_service = ClientService(client_repo, scope_repo, config)
 
         created_client = await client_service.create_client(client_request)
         return created_client.model_dump()
@@ -223,7 +225,7 @@ class TestAdminAPIHealthAndStatus:
 
     @pytest.mark.asyncio
     async def test_admin_status_endpoint_with_auth(
-        self, test_server: AsyncTestServer, admin_token_with_scopes: str, initialize_authly: Authly
+        self, test_server: AsyncTestServer, admin_token_with_scopes: str, initialize_authly
     ):
         """Test admin status endpoint with proper authentication."""
         # Use the main app which has proper configuration

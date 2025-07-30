@@ -3,13 +3,13 @@ from typing import Dict
 
 from fastapi import APIRouter, Depends
 
-from authly import authly_db_connection
+from authly.core.dependencies import get_database_connection
 
 router = APIRouter()
 
 
 @router.get("/health", tags=["health"])
-async def health_check(db_connection=Depends(authly_db_connection)) -> Dict[str, str]:
+async def health_check(db_connection=Depends(get_database_connection)) -> Dict[str, str]:
     try:
         async with db_connection.cursor() as cur:
             await cur.execute("SELECT txid_current()")

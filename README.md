@@ -7,14 +7,14 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Release](https://img.shields.io/github/v/release/descoped/authly)](https://github.com/descoped/authly/releases)
 
-A **production-ready OAuth 2.1 + OpenID Connect 1.0 authorization server** built with FastAPI and PostgreSQL. Authly provides enterprise-grade security, comprehensive testing (439/439 tests passing), and professional administration tools.
+A **production-ready OAuth 2.1 + OpenID Connect 1.0 authorization server** built with FastAPI and PostgreSQL. Authly provides enterprise-grade security, comprehensive testing (510 tests passing), and professional administration tools.
 
 ---
 
 ## 🚀 **Production Ready Features**
 
 ✅ **Complete OAuth 2.1 + OIDC 1.0 Compliance** - Full RFC implementation with PKCE  
-✅ **500+ Tests Passing** - 100% success rate with real integration testing  
+✅ **510 Tests Passing** - 100% success rate with real integration testing  
 ✅ **Enterprise Security** - Two-layer admin system, rate limiting, audit logging  
 ✅ **Production Architecture** - Docker, monitoring, health checks, deployment guides  
 ✅ **Professional CLI** - Complete admin interface with API-first architecture  
@@ -110,7 +110,7 @@ python -m authly serve
 
 # Admin operations
 python -m authly admin login
-python -m authly admin client create --name "My App" --type public
+python -m authly admin client create --name "My App" --client-type public
 python -m authly admin scope create --name read --description "Read access"
 python -m authly admin status
 ```
@@ -136,10 +136,10 @@ python -m authly admin status
 # Clone and install
 git clone <repository-url>
 cd authly
-uv sync --all-groups -U
+uv sync --all-groups
 
 # Start with embedded development server (includes PostgreSQL container)
-uv run python -m authly serve --embedded --dev
+uv run python -m authly serve --embedded
 
 # Access Authly at http://localhost:8000
 # Admin CLI: uv run python -m authly admin --help
@@ -166,7 +166,7 @@ uv run python -m authly serve
 uv run python -m authly admin login
 uv run python -m authly admin client create \
   --name "My Application" \
-  --type confidential \
+  --client-type confidential \
   --redirect-uri "https://myapp.com/callback"
 
 # Create scope
@@ -186,13 +186,8 @@ uv run python -m authly admin scope create \
 
 ### **Administration**
 - **[CLI Guide](docs/cli-guide.md)** - Complete CLI administration guide
-- **[Deployment Guide](docs/deployment-guide.md)** - Production deployment instructions
-- **[Security Guide](docs/security-guide.md)** - Security features and best practices
-
-### **Development**
-- **[Development Guide](docs/development-guide.md)** - Setup and development workflows
-- **[Testing Guide](docs/testing-guide.md)** - Testing architecture and patterns
-- **[Architecture Guide](docs/architecture-guide.md)** - System design and patterns
+- **[Docker Deployment](docs/docker-deployment.md)** - Docker infrastructure and deployment
+- **[Security Audit](docs/security-audit.md)** - Security analysis and validation
 
 ---
 
@@ -230,7 +225,7 @@ uv run python -m authly admin scope create \
 ## 🧪 **Testing Excellence**
 
 ### **Test Coverage**
-- **500+ Tests Total** - 100% passing (verified production quality)
+- **510 Tests Total** - 100% passing (verified production quality)
 - **Real Integration Testing** - PostgreSQL testcontainers (no mocking)
 - **Complete Flow Testing** - End-to-end OAuth and OIDC flows
 - **Security Testing** - Authentication, authorization, and validation
@@ -281,7 +276,7 @@ uv run python -m authly admin scope create \
 - ✅ **OIDC 1.0 Complete** - ID tokens, UserInfo, JWKS, discovery
 - ✅ **Admin System Complete** - CLI, API, security, user management
 - ✅ **Production Ready** - Docker, monitoring, deployment, documentation
-- ✅ **Test Excellence** - 439/439 tests passing with comprehensive coverage
+- ✅ **Test Excellence** - 510 tests passing with comprehensive coverage
 
 ### **Standards Compliance**
 - ✅ **6 RFC Specifications** implemented and validated
@@ -309,9 +304,9 @@ We welcome contributions! Please see our contributing guidelines and code of con
 
 ### **Development Setup**
 1. Clone the repository
-2. Install dependencies: `uv sync --all-groups -U`
+2. Install dependencies: `uv sync --all-groups`
 3. Run tests: `pytest`
-4. Start development server: `uv run python -m authly serve --embedded --dev`
+4. Start development server: `uv run python -m authly serve --embedded`
 
 ### **Development Commands**
 - **Linting**: `uv run ruff check .`

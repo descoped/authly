@@ -10,6 +10,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Dict, List, Optional, Set, Tuple
 
+from authly.config.config import AuthlyConfig
+
 from .scopes import OIDC_SCOPES, OIDCClaimsMapping
 
 logger = logging.getLogger(__name__)
@@ -176,13 +178,14 @@ class OIDCValidator:
         return is_valid, flow_type, errors
 
     @staticmethod
-    def validate_nonce(nonce: Optional[str], response_type: str) -> List[str]:
+    def validate_nonce(nonce: Optional[str], response_type: str, config: AuthlyConfig) -> List[str]:
         """
         Validate nonce parameter for OIDC requests.
 
         Args:
             nonce: Nonce value from request
             response_type: Response type from request
+            config: Configuration object
 
         Returns:
             List of validation errors
@@ -196,18 +199,8 @@ class OIDCValidator:
         if requires_nonce and not nonce:
             errors.append("Nonce parameter is required for implicit and hybrid flows")
 
-        # Get nonce max length from config
-        try:
-            from authly import get_config
-
-            config = get_config()
-            nonce_max_length = config.nonce_max_length
-        except RuntimeError:
-            # Fallback for tests
-            nonce_max_length = 255
-
-        if nonce and len(nonce) > nonce_max_length:
-            errors.append(f"Nonce parameter is too long (max {nonce_max_length} characters)")
+        if nonce and len(nonce) > config.nonce_max_length:
+            errors.append(f"Nonce parameter is too long (max {config.nonce_max_length} characters)")
 
         return errors
 
@@ -215,6 +208,7 @@ class OIDCValidator:
     def validate_oidc_request_parameters(
         scopes: List[str],
         response_type: str,
+        config: AuthlyConfig,
         nonce: Optional[str] = None,
         max_age: Optional[int] = None,
         claims: Optional[str] = None,
@@ -225,6 +219,7 @@ class OIDCValidator:
         Args:
             scopes: List of requested scopes
             response_type: OIDC response type
+            config: Configuration object
             nonce: Nonce value (optional)
             max_age: Maximum authentication age (optional)
             claims: Claims parameter (optional)
@@ -244,7 +239,7 @@ class OIDCValidator:
             scope_result.flow_type = flow_type
 
         # Validate nonce
-        nonce_errors = OIDCValidator.validate_nonce(nonce, response_type)
+        nonce_errors = OIDCValidator.validate_nonce(nonce, response_type, config)
         scope_result.errors.extend(nonce_errors)
 
         # Validate max_age

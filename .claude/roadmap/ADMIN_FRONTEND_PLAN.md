@@ -1,5 +1,10 @@
 # Authly Admin Frontend: Architectural Plan
 
+**Date:** 2025-07-12  
+**Status:** Architectural Planning Document  
+**Category:** Future Implementation Guide  
+**Implementation Status:** Not Started
+
 This document outlines the architectural plan for creating a separate React-based admin frontend for the Authly service.
 
 ## 1. Core Principle: Separation of Concerns

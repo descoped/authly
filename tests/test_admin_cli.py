@@ -10,8 +10,8 @@ from click.testing import CliRunner
 from fastapi import HTTPException
 from psycopg_toolkit import TransactionManager
 
-from authly import Authly
 from authly.admin.cli import main
+from authly.core.resource_manager import AuthlyResourceManager
 from authly.oauth.client_repository import ClientRepository
 from authly.oauth.client_service import ClientService
 from authly.oauth.models import ClientType, OAuthClientCreateRequest
@@ -140,12 +140,15 @@ class TestAdminCLIServices:
     """Test CLI underlying service functionality with real database."""
 
     @pytest.mark.asyncio
-    async def test_client_service_integration(self, initialize_authly: Authly, transaction_manager: TransactionManager):
+    async def test_client_service_integration(
+        self, initialize_authly: AuthlyResourceManager, transaction_manager: TransactionManager
+    ):
         """Test client service functionality that CLI commands would use."""
         async with transaction_manager.transaction() as conn:
+            config = initialize_authly.get_config()
             client_repo = ClientRepository(conn)
             scope_repo = ScopeRepository(conn)
-            client_service = ClientService(client_repo, scope_repo)
+            client_service = ClientService(client_repo, scope_repo, config)
 
             # Test creating a client (what CLI create command does)
             client_name = f"CLI_Test_Client_{uuid4().hex[:8]}"
@@ -182,7 +185,9 @@ class TestAdminCLIServices:
             assert success is True
 
     @pytest.mark.asyncio
-    async def test_scope_service_integration(self, initialize_authly: Authly, transaction_manager: TransactionManager):
+    async def test_scope_service_integration(
+        self, initialize_authly: AuthlyResourceManager, transaction_manager: TransactionManager
+    ):
         """Test scope service functionality that CLI commands would use."""
         async with transaction_manager.transaction() as conn:
             scope_repo = ScopeRepository(conn)
@@ -225,13 +230,14 @@ class TestAdminCLIServices:
 
     @pytest.mark.asyncio
     async def test_confidential_client_secret_generation(
-        self, initialize_authly: Authly, transaction_manager: TransactionManager
+        self, initialize_authly: AuthlyResourceManager, transaction_manager: TransactionManager
     ):
         """Test confidential client creation with secret generation."""
         async with transaction_manager.transaction() as conn:
+            config = initialize_authly.get_config()
             client_repo = ClientRepository(conn)
             scope_repo = ScopeRepository(conn)
-            client_service = ClientService(client_repo, scope_repo)
+            client_service = ClientService(client_repo, scope_repo, config)
 
             # Test creating confidential client (what CLI create command does for confidential clients)
             client_name = f"Confidential_Client_{uuid4().hex[:8]}"
@@ -255,12 +261,15 @@ class TestAdminCLIServices:
             assert len(new_secret) > 20
 
     @pytest.mark.asyncio
-    async def test_client_scope_associations(self, initialize_authly: Authly, transaction_manager: TransactionManager):
+    async def test_client_scope_associations(
+        self, initialize_authly: AuthlyResourceManager, transaction_manager: TransactionManager
+    ):
         """Test client-scope associations functionality."""
         async with transaction_manager.transaction() as conn:
+            config = initialize_authly.get_config()
             client_repo = ClientRepository(conn)
             scope_repo = ScopeRepository(conn)
-            client_service = ClientService(client_repo, scope_repo)
+            client_service = ClientService(client_repo, scope_repo, config)
             scope_service = ScopeService(scope_repo)
 
             # Create test scopes
@@ -292,12 +301,15 @@ class TestAdminCLIServices:
             assert scope2_name in client_scopes
 
     @pytest.mark.asyncio
-    async def test_cli_service_error_handling(self, initialize_authly: Authly, transaction_manager: TransactionManager):
+    async def test_cli_service_error_handling(
+        self, initialize_authly: AuthlyResourceManager, transaction_manager: TransactionManager
+    ):
         """Test error handling in services that CLI commands would encounter."""
         async with transaction_manager.transaction() as conn:
+            config = initialize_authly.get_config()
             client_repo = ClientRepository(conn)
             scope_repo = ScopeRepository(conn)
-            client_service = ClientService(client_repo, scope_repo)
+            client_service = ClientService(client_repo, scope_repo, config)
             scope_service = ScopeService(scope_repo)
 
             # Test getting non-existent client (what CLI show would encounter)

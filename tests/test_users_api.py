@@ -6,17 +6,17 @@ import pytest
 from fastapi_testing import AsyncTestServer
 from psycopg_toolkit import TransactionManager
 
-from authly import Authly
 from authly.api import auth_router, users_router
 from authly.auth import create_access_token, get_password_hash, verify_password
 from authly.config import AuthlyConfig
+from authly.core.resource_manager import AuthlyResourceManager
 from authly.users import UserModel, UserRepository
 
 logger = logging.getLogger(__name__)
 
 
 @pytest.fixture
-async def test_user_data(initialize_authly: Authly):
+async def test_user_data(initialize_authly: AuthlyResourceManager):
     unique = uuid4().hex[:8]
     password_hash = get_password_hash("SecurePass123!")
     return {"username": f"testuser_{unique}", "email": f"test_{unique}@example.com", "password_hash": password_hash}
@@ -24,7 +24,7 @@ async def test_user_data(initialize_authly: Authly):
 
 @pytest.fixture
 async def test_user(
-    initialize_authly: Authly, test_user_data: dict, transaction_manager: TransactionManager
+    initialize_authly: AuthlyResourceManager, test_user_data: dict, transaction_manager: TransactionManager
 ) -> UserModel:
     """Create a test user in the database"""
     async with transaction_manager.transaction() as conn:
@@ -51,6 +51,7 @@ async def test_user_token(
     return create_access_token(
         data={"sub": str(test_user.id)},
         secret_key=test_config.secret_key,
+        config=test_config,
         algorithm=test_config.algorithm,
         expires_delta=60,  # Set explicit expiration in minutes
     )

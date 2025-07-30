@@ -1,5 +1,12 @@
 # Technical Plan: Replacing Authly Singleton with Dependency Injection
 
+**Date:** 2025-07-12  
+**Status:** Technical Implementation Plan  
+**Category:** Critical Architectural Refactor  
+**Implementation Status:** Ready for Implementation - Deep Analysis Complete  
+**Priority:** High (TodoWrite ID: singleton-pattern-refactor)  
+**Updated:** 2025-07-21 (Added current codebase analysis and detailed implementation plan)
+
 ## 1. Problem Statement
 
 The current `Authly` class is implemented as a singleton, managing global state such as the PostgreSQL database connection pool and core configuration. While this simplifies access in a single-process environment, it introduces critical limitations for horizontal scaling and distributed deployments:
@@ -208,3 +215,124 @@ async def client(test_authly_instance: Authly, test_db_pool: AsyncConnectionPool
 *   **Improved Resource Utilization**: Reduced overall database connections and more efficient use of system resources.
 *   **Cleaner Architecture**: Decoupling resource management from the core `Authly` logic, leading to a more maintainable and testable codebase.
 *   **Adherence to Best Practices**: Aligning with modern Python and FastAPI application design patterns for production-ready services.
+
+---
+
+## 6. Current Codebase Analysis (Added 2025-07-21)
+
+### **Comprehensive Singleton Usage Analysis**
+
+**Direct `Authly.get_instance()` Calls (5 locations):**
+- `src/authly/__init__.py:21` - In `get_config()` function
+- `src/authly/__init__.py:30` - In `authly_db_connection()` function  
+- `src/authly/api/admin_dependencies.py:113` - In admin scope validation
+- `src/authly/api/admin_router.py:41` - In `get_db_connection()` dependency
+- `src/authly/api/admin_router.py:112` - In `get_system_status()` endpoint
+
+**Configuration Access via `get_config()` (25+ locations):**
+- JWT operations: `src/authly/auth/core.py:36, 61, 65`
+- Token management: `src/authly/tokens/service.py:103, 196, 230, 323, 360, 475`
+- OAuth services: `src/authly/oauth/client_service.py:70`, `authorization_service.py:133`, `authorization_code_repository.py:78`
+- OIDC validation: `src/authly/oidc/validation.py:203`
+- Rate limiting: `src/authly/api/rate_limiter.py:15`
+- Discovery: `src/authly/api/oauth_discovery_router.py:136`
+- User dependencies: `src/authly/api/users_dependencies.py:65, 228`
+
+**Database Pool Access Patterns:**
+- Direct pool access: `src/authly/main.py:81` (bootstrap operations)
+- Standard dependency: `authly_db_connection()` used throughout API layers
+- Duplicate pattern: Admin router has custom `get_db_connection()` function
+
+**Current Dependency Injection Structure (GOOD):**
+- ✅ Repository layer already uses proper DI patterns
+- ✅ Service layer constructors accept dependencies
+- ✅ FastAPI dependencies for repository and service creation
+- ✅ Authentication dependencies well-structured
+
+**Key Issues Identified:**
+1. **Mixed Patterns** - Some services use DI, others access singleton directly
+2. **Configuration Scattered** - Config accessed throughout service layers rather than injected
+3. **Inconsistent Database Access** - Admin router duplicates database dependency
+4. **Testing Complexity** - Singleton reset required between tests
+
+### **Implementation Priority Matrix**
+
+**Phase 1 (Infrastructure) - No Breaking Changes:**
+- Create `src/authly/core/database.py` and `src/authly/core/dependencies.py`
+- Update `src/authly/main.py` lifespan to use app.state
+- Verify basic app startup with new infrastructure
+
+**Phase 2 (Service Layer) - Configuration Injection:**
+- Update service constructors to accept config parameter
+- Replace `get_config()` calls in 25+ locations
+- Update service dependency factories
+
+**Phase 3 (Database Access) - Standardization:**
+- Remove admin router's duplicate `get_db_connection()`
+- Update admin dependencies to remove singleton access
+- Ensure all database access through standard dependency
+
+**Phase 4 (Core Refactor) - Singleton Removal:**
+- Convert `Authly` class to regular class
+- Remove singleton methods and class variables
+- Update all remaining singleton references
+
+**Phase 5 (Testing) - Validation:**
+- Update test fixtures for dependency injection
+- Maintain 551 tests passing
+- Performance testing with multiple workers
+
+### **Risk Assessment and Mitigation**
+
+**Low Risk Areas:**
+- ✅ Repository and service layers already use good DI patterns
+- ✅ Database connection dependency pattern already established
+- ✅ FastAPI lifespan already in use
+
+**Medium Risk Areas:**
+- ⚠️ Configuration injection across 25+ files
+- ⚠️ Service constructor updates
+- ⚠️ Admin router refactoring
+
+**High Risk Areas:**
+- 🔴 Core `Authly` class modification
+- 🔴 Testing infrastructure changes
+- 🔴 Potential import chain issues
+
+**Mitigation Strategies:**
+- Incremental phase-by-phase implementation
+- Comprehensive testing after each phase
+- Backward compatibility maintenance during transition
+- Rollback capability at each milestone
+
+### **Success Metrics**
+
+**Functional Verification:**
+- 551 tests continue to pass (no regression)
+- Application starts successfully with multiple Uvicorn workers
+- Database pool shared across workers (verify single pool instance)
+- Configuration consistency across all workers
+
+**Performance Verification:**
+- Database connections = pool_size (not workers × pool_size)
+- Memory usage scales linearly with workers
+- No response time degradation
+- Faster application startup
+
+**Production Readiness:**
+- Multi-container deployment capability
+- Auto-scaling compatibility
+- Load balancer compatibility
+- Graceful shutdown and resource cleanup
+
+### **Ready for Implementation**
+
+**Analysis Complete:**
+- ✅ All singleton usage patterns identified and catalogued
+- ✅ Dependency injection patterns analyzed and validated
+- ✅ Risk assessment completed with mitigation strategies
+- ✅ Phase-by-phase implementation plan defined
+- ✅ Success metrics and testing strategy established
+
+**Next Action:**
+The codebase is ready for **Phase 1 implementation** - creating the core infrastructure files without breaking existing functionality. All necessary analysis has been completed and the implementation plan is validated against the current codebase structure.

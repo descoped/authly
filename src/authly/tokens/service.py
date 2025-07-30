@@ -1,8 +1,11 @@
 import logging
 import secrets
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 from uuid import UUID, uuid4
+
+if TYPE_CHECKING:
+    from authly.oauth.client_repository import ClientRepository
 
 from fastapi import HTTPException
 from jose import jwt
@@ -10,8 +13,8 @@ from jose.exceptions import JWTError
 from psycopg_toolkit import RecordNotFoundError
 from starlette import status
 
-from authly import get_config
 from authly.auth import create_access_token, create_refresh_token, decode_token
+from authly.config import AuthlyConfig
 from authly.oidc.scopes import OIDCClaimsMapping
 from authly.tokens.models import TokenModel, TokenPairResponse, TokenType
 from authly.tokens.repository import TokenRepository
@@ -26,8 +29,12 @@ class TokenService:
     Simplified architecture that removes unnecessary abstraction layers.
     """
 
-    def __init__(self, repository: TokenRepository):
+    def __init__(
+        self, repository: TokenRepository, config: AuthlyConfig, client_repository: Optional["ClientRepository"] = None
+    ):
         self._repo = repository
+        self._config = config
+        self._client_repo = client_repository
 
     async def create_token(self, token: TokenModel) -> TokenModel:
         """Create a new token record"""
@@ -83,7 +90,7 @@ class TokenService:
         self,
         user: UserModel,
         scope: Optional[str] = None,
-        client_id: Optional[UUID] = None,
+        client_id: Optional[str] = None,
         oidc_params: Optional[dict] = None,
     ) -> TokenPairResponse:
         """
@@ -100,12 +107,10 @@ class TokenService:
         Raises:
             HTTPException: If token creation fails
         """
-        config = get_config()
-
         try:
             # Generate unique JTIs for both tokens
-            access_jti = secrets.token_hex(config.token_hex_length)
-            refresh_jti = secrets.token_hex(config.token_hex_length)
+            access_jti = secrets.token_hex(self._config.token_hex_length)
+            refresh_jti = secrets.token_hex(self._config.token_hex_length)
 
             # Prepare token data
             access_data = {"sub": str(user.id), "jti": access_jti}
@@ -117,20 +122,24 @@ class TokenService:
             # Create JWT tokens
             access_token = create_access_token(
                 data=access_data,
-                secret_key=config.secret_key,
-                algorithm=config.algorithm,
-                expires_delta=config.access_token_expire_minutes,
+                secret_key=self._config.secret_key,
+                algorithm=self._config.algorithm,
+                expires_delta=self._config.access_token_expire_minutes,
+                config=self._config,
             )
 
             refresh_token = create_refresh_token(
                 user_id=str(user.id),
-                secret_key=config.refresh_secret_key,
+                secret_key=self._config.refresh_secret_key,
                 jti=refresh_jti,
+                config=self._config,
             )
 
             # Decode tokens to get expiry times
-            access_payload = jwt.decode(access_token, config.secret_key, algorithms=[config.algorithm])
-            refresh_payload = jwt.decode(refresh_token, config.refresh_secret_key, algorithms=[config.algorithm])
+            access_payload = jwt.decode(access_token, self._config.secret_key, algorithms=[self._config.algorithm])
+            refresh_payload = jwt.decode(
+                refresh_token, self._config.refresh_secret_key, algorithms=[self._config.algorithm]
+            )
 
             # Create token models
             access_token_model = TokenModel(
@@ -168,7 +177,7 @@ class TokenService:
                 access_token=access_token,
                 refresh_token=refresh_token,
                 token_type="Bearer",
-                expires_in=config.access_token_expire_minutes * 60,
+                expires_in=self._config.access_token_expire_minutes * 60,
                 id_token=id_token,
             )
 
@@ -178,7 +187,7 @@ class TokenService:
             )
 
     async def refresh_token_pair(
-        self, refresh_token: str, user_repo: UserRepository, client_id: Optional[UUID] = None
+        self, refresh_token: str, user_repo: UserRepository, client_id: Optional[str] = None
     ) -> TokenPairResponse:
         """
         Create a new token pair using a refresh token, invalidating the old refresh token.
@@ -193,11 +202,9 @@ class TokenService:
         Raises:
             HTTPException: If token refresh fails
         """
-        config = get_config()
-
         try:
             # Decode the provided refresh token
-            payload = jwt.decode(refresh_token, config.refresh_secret_key, algorithms=[config.algorithm])
+            payload = jwt.decode(refresh_token, self._config.refresh_secret_key, algorithms=[self._config.algorithm])
 
             # Validate token type and extract claims
             if payload.get("type") != "refresh":
@@ -227,9 +234,8 @@ class TokenService:
                 raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User is inactive")
 
             # Generate new JTIs for both tokens
-            config = get_config()
-            new_access_jti = secrets.token_hex(config.token_hex_length)
-            new_refresh_jti = secrets.token_hex(config.token_hex_length)
+            new_access_jti = secrets.token_hex(self._config.token_hex_length)
+            new_refresh_jti = secrets.token_hex(self._config.token_hex_length)
 
             # Prepare access token data with scope if available
             access_data = {"sub": user_id, "jti": new_access_jti}
@@ -239,20 +245,24 @@ class TokenService:
             # Create new tokens
             new_access_token = create_access_token(
                 data=access_data,
-                secret_key=config.secret_key,
-                algorithm=config.algorithm,
-                expires_delta=config.access_token_expire_minutes,
+                secret_key=self._config.secret_key,
+                algorithm=self._config.algorithm,
+                expires_delta=self._config.access_token_expire_minutes,
+                config=self._config,
             )
 
             new_refresh_token = create_refresh_token(
                 user_id=user_id,
-                secret_key=config.refresh_secret_key,
+                secret_key=self._config.refresh_secret_key,
                 jti=new_refresh_jti,
+                config=self._config,
             )
 
             # Decode new tokens to get expiry times
-            access_payload = jwt.decode(new_access_token, config.secret_key, algorithms=[config.algorithm])
-            refresh_payload = jwt.decode(new_refresh_token, config.refresh_secret_key, algorithms=[config.algorithm])
+            access_payload = jwt.decode(new_access_token, self._config.secret_key, algorithms=[self._config.algorithm])
+            refresh_payload = jwt.decode(
+                new_refresh_token, self._config.refresh_secret_key, algorithms=[self._config.algorithm]
+            )
 
             # Invalidate the old refresh token
             await self.invalidate_token(token_jti)
@@ -294,7 +304,7 @@ class TokenService:
                 access_token=new_access_token,
                 refresh_token=new_refresh_token,
                 token_type="Bearer",
-                expires_in=config.access_token_expire_minutes * 60,
+                expires_in=self._config.access_token_expire_minutes * 60,
                 id_token=id_token,
             )
 
@@ -320,11 +330,9 @@ class TokenService:
         Raises:
             HTTPException: If logout fails
         """
-        config = get_config()
-
         try:
             # Decode current access token to get JTI
-            payload = jwt.decode(access_token, config.secret_key, algorithms=[config.algorithm])
+            payload = jwt.decode(access_token, self._config.secret_key, algorithms=[self._config.algorithm])
             current_jti = payload.get("jti")
 
             # Invalidate current token first if JTI exists
@@ -357,8 +365,6 @@ class TokenService:
             - If revoking an access token, only revokes that specific token
             - Returns False for invalid tokens (don't raise exceptions per RFC 7009)
         """
-        config = get_config()
-
         try:
             # Try to decode as access token first (most common case)
             token_payload = None
@@ -368,7 +374,7 @@ class TokenService:
             if token_type_hint == "refresh_token":
                 # Try refresh token first
                 try:
-                    token_payload = decode_token(token, config.refresh_secret_key, config.algorithm)
+                    token_payload = decode_token(token, self._config.refresh_secret_key, self._config.algorithm)
                     if token_payload.get("type") == "refresh":
                         token_type = TokenType.REFRESH
                 except ValueError:
@@ -377,19 +383,19 @@ class TokenService:
                 # If refresh failed, try access token
                 if token_payload is None:
                     try:
-                        token_payload = decode_token(token, config.secret_key, config.algorithm)
+                        token_payload = decode_token(token, self._config.secret_key, self._config.algorithm)
                         token_type = TokenType.ACCESS
                     except ValueError:
                         return False
             else:
                 # Try access token first (default case)
                 try:
-                    token_payload = decode_token(token, config.secret_key, config.algorithm)
+                    token_payload = decode_token(token, self._config.secret_key, self._config.algorithm)
                     token_type = TokenType.ACCESS
                 except ValueError:
                     # If access failed, try refresh token
                     try:
-                        token_payload = decode_token(token, config.refresh_secret_key, config.algorithm)
+                        token_payload = decode_token(token, self._config.refresh_secret_key, self._config.algorithm)
                         if token_payload.get("type") == "refresh":
                             token_type = TokenType.REFRESH
                     except ValueError:
@@ -452,41 +458,37 @@ class TokenService:
         return OIDCClaimsMapping.is_oidc_request(scopes)
 
     async def _generate_id_token(
-        self, user: UserModel, scope: str, client_id: UUID, oidc_params: Optional[dict] = None
-    ) -> str:
+        self, user: UserModel, scope: str, client_id: str, oidc_params: Optional[dict] = None
+    ) -> Optional[str]:
         """
         Generate an ID token for OpenID Connect flows.
 
         Args:
             user: The user to create ID token for
             scope: Granted scopes (space-separated string)
+            client_id: Client ID for token generation
             oidc_params: Optional OIDC parameters from authorization code
 
         Returns:
-            JWT ID token string
+            JWT ID token string or None if client repository not available
         """
-        # Import here to avoid circular imports
-        from authly import authly_db_connection, get_config
-        from authly.oauth.client_repository import ClientRepository
-        from authly.oidc.id_token import create_id_token_service
+        # Skip ID token generation if no client repository available
+        if not self._client_repo:
+            logger.warning("Client repository not available for ID token generation")
+            return None
 
         try:
-            # Get configuration
-            config = get_config()
+            # Import here to avoid circular imports
+            from authly.oidc.id_token import create_id_token_service
 
             # Create ID token service
-            id_token_service = create_id_token_service(config)
+            id_token_service = create_id_token_service(self._config)
 
-            # Get client information for ID token audience
-            async for conn in authly_db_connection():
-                client_repo = ClientRepository(conn)
-                client = await client_repo.get_by_id(client_id)
-                break
-
+            # Get client from repository by client_id string
+            client = await self._client_repo.get_by_client_id(client_id)
             if not client:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid client for ID token generation"
-                )
+                logger.warning(f"Client {client_id} not found for ID token generation")
+                return None
 
             # Extract scopes
             scopes = scope.split() if scope else []
@@ -498,9 +500,8 @@ class TokenService:
 
             # Generate ID token
             id_token = await id_token_service.create_id_token(user=user, client=client, scopes=scopes, nonce=nonce)
-
             return id_token
 
         except Exception as e:
             logger.error(f"Error generating ID token: {e}")
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not generate ID token")
+            return None

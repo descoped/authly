@@ -1,7 +1,7 @@
 # Authly Codebase Structure - Current State
 
 **Last Updated**: July 12, 2025  
-**Test Status**: 551 tests passing (100% success rate)  
+**Test Status**: 510 tests passing (100% success rate)  
 **Implementation**: Complete OAuth 2.1 + OpenID Connect Core 1.0 + Session Management 1.0 authorization server
 
 ---
@@ -21,7 +21,7 @@ authly/
 ├── examples/                   # Usage examples and testing
 ├── report/                     # Analysis and audit reports
 ├── src/authly/                 # Main application source code
-├── tests/                      # Comprehensive test suite (551 tests across 44 files)
+├── tests/                      # Comprehensive test suite (510 tests across 49 files)
 ├── .gitignore                  # Git ignore patterns
 ├── .python-version             # Python version specification
 ├── CHANGELOG.md                # Complete implementation changelog
@@ -267,7 +267,7 @@ tests/
 ```
 
 **Test Metrics**:
-- **✅ Total Tests**: 439 tests (100% passing)
+- **✅ Total Tests**: 510 tests (100% passing)
 - **✅ Real Integration**: PostgreSQL testcontainers, no mocking
 - **✅ Comprehensive Coverage**: All OAuth 2.1 + OIDC 1.0 flows
 - **✅ Security Testing**: Authentication, authorization, validation
@@ -416,4 +416,4 @@ audit_logs                      # Administrative action logging and compliance
 
 ---
 
-This comprehensive codebase structure document reflects the current state of Authly as a production-ready OAuth 2.1 + OpenID Connect 1.0 authorization server with 439/439 tests passing and complete enterprise-grade features.
+This comprehensive codebase structure document reflects the current state of Authly as a production-ready OAuth 2.1 + OpenID Connect 1.0 authorization server with 510/510 tests passing and complete enterprise-grade features.

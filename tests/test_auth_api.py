@@ -11,9 +11,9 @@ from jose import jwt
 from psycopg import AsyncConnection
 from psycopg_toolkit import TransactionManager
 
-from authly import AuthlyConfig
 from authly.api import auth_router, users_router
 from authly.auth.core import get_password_hash
+from authly.config.config import AuthlyConfig
 from authly.tokens import TokenRepository, TokenService, TokenType
 from authly.users.models import UserModel
 from authly.users.repository import UserRepository
@@ -33,9 +33,10 @@ async def token_repository(db_connection: AsyncConnection) -> TokenRepository:
 
 
 @pytest.fixture(scope="function")
-async def token_service(token_repository: TokenRepository) -> TokenService:
+async def token_service(token_repository: TokenRepository, initialize_authly) -> TokenService:
     """Create a token service with a proper database connection."""
-    return TokenService(token_repository)
+    config = initialize_authly.get_config()
+    return TokenService(token_repository, config, None)
 
 
 @pytest.fixture()

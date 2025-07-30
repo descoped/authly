@@ -59,18 +59,16 @@ class UserRepository(BaseRepository[UserModel, UUID]):
                 raise
             raise OperationError(f"Failed to update last login: {str(e)}") from e
 
-    async def get_paginated(self, skip: int = 0, limit: Optional[int] = None) -> List[UserModel]:
-        # Get default limit from config if not provided
-        if limit is None:
-            try:
-                from authly import get_config
+    async def get_paginated(self, skip: int = 0, limit: int = 100) -> List[UserModel]:
+        """Get paginated list of users.
 
-                config = get_config()
-                limit = config.default_page_size
-            except RuntimeError:
-                # Fallback for tests
-                limit = 100
+        Args:
+            skip: Number of records to skip
+            limit: Maximum number of records to return (default 100)
 
+        Returns:
+            List of user models
+        """
         # noinspection SqlDialectInspection,SqlNoDataSourceInspection
         query = SQL(
             """

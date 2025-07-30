@@ -9,8 +9,8 @@ import logging
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 
-from authly import get_config
 from authly.api.oauth_router import get_discovery_service
+from authly.core.dependencies import get_config
 from authly.oauth.discovery_models import OAuthServerMetadata
 from authly.oauth.discovery_service import DiscoveryService
 

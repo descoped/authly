@@ -94,7 +94,7 @@ jobs:
     - name: Load Docker image
       run: |
         docker load < authly-fullstack-image.tar.gz
-        docker tag authly:fullstack-test authly:latest
+        docker tag authly:fullstack-test authly-authly:latest
     
     - name: Install test dependencies
       run: |
@@ -104,19 +104,24 @@ jobs:
     - name: Create environment file
       run: |
         cat << EOF > .env
+        # Resource Manager Configuration
+        AUTHLY_MODE=production
+        AUTHLY_BOOTSTRAP_ENABLED=true
+        
         # Database Configuration
         POSTGRES_PASSWORD=fullstack_test_password
+        DATABASE_URL=postgresql://authly:fullstack_test_password@postgres:5432/authly
         
         # Redis Configuration
         REDIS_PASSWORD=fullstack_redis_password
+        REDIS_URL=redis://:fullstack_redis_password@redis:6379/0
         
         # JWT Configuration
         JWT_SECRET_KEY=fullstack-test-secret-key-256-bit-long-for-jwt-tokens
         JWT_REFRESH_SECRET_KEY=fullstack-test-refresh-secret-key-256-bit-long
         
-        # Development Mode
-        AUTHLY_BOOTSTRAP_DEV_MODE=true
-        AUTHLY_DEV_MODE=true
+        # Logging Configuration
+        LOG_LEVEL=INFO
         AUTHLY_LOG_LEVEL=INFO
         
         # Admin Configuration

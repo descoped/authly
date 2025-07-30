@@ -10,7 +10,7 @@ on:
       - '**.md'
 
 env:
-  PYTHON_VERSION: '3.11'
+  PYTHON_VERSION: '3.13'
   UV_VERSION: '0.5.11'
 
 jobs:
@@ -24,7 +24,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.13'
+        python-version: ${{ env.PYTHON_VERSION }}
 
     - name: Install uv
       uses: astral-sh/setup-uv@v6
@@ -42,11 +42,23 @@ jobs:
     
     - name: Run tests with coverage
       env:
-        AUTHLY_SECRET_KEY: test-secret-key-for-ci-only
+        # Resource Manager Configuration
+        AUTHLY_MODE: testing
+        AUTHLY_BOOTSTRAP_ENABLED: true
+        
+        # Database (uses testcontainers)
+        DATABASE_URL: postgresql://test:test@localhost:5432/test
+        
+        # JWT Configuration
+        JWT_SECRET_KEY: test-secret-key-for-ci-only-256-bit-long
+        JWT_REFRESH_SECRET_KEY: test-refresh-secret-key-for-ci-only-256-bit-long
+        
+        # Admin Configuration
         AUTHLY_ADMIN_USERNAME: admin
         AUTHLY_ADMIN_PASSWORD: admin123
         AUTHLY_ADMIN_EMAIL: admin@localhost
         AUTHLY_ADMIN_ALLOW_LOCALHOST: true
+        AUTHLY_ADMIN_API_ENABLED: true
       run: |
         uv run pytest -v --tb=short --cov=src/authly --cov-report=xml --cov-report=term
     

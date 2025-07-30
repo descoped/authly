@@ -1,5 +1,10 @@
 # OAuth 2.1 + OpenID Connect Flow Research
 
+**Date:** 2025-07-13  
+**Status:** Research Documentation  
+**Category:** Implementation Research  
+**Implementation Status:** Research Complete - Implementation Complete
+
 ## Overview
 Research findings for implementing end-to-end OAuth 2.1 and OpenID Connect flow testing in the Authly authorization server.
 
@@ -21,7 +26,7 @@ Research findings for implementing end-to-end OAuth 2.1 and OpenID Connect flow 
 **Endpoint:** `/.well-known/openid_configuration`
 
 **Additional OIDC Features:**
-- **UserInfo Endpoint:** `/api/v1/oidc/userinfo`
+- **UserInfo Endpoint:** `/oidc/userinfo`
 - **End Session Endpoint:** `/api/v1/oidc/logout`
 - **Session Iframe:** `/api/v1/oidc/session/iframe`
 - **JWKS URI:** `/.well-known/jwks.json`
@@ -89,7 +94,7 @@ Research findings for implementing end-to-end OAuth 2.1 and OpenID Connect flow 
 ```
 
 ### 3. UserInfo Endpoint
-**URL:** `/api/v1/oidc/userinfo`
+**URL:** `/oidc/userinfo`
 **Method:** GET
 **Authentication:** Bearer token with `openid` scope required
 

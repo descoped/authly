@@ -47,9 +47,10 @@ class ClientRepository(BaseRepository[OAuthClientModel, UUID]):
     async def get_by_client_id(self, client_id: str) -> Optional[OAuthClientModel]:
         """Get OAuth client by client_id"""
         try:
-            query = PsycopgHelper.build_select_query(table_name="oauth_clients", where_clause={"client_id": client_id})
+            # Explicitly cast parameter to varchar to avoid UUID conversion issues
+            query = "SELECT * FROM oauth_clients WHERE client_id = %s::varchar AND is_active = true"
             async with self.db_connection.cursor(row_factory=dict_row) as cur:
-                await cur.execute(query, [client_id])
+                await cur.execute(query, [str(client_id)])  # Ensure it's a string
                 result = await cur.fetchone()
                 if result:
                     result = dict(result)

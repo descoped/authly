@@ -7,8 +7,8 @@ from uuid import uuid4
 import pytest
 from psycopg_toolkit import TransactionManager
 
-from authly import Authly
 from authly.auth import get_password_hash
+from authly.core.resource_manager import AuthlyResourceManager
 from authly.oauth.authorization_code_repository import AuthorizationCodeRepository
 from authly.oauth.client_repository import ClientRepository
 from authly.oauth.models import (
@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 
 @pytest.fixture
-async def test_user_data(initialize_authly: Authly):
+async def test_user_data(initialize_authly: AuthlyResourceManager):
     unique = uuid4().hex[:8]
     password_hash = get_password_hash("SecurePass123!")
     return {"username": f"testuser_{unique}", "email": f"test_{unique}@example.com", "password_hash": password_hash}
@@ -34,7 +34,7 @@ async def test_user_data(initialize_authly: Authly):
 
 @pytest.fixture
 async def test_user(
-    initialize_authly: Authly, test_user_data: dict, transaction_manager: TransactionManager
+    initialize_authly: AuthlyResourceManager, test_user_data: dict, transaction_manager: TransactionManager
 ) -> UserModel:
     """Create a test user in the database"""
     async with transaction_manager.transaction() as conn:
@@ -97,7 +97,7 @@ class TestClientRepository:
 
     @pytest.mark.asyncio
     async def test_create_client(
-        self, initialize_authly: Authly, test_client_data: dict, transaction_manager: TransactionManager
+        self, initialize_authly: AuthlyResourceManager, test_client_data: dict, transaction_manager: TransactionManager
     ):
         """Test creating an OAuth client."""
         async with transaction_manager.transaction() as conn:
@@ -119,7 +119,7 @@ class TestClientRepository:
 
     @pytest.mark.asyncio
     async def test_get_client_by_id(
-        self, initialize_authly: Authly, test_client_data: dict, transaction_manager: TransactionManager
+        self, initialize_authly: AuthlyResourceManager, test_client_data: dict, transaction_manager: TransactionManager
     ):
         """Test retrieving client by ID."""
         async with transaction_manager.transaction() as conn:
@@ -138,7 +138,7 @@ class TestClientRepository:
 
     @pytest.mark.asyncio
     async def test_get_client_by_client_id(
-        self, initialize_authly: Authly, test_client_data: dict, transaction_manager: TransactionManager
+        self, initialize_authly: AuthlyResourceManager, test_client_data: dict, transaction_manager: TransactionManager
     ):
         """Test retrieving client by client_id."""
         async with transaction_manager.transaction() as conn:
@@ -156,7 +156,7 @@ class TestClientRepository:
 
     @pytest.mark.asyncio
     async def test_update_client(
-        self, initialize_authly: Authly, test_client_data: dict, transaction_manager: TransactionManager
+        self, initialize_authly: AuthlyResourceManager, test_client_data: dict, transaction_manager: TransactionManager
     ):
         """Test updating client information."""
         async with transaction_manager.transaction() as conn:
@@ -187,7 +187,7 @@ class TestClientRepository:
 
     @pytest.mark.asyncio
     async def test_delete_client(
-        self, initialize_authly: Authly, test_client_data: dict, transaction_manager: TransactionManager
+        self, initialize_authly: AuthlyResourceManager, test_client_data: dict, transaction_manager: TransactionManager
     ):
         """Test client deletion."""
         async with transaction_manager.transaction() as conn:
@@ -208,7 +208,7 @@ class TestClientRepository:
     @pytest.mark.asyncio
     async def test_client_scope_association(
         self,
-        initialize_authly: Authly,
+        initialize_authly: AuthlyResourceManager,
         test_client_data: dict,
         test_scope_data: dict,
         transaction_manager: TransactionManager,
@@ -233,7 +233,7 @@ class TestClientRepository:
 
     @pytest.mark.asyncio
     async def test_duplicate_client_id(
-        self, initialize_authly: Authly, test_client_data: dict, transaction_manager: TransactionManager
+        self, initialize_authly: AuthlyResourceManager, test_client_data: dict, transaction_manager: TransactionManager
     ):
         """Test creating client with duplicate client_id raises error."""
         async with transaction_manager.transaction() as conn:
@@ -252,7 +252,7 @@ class TestScopeRepository:
 
     @pytest.mark.asyncio
     async def test_create_scope(
-        self, initialize_authly: Authly, test_scope_data: dict, transaction_manager: TransactionManager
+        self, initialize_authly: AuthlyResourceManager, test_scope_data: dict, transaction_manager: TransactionManager
     ):
         """Test creating an OAuth scope."""
         async with transaction_manager.transaction() as conn:
@@ -269,7 +269,7 @@ class TestScopeRepository:
 
     @pytest.mark.asyncio
     async def test_get_scope_by_name(
-        self, initialize_authly: Authly, test_scope_data: dict, transaction_manager: TransactionManager
+        self, initialize_authly: AuthlyResourceManager, test_scope_data: dict, transaction_manager: TransactionManager
     ):
         """Test retrieving scope by name."""
         async with transaction_manager.transaction() as conn:
@@ -286,7 +286,9 @@ class TestScopeRepository:
             assert retrieved_scope.scope_name == created_scope.scope_name
 
     @pytest.mark.asyncio
-    async def test_get_active_scopes(self, initialize_authly: Authly, transaction_manager: TransactionManager):
+    async def test_get_active_scopes(
+        self, initialize_authly: AuthlyResourceManager, transaction_manager: TransactionManager
+    ):
         """Test retrieving active scopes with pagination."""
         async with transaction_manager.transaction() as conn:
             scope_repo = ScopeRepository(conn)
@@ -326,7 +328,9 @@ class TestScopeRepository:
                 )
 
     @pytest.mark.asyncio
-    async def test_get_default_scopes(self, initialize_authly: Authly, transaction_manager: TransactionManager):
+    async def test_get_default_scopes(
+        self, initialize_authly: AuthlyResourceManager, transaction_manager: TransactionManager
+    ):
         """Test retrieving default scopes."""
         async with transaction_manager.transaction() as conn:
             scope_repo = ScopeRepository(conn)
@@ -356,7 +360,9 @@ class TestScopeRepository:
             assert created_default.scope_name in default_scope_names
 
     @pytest.mark.asyncio
-    async def test_validate_scope_names(self, initialize_authly: Authly, transaction_manager: TransactionManager):
+    async def test_validate_scope_names(
+        self, initialize_authly: AuthlyResourceManager, transaction_manager: TransactionManager
+    ):
         """Test validating scope names."""
         async with transaction_manager.transaction() as conn:
             scope_repo = ScopeRepository(conn)
@@ -389,7 +395,7 @@ class TestScopeRepository:
 
     @pytest.mark.asyncio
     async def test_token_scope_association(
-        self, initialize_authly: Authly, test_scope_data: dict, transaction_manager: TransactionManager
+        self, initialize_authly: AuthlyResourceManager, test_scope_data: dict, transaction_manager: TransactionManager
     ):
         """Test associating tokens with scopes."""
         async with transaction_manager.transaction() as conn:
@@ -444,7 +450,7 @@ class TestAuthorizationCodeRepository:
     @pytest.mark.asyncio
     async def test_create_authorization_code(
         self,
-        initialize_authly: Authly,
+        initialize_authly: AuthlyResourceManager,
         test_client_data: dict,
         test_authorization_code_data: dict,
         test_user: UserModel,
@@ -480,7 +486,7 @@ class TestAuthorizationCodeRepository:
     @pytest.mark.asyncio
     async def test_get_authorization_code(
         self,
-        initialize_authly: Authly,
+        initialize_authly: AuthlyResourceManager,
         test_client_data: dict,
         test_authorization_code_data: dict,
         test_user: UserModel,
@@ -511,7 +517,7 @@ class TestAuthorizationCodeRepository:
     @pytest.mark.asyncio
     async def test_consume_authorization_code(
         self,
-        initialize_authly: Authly,
+        initialize_authly: AuthlyResourceManager,
         test_client_data: dict,
         test_authorization_code_data: dict,
         test_user: UserModel,
@@ -545,7 +551,7 @@ class TestAuthorizationCodeRepository:
     @pytest.mark.asyncio
     async def test_verify_pkce_challenge(
         self,
-        initialize_authly: Authly,
+        initialize_authly: AuthlyResourceManager,
         test_client_data: dict,
         test_authorization_code_data: dict,
         test_user: UserModel,
@@ -578,7 +584,7 @@ class TestAuthorizationCodeRepository:
     @pytest.mark.asyncio
     async def test_cleanup_expired_codes(
         self,
-        initialize_authly: Authly,
+        initialize_authly: AuthlyResourceManager,
         test_client_data: dict,
         test_user: UserModel,
         transaction_manager: TransactionManager,

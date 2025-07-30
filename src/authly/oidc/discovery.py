@@ -174,7 +174,7 @@ class OIDCDiscoveryService:
             require_pkce=oauth_metadata.require_pkce,
             response_modes_supported=combined_response_modes,
             # OIDC-specific fields
-            userinfo_endpoint=urljoin(base_url, f"{api_prefix}/oidc/userinfo"),
+            userinfo_endpoint=urljoin(base_url, "/oidc/userinfo"),
             end_session_endpoint=urljoin(base_url, f"{api_prefix}/oidc/logout"),
             check_session_iframe=urljoin(base_url, f"{api_prefix}/oidc/session/iframe"),
             frontchannel_logout_supported=True,
@@ -245,7 +245,7 @@ class OIDCDiscoveryService:
             authorization_endpoint=urljoin(base_url, f"{api_prefix}/oauth/authorize"),
             token_endpoint=urljoin(base_url, f"{api_prefix}/auth/token"),
             revocation_endpoint=urljoin(base_url, f"{api_prefix}/auth/revoke"),
-            userinfo_endpoint=urljoin(base_url, f"{api_prefix}/oidc/userinfo"),
+            userinfo_endpoint=urljoin(base_url, "/oidc/userinfo"),
             end_session_endpoint=urljoin(base_url, f"{api_prefix}/oidc/logout"),
             check_session_iframe=urljoin(base_url, f"{api_prefix}/oidc/session/iframe"),
             frontchannel_logout_supported=True,

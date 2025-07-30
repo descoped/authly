@@ -47,6 +47,28 @@ Features and capabilities for enterprise deployment:
 - **[Docker Configuration](../../docker/)** - Container deployment and database setup
 - **[Monitoring Setup](../../docs/monitoring-guide.md)** - Production observability
 
+#### **Docker/CI Pipeline Configuration**
+**Environment Variables for CI/CD:**
+```bash
+AUTHLY_BOOTSTRAP_DEV_MODE=true
+AUTHLY_ADMIN_PASSWORD=ci_admin_test_password  # Required for CI environments
+```
+
+**Docker Compose Configuration:**
+```yaml
+AUTHLY_API_VERSION_PREFIX: "/api/v1"  # Business endpoints versioning
+# Note: .well-known endpoints remain at root level for RFC compliance
+```
+
+**Pipeline Health Check Commands:**
+```bash
+# Verify RFC 8414 compliant endpoints
+curl -f http://localhost:8000/.well-known/oauth-authorization-server
+curl -f http://localhost:8000/.well-known/openid_configuration
+curl -f http://localhost:8000/.well-known/jwks.json
+curl -f http://localhost:8000/health
+```
+
 ### 📚 **Professional Documentation**
 - **[API Reference](../../docs/api-reference.md)** - Complete API documentation
 - **[OAuth 2.1 Implementation](../../docs/oauth-2.1-implementation.md)** - OAuth integration guide

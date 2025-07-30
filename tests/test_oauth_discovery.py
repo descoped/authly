@@ -9,8 +9,8 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from psycopg_toolkit import TransactionManager
 
-from authly import Authly
 from authly.api.oauth_discovery_router import oauth_discovery_router
+from authly.core.resource_manager import AuthlyResourceManager
 from authly.oauth.discovery_models import OAuthServerMetadata
 from authly.oauth.discovery_service import DiscoveryService
 from authly.oauth.scope_repository import ScopeRepository
@@ -57,7 +57,7 @@ class TestDiscoveryService:
 
     @pytest.mark.asyncio
     async def test_get_server_metadata_with_scope_repo(
-        self, initialize_authly: Authly, transaction_manager: TransactionManager
+        self, initialize_authly: AuthlyResourceManager, transaction_manager: TransactionManager
     ):
         """Test generating server metadata with scope repository."""
         async with transaction_manager.transaction() as conn:
@@ -119,7 +119,7 @@ class TestDiscoveryService:
 
     @pytest.mark.asyncio
     async def test_get_server_metadata_scope_repo_error(
-        self, initialize_authly: Authly, transaction_manager: TransactionManager
+        self, initialize_authly: AuthlyResourceManager, transaction_manager: TransactionManager
     ):
         """Test metadata generation when scope repository fails."""
         async with transaction_manager.transaction() as conn:
@@ -224,7 +224,7 @@ class TestDiscoveryEndpoint:
 
     @pytest.mark.asyncio
     async def test_discovery_endpoint_with_real_scope_repo(
-        self, initialize_authly: Authly, transaction_manager: TransactionManager
+        self, initialize_authly: AuthlyResourceManager, transaction_manager: TransactionManager
     ):
         """Test discovery endpoint with real scope repository integration."""
         # Create test scopes in database

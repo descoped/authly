@@ -52,10 +52,14 @@ services:
       target: production
     container_name: authly-app
     environment:
+      # Resource Manager Configuration
+      AUTHLY_MODE: "production"
+      AUTHLY_BOOTSTRAP_ENABLED: ${AUTHLY_BOOTSTRAP_ENABLED:-true}
+      
       # Database Configuration
       DATABASE_URL: "postgresql://authly:${POSTGRES_PASSWORD:-authly_dev_password}@postgres:5432/authly"
       
-      # Redis Configuration
+      # Redis Configuration (optional - for future caching/sessions)
       REDIS_URL: "redis://:${REDIS_PASSWORD:-redis_dev_password}@redis:6379/0"
       
       # JWT Configuration
@@ -91,12 +95,11 @@ services:
       USERNAME_MAX_LENGTH: ${USERNAME_MAX_LENGTH:-50}
       PASSWORD_MIN_LENGTH: ${PASSWORD_MIN_LENGTH:-8}
       
-      # Development Mode
-      AUTHLY_BOOTSTRAP_DEV_MODE: ${AUTHLY_BOOTSTRAP_DEV_MODE:-false}
-      AUTHLY_DEV_MODE: ${AUTHLY_DEV_MODE:-false}
+      # Logging Configuration
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
       AUTHLY_LOG_LEVEL: ${AUTHLY_LOG_LEVEL:-INFO}
       
-      # Admin API
+      # Admin API Configuration
       AUTHLY_ADMIN_API_ENABLED: ${AUTHLY_ADMIN_API_ENABLED:-true}
       AUTHLY_ADMIN_API_LOCALHOST_ONLY: ${AUTHLY_ADMIN_API_LOCALHOST_ONLY:-false}
       AUTHLY_ADMIN_PASSWORD: ${AUTHLY_ADMIN_PASSWORD:-}
@@ -107,8 +110,9 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
-        condition: service_healthy
+      # Redis is optional for basic OAuth functionality
+      # redis:
+      #   condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
       interval: 30s

@@ -18,9 +18,11 @@ class TestPasswordChangeAPI:
         assert request.current_password == "OldPassword123!"
         assert request.new_password == "NewPassword456!"
 
-        # Test minimum length validation
-        with pytest.raises(ValueError):
-            PasswordChangeRequest(current_password="short", new_password="NewPassword456!")
+        # Test minimum length validation for new_password (not current_password)
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError):
+            PasswordChangeRequest(current_password="OldPassword123!", new_password="short")
 
     def test_password_change_response_model(self):
         """Test PasswordChangeResponse model."""

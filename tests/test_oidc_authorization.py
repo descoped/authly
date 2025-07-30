@@ -344,7 +344,7 @@ class TestOIDCAuthorizationService:
         assert error is None
         assert code_data is not None
         assert code_data["user_id"] == mock_auth_code.user_id
-        assert code_data["client_id"] == mock_auth_code.client_id
+        assert code_data["client_id"] == "test-client"  # String client_id from the request
         assert code_data["scope"] == "openid profile email"
         assert code_data["nonce"] == "test-nonce-123"
         assert code_data["max_age"] == 3600

@@ -2,7 +2,7 @@
 
 **Generated**: 2025-07-11  
 **Updated**: 2025-07-12 (Consolidated completed work to Evolution Knowledge)  
-**Project Status**: Production-ready OAuth 2.1 + OIDC Core 1.0 + Session Management 1.0 authorization server (551 tests passing)
+**Project Status**: Production-ready OAuth 2.1 + OIDC Core 1.0 + Session Management 1.0 authorization server (510 tests passing)
 
 ---
 
@@ -16,11 +16,11 @@
 
 ## 🔴 Critical Priority Tasks (Code Review Findings)
 
-### 1. Singleton Pattern Resolution
-**ID**: `singleton-pattern-refactor`  
-**Status**: Pending  
-**Description**: Replace `Authly` singleton with dependency injection pattern to enable horizontal scaling. The current singleton pattern prevents stateless design and limits multi-instance deployment  
-**Background**: Code review identified this as a critical architectural limitation for production scalability. Contradicts "production-ready" assessment until resolved.
+### 1. Unified Resource Manager Implementation
+**ID**: `unified-resource-manager-implementation`  
+**Status**: ✅ **VALIDATED AND APPROVED BY GEMINI AI** - Ready for Phase 1 Implementation  
+**Description**: Implement unified resource manager architecture to replace singleton pattern and consolidate 7 initialization paths. Single `AUTHLY_MODE` environment variable controls all deployment modes (production, embedded, CLI, testing)  
+**Background**: Deep analysis revealed 7 different initialization paths and dual resource management (singleton + DI). Gemini AI validation confirmed architectural soundness and implementation feasibility. Ready for direct greenfield implementation.
 
 ### 2. JWKS Caching Implementation  
 **ID**: `jwks-caching`  
@@ -31,106 +31,112 @@
 ### 3. Code Review Report Corrections
 **ID**: `code-review-corrections`  
 **Status**: ✅ Completed  
-**Description**: Fixed factual errors and contradictions in code review documentation. Created corrected version (`ai_docs/code_review_corrected.md`) and archived flawed original to evolution knowledge system  
+**Description**: Fixed factual errors and contradictions in code review documentation. Created corrected version (`.claude/evolution/implementation-reality/code_review_corrected.md`) and archived flawed original to evolution knowledge system  
 **Background**: Gemini validation identified several factual inaccuracies. Corrected version provides balanced assessment (4/5) addressing all identified issues.
+
+### 4. UserInfo Endpoint Standards Compliance
+**ID**: `userinfo-endpoint-standards-compliance`  
+**Status**: ✅ Completed  
+**Description**: Fixed UserInfo endpoint path configuration for OIDC Core 1.0 Section 5.3 compliance. Discovery document now correctly advertises `/oidc/userinfo` to match actual implementation, eliminating inconsistency between advertised and actual endpoint paths  
+**Background**: Identified during standards compliance review - discovery service was incorrectly advertising `/api/v1/oidc/userinfo` while actual endpoint was at `/oidc/userinfo`. Fixed discovery service, updated tests, and corrected documentation.
 
 ## 🟡 Medium Priority Tasks
 
-### 4. Redis Integration for Scalability
+### 5. Redis Integration for Scalability
 **ID**: `redis-integration`  
 **Status**: Pending  
 **Description**: Implement Redis-based rate limiting and caching to replace in-memory implementations that don't work in distributed deployments  
 **Background**: Code review identified in-memory rate limiter as scalability limitation. Redis enables distributed deployment.
 
-### 5. Structured JSON Logging
+### 6. Structured JSON Logging
 **ID**: `structured-logging`  
 **Status**: Pending  
 **Description**: Implement JSON-formatted logging with correlation IDs for better observability and debugging in production environments  
 **Background**: Current string-based logging limits observability. JSON logging with correlation IDs essential for distributed systems.
 
-### 6. Security Headers Middleware
+### 7. Security Headers Middleware
 **ID**: `security-headers-middleware`  
 **Status**: Pending  
 **Description**: Implement comprehensive security headers (HSTS, CSP, X-Frame-Options) across all endpoints, not just auth endpoints  
 **Background**: Code review found security headers only applied to some endpoints. Comprehensive coverage needed for production security.
 
-### 7. OIDC Documentation
+### 8. OIDC Documentation
 **ID**: `oidc-documentation`  
 **Status**: Pending  
 **Description**: Create OIDC Documentation (Task 6.10) - Write docs/oidc-implementation.md with complete OIDC features, integration examples (JavaScript, Python), security considerations, and troubleshooting guide
 
 **Background**: No OIDC-specific documentation exists. Essential for adoption and proper implementation by integrators.
 
-### 8. Application Metrics Implementation
+### 9. Application Metrics Implementation
 **ID**: `application-metrics`  
 **Status**: Pending  
 **Description**: Add Prometheus metrics for request rates, response times, database connection pool monitoring, and custom business metrics (token creation rates, authentication success/failure rates)  
 **Background**: Code review identified missing application-level metrics. Essential for production monitoring and performance optimization.
 
-### 9. GDPR Compliance Analysis
+### 10. GDPR Compliance Analysis
 **ID**: `gdpr-compliance-analysis`  
 **Status**: Pending  
 **Description**: GDPR Compliance Analysis and Privacy Statement Generation - Inspect Authly codebase to generate complete GDPR-compliant privacy statement. Analyze personal data processed (usernames, emails, IPs, tokens, timestamps), processing purposes (auth/authz/session), storage locations (PostgreSQL), security measures (bcrypt, JWT, rate limiting), retention policies, third-party sharing, user rights, and integrator responsibilities. Output: model privacy policy template + developer implementation notes
 
 **Background**: As a production-ready authorization server handling personal data, Authly needs comprehensive GDPR compliance documentation to help organizations deploy it legally.
 
-### 3. Data Retention Policies
+### 11. Data Retention Policies
 **ID**: `data-retention-policies`  
 **Status**: Pending  
 **Description**: Implement automated data retention policies - Add database cleanup jobs for expired tokens, authorization codes, and inactive user sessions. Include configurable retention periods for GDPR compliance
 
 **Background**: Database schema shows token expiration tracking but lacks automated cleanup. GDPR Article 5(1)(e) requires data not be kept longer than necessary.
 
-### 4. User Consent Tracking
+### 12. User Consent Tracking
 **ID**: `user-consent-tracking`  
 **Status**: Pending  
 **Description**: Add user consent tracking system - Implement consent timestamps, versions, and scope-specific consent tracking for GDPR Article 7 compliance. Add consent withdrawal mechanisms
 
 **Background**: Database schema lacks consent tracking. GDPR Article 7 requires proof of consent and ability to withdraw consent.
 
-### 5. Audit Logging System
+### 13. Audit Logging System
 **ID**: `audit-logging-system`  
 **Status**: Pending  
 **Description**: Implement comprehensive audit logging - Add audit_logs table and system to track all administrative actions, user data access, consent changes, and security events for GDPR Article 30 compliance
 
 **Background**: GDPR Article 30 requires records of processing activities. Current schema lacks comprehensive audit logging.
 
-### 6. User Management Endpoints
+### 14. User Management Endpoints
 **ID**: `user-management-endpoints`  
 **Status**: Pending  
 **Description**: Implement comprehensive user management endpoints in admin API (admin_router.py line 723 TODO)
 
 **Background**: Admin API currently has TODO comment indicating missing comprehensive user management functionality.
 
-### 7. Data Portability Export
+### 15. Data Portability Export
 **ID**: `data-portability-export`  
 **Status**: Pending  
 **Description**: Implement GDPR data portability - Add user data export functionality providing machine-readable format of all personal data (profile, tokens, consent history, audit logs) per GDPR Article 20
 
 **Background**: GDPR Article 20 grants users right to data portability. Need export functionality for user personal data.
 
-### 8. Right to Erasure
+### 16. Right to Erasure
 **ID**: `right-to-erasure`  
 **Status**: Pending  
 **Description**: Implement GDPR right to erasure (right to be forgotten) - Add secure user data deletion with cascade cleanup, anonymization of audit logs, and proper token revocation per GDPR Article 17
 
 **Background**: GDPR Article 17 grants right to erasure. Need secure deletion with proper cascade cleanup and audit trail anonymization.
 
-### 9. Enterprise Secret Providers
+### 17. Enterprise Secret Providers
 **ID**: `enterprise-secret-providers`  
 **Status**: Pending  
 **Description**: Implement additional secret providers (secret_providers.py line 19 TODO) - HashiCorp Vault, AWS Secrets Manager, Azure Key Vault, GCP Secret Manager
 
 **Background**: Current implementation only supports environment and file-based secrets. Enterprise deployments need integration with professional secret management systems.
 
-### 10. Cloud Database Providers
+### 18. Cloud Database Providers
 **ID**: `cloud-database-providers`  
 **Status**: Pending  
 **Description**: Implement additional database providers (database_providers.py line 54 TODO) - AWS RDS Proxy, Azure Database, GCP Cloud SQL
 
 **Background**: Current implementation supports basic PostgreSQL. Cloud deployments need native integration with managed database services.
 
-### 11. Argon2 Password Hashing
+### 19. Argon2 Password Hashing
 **ID**: `argon2-password-hashing`  
 **Status**: Pending  
 **Description**: Implement Argon2 password hashing - Add configurable password hashing with Argon2 for production environments, maintaining bcrypt for development. Include PasswordHasher abstraction and environment-based selection
@@ -141,65 +147,65 @@
 
 ## 🔵 Low Priority Tasks
 
-### 19. Circuit Breaker Implementation
+### 20. Circuit Breaker Implementation
 **ID**: `circuit-breaker-patterns`  
 **Status**: Pending  
 **Description**: Implement circuit breaker patterns for database operations and external dependencies to provide graceful degradation under failure conditions  
 **Background**: Code review identified missing resilience patterns. Important for system stability under high load or partial failures.
 
-### 20. Token Cleanup Automation
+### 21. Token Cleanup Automation
 **ID**: `token-cleanup-automation`  
 **Status**: Pending  
 **Description**: Add automated token cleanup jobs - Implement background tasks to clean expired tokens, revoked refresh tokens, and used authorization codes. Include metrics and monitoring
 
 **Background**: Database schema tracks expiration but lacks automated cleanup jobs. Important for performance and storage optimization.
 
-### 13. Encryption at Rest
+### 22. Encryption at Rest
 **ID**: `encryption-at-rest`  
 **Status**: Pending  
 **Description**: Evaluate encryption at rest for sensitive fields - Consider encrypting token_value, client_secret_hash, and user PII in database columns using application-level encryption
 
 **Background**: Database schema stores sensitive data in plaintext. Consider application-level encryption for enhanced security.
 
-### 14. Data Minimization Review
+### 23. Data Minimization Review
 **ID**: `data-minimization-review`  
 **Status**: Pending  
 **Description**: Conduct data minimization review - Audit all optional fields (user_agent, created_by_ip, OIDC metadata) to ensure necessity and implement configurable data collection policies
 
 **Background**: GDPR Article 5(1)(c) requires data minimization. Schema includes optional tracking fields that should be configurable.
 
-### 15. Service Layer Abstraction
+### 24. Service Layer Abstraction
 **ID**: `service-layer-abstraction`  
 **Status**: Pending  
 **Description**: Implement storage provider pattern for services (Phase 3) - Abstract services from PostgreSQL to enable Redis, in-memory backends
 
 **Background**: Strategic enhancement to enable different storage backends for tokens and sessions.
 
-### 16. Production Hardening
+### 25. Production Hardening
 **ID**: `production-hardening`  
 **Status**: Pending  
 **Description**: Complete production hardening (Phase 4) - Enhanced security features, session timeout, brute force protection, production Docker config, full audit logging
 
 **Background**: Final production polish for enterprise deployments.
 
-### 17. Performance Optimization
+### 26. Performance Optimization
 **ID**: `performance-optimization`  
 **Status**: Pending  
 **Description**: Performance optimization - Advanced caching, connection pooling optimization, query optimization
 
 **Background**: Post-launch optimization for high-traffic deployments.
 
-### 18. Multi-tenant Support
+### 27. Multi-tenant Support
 **ID**: `multi-tenant-support`  
 **Status**: Pending  
 **Description**: Add multi-tenant support - Tenant isolation, management, and scaling for enterprise deployments
 
 **Background**: Strategic enterprise feature for SaaS deployments.
 
-### 19. Signed URLs with Policy-Based Access Control
+### 28. Signed URLs with Policy-Based Access Control
 **ID**: `signed-urls-policy-acl`  
 **Status**: Pending  
-**Description**: Implement Signed URLs with Policy-Based Access Control - Add cryptographically signed URLs with temporal, usage, and contextual constraints for secure resource access without traditional auth flows. See ai_docs/SIGNED_URLS_WITH_POLICY_BASED_ACL.md for complete technical design
+**Description**: Implement Signed URLs with Policy-Based Access Control - Add cryptographically signed URLs with temporal, usage, and contextual constraints for secure resource access without traditional auth flows. See .claude/roadmap/SIGNED_URLS_WITH_POLICY_BASED_ACL.md for complete technical design
 
 **Background**: Major feature expansion to enable secure, time-limited, and usage-constrained access to protected resources. Would position Authly as comprehensive access management platform beyond OAuth flows.
 
@@ -216,7 +222,7 @@
 
 ### **✅ COMPLETED CAPABILITIES** (See .claude/evolution/ for detailed history)
 - **Core Functionality**: Complete OAuth 2.1 + OIDC Core 1.0 + Session Management 1.0
-- **Test Coverage**: 551 tests passing (100% success rate)
+- **Test Coverage**: 510 tests passing (100% success rate)
 - **Security**: Enterprise-grade security with comprehensive validation
 - **Production Ready**: Docker, monitoring, deployment guides
 - **Database Schema**: Production-grade PostgreSQL schema with OIDC support
@@ -242,9 +248,9 @@
 The project has achieved complete OAuth 2.1 + OIDC Core 1.0 + Session Management 1.0 compliance. The highest impact next steps would be:
 
 ### **Phase 1: Critical Architecture Fixes** (Immediate - 1-2 weeks)
-1. **Resolve singleton pattern** - Enable horizontal scaling
+1. **✅ Implement unified resource manager** - VALIDATED AND READY - Enable horizontal scaling
 2. **Implement JWKS caching** - Fix performance bottleneck  
-3. **Correct code review documentation** - Restore credibility
+3. **✅ Correct code review documentation** - COMPLETED - Credibility restored
 
 ### **Phase 2: Scalability & Observability** (1-2 months)
 4. **Redis integration** - Enable distributed deployment

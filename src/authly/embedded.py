@@ -18,11 +18,13 @@ from psycopg_pool import AsyncConnectionPool
 from psycopg_toolkit import Database, DatabaseSettings
 from testcontainers.postgres import PostgresContainer
 
-from authly import Authly
 from authly.app import create_embedded_app
 from authly.auth import get_password_hash
 from authly.bootstrap import bootstrap_admin_system
 from authly.config import AuthlyConfig, StaticDatabaseProvider, StaticSecretProvider, find_root_folder
+from authly.core.deployment_modes import DeploymentMode
+from authly.core.mode_factory import AuthlyModeFactory
+from authly.core.resource_manager import AuthlyResourceManager
 from authly.users import UserModel, UserRepository
 
 logger = logging.getLogger("authly.embedded")
@@ -94,7 +96,12 @@ def create_embedded_app_with_config(database_url: str, seed: bool = False) -> Fa
 
 
 async def run_embedded_server(host: str = "0.0.0.0", port: int = 8000, seed: bool = False) -> None:
-    """Run Authly with embedded PostgreSQL container."""
+    """Run Authly with embedded PostgreSQL container.
+
+    This function automatically sets AUTHLY_MODE=embedded for proper resource manager initialization.
+    """
+    # Set deployment mode for embedded operation
+    os.environ.setdefault("AUTHLY_MODE", "embedded")
     logger.info("Starting Authly embedded development server...")
 
     # Create PostgreSQL container with proper configuration
@@ -113,14 +120,8 @@ async def run_embedded_server(host: str = "0.0.0.0", port: int = 8000, seed: boo
 
     try:
         # Get dynamic port assignment from container
-        try:
-            from authly import get_config
-
-            config = get_config()
-            postgres_port = config.postgres_port
-        except RuntimeError:
-            # Fallback for tests without full Authly initialization
-            postgres_port = 5432
+        # Use standard PostgreSQL port for embedded containers
+        postgres_port = 5432
 
         container_host = postgres.get_container_host_ip()
         container_port = postgres.get_exposed_port(postgres_port)
@@ -153,15 +154,22 @@ async def run_embedded_server(host: str = "0.0.0.0", port: int = 8000, seed: boo
 
         db_pool = await db.get_pool()
 
-        # Initialize Authly singleton
+        # Initialize resource manager for embedded mode
         secret_provider = StaticSecretProvider("my-secret", "refresh-secret")
         database_provider = StaticDatabaseProvider(database_url)
         config = AuthlyConfig.load(secret_provider, database_provider)
 
-        authly = Authly.initialize(pool=db_pool, configuration=config)
+        # Create resource manager using mode factory (will detect embedded mode)
+        resource_manager = AuthlyModeFactory.create_resource_manager(config, DeploymentMode.EMBEDDED)
+        await resource_manager.initialize_with_external_database(db)
 
-        # Create FastAPI application
-        app = create_embedded_app_with_config(database_url, seed)
+        # Create FastAPI application with resource manager
+        app = create_embedded_app(config, database_url, seed)
+        
+        # Set up dependency injection without app.state
+        from authly.core.dependencies import create_resource_manager_provider, get_resource_manager
+        provider = create_resource_manager_provider(resource_manager)
+        app.dependency_overrides[get_resource_manager] = provider
 
         # Create uvicorn server
         config = uvicorn.Config(app, host=host, port=port)
@@ -172,18 +180,15 @@ async def run_embedded_server(host: str = "0.0.0.0", port: int = 8000, seed: boo
             logger.info("Initiating graceful shutdown...")
             server.should_exit = True
 
-            # Close database connections
-            logger.info("Closing database connections...")
+            # Close resource manager and database connections
+            logger.info("Cleaning up resource manager and database connections...")
             try:
-                # Get cleanup timeout from config
-                try:
-                    from authly import get_config
+                # Cleanup resource manager first
+                if resource_manager:
+                    await resource_manager.cleanup()
 
-                    config = get_config()
-                    cleanup_timeout = config.db_cleanup_timeout_seconds
-                except RuntimeError:
-                    # Fallback for tests
-                    cleanup_timeout = 10.0
+                # Clean up database with timeout from config
+                cleanup_timeout = config.db_cleanup_timeout_seconds
                 await asyncio.wait_for(db.cleanup(), timeout=cleanup_timeout)
             except asyncio.TimeoutError:
                 logger.warning("Database cleanup timed out")

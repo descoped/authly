@@ -4,7 +4,8 @@ Complete command-line interface guide for administering the Authly OAuth 2.1 + O
 
 **CLI Access**: `python -m authly`  
 **Admin Commands**: `python -m authly admin`  
-**Architecture**: API-first (CLI uses HTTP API exclusively)
+**Architecture**: API-first (CLI uses HTTP API exclusively)  
+**Resource Mode**: Unified resource manager with `AUTHLY_MODE=cli` for optimal performance
 
 ---
 
@@ -16,7 +17,7 @@ Complete command-line interface guide for administering the Authly OAuth 2.1 + O
 uv sync --all-groups -U
 
 # Start Authly server (embedded development mode)
-uv run python -m authly serve --embedded --dev
+uv run python -m authly serve --embedded
 
 # In another terminal, access admin CLI
 uv run python -m authly admin --help
@@ -31,7 +32,7 @@ uv run python -m authly admin login
 # Create your first OAuth client
 uv run python -m authly admin client create \
   --name "My Application" \
-  --type confidential \
+  --client-type confidential \
   --redirect-uri "https://myapp.com/callback"
 
 # Create a scope
@@ -64,6 +65,80 @@ Commands:
 
 ---
 
+## ⚙️ **How CLI Mode Works**
+
+### **Unified Resource Manager Architecture**
+
+The Authly CLI uses a unified resource manager architecture that automatically optimizes for administrative operations:
+
+```python
+# CLI mode automatically configured when running admin commands
+AUTHLY_MODE=cli python -m authly admin status
+```
+
+**CLI Mode Characteristics**:
+
+| Feature | CLI Mode | Production Mode | Embedded Mode |
+|---------|----------|-----------------|---------------|
+| **Pool Size** | 1-3 connections | 5-20 connections | 2-8 connections |
+| **Timeout** | 10s | 30s | 15s |
+| **Idle Time** | 1 minute | 5 minutes | 3 minutes |
+| **Bootstrap** | Disabled | Environment controlled | Always enabled |
+| **Lifecycle** | Context-managed | FastAPI lifespan | Self-contained |
+
+### **Resource Optimization**
+
+CLI mode provides several optimizations for administrative workflows:
+
+1. **Minimal Resource Usage**: Small connection pool optimized for short operations
+2. **Fast Cleanup**: Resources automatically cleaned up after each command
+3. **No Bootstrap Overhead**: Skips admin bootstrap (assumes existing setup)
+4. **Quick Timeouts**: Optimized for interactive CLI usage
+
+### **Mode Detection & Override**
+
+The CLI automatically detects and sets optimal resource mode:
+
+```bash
+# Automatic CLI mode (recommended)
+python -m authly admin client list
+
+# Manual override (advanced usage)
+AUTHLY_MODE=production python -m authly admin status  # Uses production settings
+AUTHLY_MODE=testing python -m authly admin status     # Uses testing settings
+```
+
+**Mode Aliases Supported**:
+- `cli`, `admin` → CLI mode
+- `production`, `prod` → Production mode  
+- `embedded`, `embed`, `dev`, `development` → Embedded mode
+- `testing`, `test` → Testing mode
+
+### **Database Connection Management**
+
+CLI mode uses context-managed database connections:
+
+```python
+# Simplified connection lifecycle for CLI operations
+async with resource_manager.get_database().connection() as conn:
+    # Execute admin operation
+    result = await admin_operation(conn)
+    # Connection automatically cleaned up
+```
+
+**Connection Pool Settings** (CLI Mode):
+```python
+{
+    "min_size": 1,        # Minimal baseline
+    "max_size": 3,        # Small pool for CLI ops
+    "timeout": 10.0,      # Quick connection timeout
+    "max_idle": 60.0,     # 1 minute idle timeout
+    "reconnect_timeout": 1.0  # Fast reconnection
+}
+```
+
+---
+
 ## 🌐 **Server Commands**
 
 ### **Start Authly Server**
@@ -87,7 +162,7 @@ Start the Authly web service in production mode.
 python -m authly serve --host 0.0.0.0 --port 8000
 
 # Development with embedded database
-python -m authly serve --embedded --dev --reload
+python -m authly serve --embedded
 
 # Multi-worker production
 python -m authly serve --workers 4
@@ -95,9 +170,17 @@ python -m authly serve --workers 4
 
 **Environment Variables**:
 ```bash
+# Resource Mode (automatically optimizes for CLI usage)
+AUTHLY_MODE="cli"
+
+# Database Configuration
 DATABASE_URL="postgresql://user:pass@host:5432/authly"
+
+# JWT Configuration
 JWT_SECRET_KEY="your-secret-key"
 JWT_REFRESH_SECRET_KEY="your-refresh-secret"
+
+# Admin API Configuration (for CLI communication)
 AUTHLY_ADMIN_API_ENABLED="true"
 ```
 
@@ -188,20 +271,20 @@ Create a new OAuth 2.1 client.
 # Basic confidential client
 python -m authly admin client create \
   --name "My Web App" \
-  --type confidential \
+  --client-type confidential \
   --redirect-uri "https://myapp.com/callback"
 
 # Public client with multiple redirect URIs
 python -m authly admin client create \
   --name "My Mobile App" \
-  --type public \
+  --client-type public \
   --redirect-uri "myapp://callback" \
   --redirect-uri "http://localhost:3000/callback"
 
 # Client with metadata and scopes
 python -m authly admin client create \
   --name "Enterprise App" \
-  --type confidential \
+  --client-type confidential \
   --redirect-uri "https://enterprise.com/oauth/callback" \
   --scope "read" \
   --scope "write" \
@@ -589,15 +672,33 @@ Last Updated: 2025-07-10 12:00:00 UTC
 
 ## 🔧 **Configuration**
 
+### **Unified Resource Manager**
+
+The CLI uses Authly's unified resource manager architecture with optimal settings for admin operations:
+
+```bash
+# Resource Mode - Automatically optimizes for CLI usage
+AUTHLY_MODE="cli"              # Triggers CLI-optimized resource management
+```
+
+**CLI Mode Features**:
+- **Minimal Database Pool**: 1-3 connections optimized for short-lived operations
+- **Context-Managed Lifecycle**: Resources cleaned up after each command
+- **No Bootstrap**: Assumes existing admin system setup
+- **Fast Timeout**: 10s timeout, 1min idle for quick operations
+
 ### **Environment Variables**
 
 The CLI respects these environment variables:
 
 ```bash
+# Resource Management
+AUTHLY_MODE="cli"              # Enables CLI-optimized resource management
+
 # Database Configuration
 DATABASE_URL="postgresql://user:pass@host:5432/authly"
 
-# JWT Configuration
+# JWT Configuration  
 JWT_SECRET_KEY="your-secret-key"
 JWT_REFRESH_SECRET_KEY="your-refresh-secret"
 
@@ -605,9 +706,23 @@ JWT_REFRESH_SECRET_KEY="your-refresh-secret"
 AUTHLY_ADMIN_API_ENABLED="true"
 AUTHLY_ADMIN_API_URL="http://localhost:8000"
 
-# Development
+# Development & Debugging
 AUTHLY_DEV_MODE="true"
 AUTHLY_LOG_LEVEL="DEBUG"
+```
+
+### **Resource Mode Detection**
+
+The CLI automatically sets `AUTHLY_MODE=cli` when running admin commands:
+
+```bash
+# These commands automatically use CLI mode
+python -m authly admin login
+python -m authly admin client list
+python -m authly admin status
+
+# Manual mode override (advanced usage)
+AUTHLY_MODE=production python -m authly admin status
 ```
 
 ### **CLI Configuration File**
@@ -662,7 +777,7 @@ echo "$clients" | jq '.clients[].client_id'
 # Create client and extract client_id
 client_info=$(python -m authly admin client create \
   --name "Automated Client" \
-  --type confidential \
+  --client-type confidential \
   --redirect-uri "https://example.com/callback" \
   --output json)
 
@@ -698,7 +813,7 @@ done
     # Create deployment client
     python -m authly admin client create \
       --name "Production Deploy" \
-      --type confidential \
+      --client-type confidential \
       --redirect-uri "${{ env.PRODUCTION_CALLBACK_URL }}" \
       --output json > client.json
 ```
@@ -724,26 +839,46 @@ Exit code: 4
 
 ### **Debugging**
 
-#### **Verbose Mode**
+#### **Resource Manager Debugging**
 ```bash
-# Enable verbose output
+# Enable verbose output with resource manager details
 export AUTHLY_LOG_LEVEL=DEBUG
 python -m authly admin status --verbose
+
+# Show resource mode detection
+python -c "
+from authly.core.mode_factory import AuthlyModeFactory
+print(f'Detected mode: {AuthlyModeFactory.detect_mode()}')
+print(f'CLI mode check: {AuthlyModeFactory.is_cli_mode()}')
+"
 
 # Show HTTP requests
 export AUTHLY_DEBUG_HTTP=true
 python -m authly admin client list
 ```
 
+#### **CLI Mode Testing**
+```bash
+# Test CLI mode resource management
+AUTHLY_MODE=cli python -m authly admin status
+
+# Compare with other modes (requires running server)
+AUTHLY_MODE=production python -m authly admin status
+AUTHLY_MODE=embedded python -m authly admin status
+
+# Force different pool settings for testing
+AUTHLY_MODE=testing python -m authly admin status --verbose
+```
+
 #### **API Connection Testing**
 ```bash
-# Test API connectivity
+# Test API connectivity with CLI mode
 python -m authly admin status
 
-# Test authentication
+# Test authentication with resource manager info
 python -m authly admin whoami
 
-# Show detailed connection info
+# Show detailed connection and resource info
 python -m authly admin status --verbose
 ```
 
@@ -771,4 +906,65 @@ python -m authly admin status --verbose
 
 ---
 
-This comprehensive CLI guide covers all administrative operations for the Authly OAuth 2.1 + OpenID Connect 1.0 authorization server. For API integration details, see the [API Reference](api-reference.md).
+## 🛠️ **CLI Mode Troubleshooting**
+
+### **Common Issues & Solutions**
+
+#### **Database Connection Issues**
+```bash
+# Check CLI mode is using correct database
+AUTHLY_LOG_LEVEL=DEBUG python -m authly admin status
+
+# Test with different pool settings
+AUTHLY_MODE=testing python -m authly admin status  # Larger pool for testing
+```
+
+#### **Resource Manager Issues**
+```bash
+# Verify mode detection
+python -c "
+from authly.core.mode_factory import AuthlyModeFactory
+print(f'Current mode: {AuthlyModeFactory.detect_mode()}')
+print(f'Pool settings: {AuthlyModeFactory.get_pool_settings(AuthlyModeFactory.detect_mode())}')
+"
+
+# Force CLI mode explicitly
+AUTHLY_MODE=cli python -m authly admin client list
+```
+
+#### **Admin API Connection Issues**
+```bash
+# Check if admin API is enabled on the server
+curl -s http://localhost:8000/admin/health | jq
+
+# Test with verbose logging
+AUTHLY_LOG_LEVEL=DEBUG python -m authly admin status --verbose
+```
+
+### **Performance Optimization**
+
+For frequent CLI operations, consider these optimizations:
+
+```bash
+# Use CLI mode for optimal performance
+export AUTHLY_MODE=cli
+
+# Batch operations in scripts
+python -m authly admin client list --output json | jq '.clients[].client_id'
+
+# Use connection pooling benefits
+# CLI mode maintains connections for up to 1 minute for rapid successive commands
+```
+
+### **Development vs Production CLI Usage**
+
+| Scenario | Recommended Mode | Reason |
+|----------|------------------|---------|
+| **Local Development** | `cli` | Optimized for quick admin tasks |
+| **Production Admin** | `production` | Uses same settings as server |
+| **CI/CD Scripts** | `cli` or `testing` | Fast, minimal resource usage |
+| **Debugging** | `testing` | Larger pool, detailed logging |
+
+---
+
+This comprehensive CLI guide covers all administrative operations for the Authly OAuth 2.1 + OpenID Connect 1.0 authorization server, including the unified resource manager architecture and CLI mode optimizations. For API integration details, see the [API Reference](api-reference.md).

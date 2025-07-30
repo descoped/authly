@@ -126,16 +126,8 @@ class AuthorizationService:
             if not consent_request.approved:
                 return None
 
-            # Generate secure authorization code
-            try:
-                from authly import get_config
-
-                config = get_config()
-                auth_code_length = config.authorization_code_length
-            except RuntimeError:
-                # Fallback for tests without full Authly initialization
-                auth_code_length = 32
-            auth_code = secrets.token_urlsafe(auth_code_length)
+            # Generate secure authorization code (OAuth 2.1 recommended length)
+            auth_code = secrets.token_urlsafe(32)
 
             # Calculate expiration (OAuth 2.1 recommends short-lived codes, max 10 minutes)
             expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
@@ -227,11 +219,12 @@ class AuthorizationService:
                 return False, None, "Failed to consume authorization code"
 
             # Return code data for token generation with OpenID Connect parameters
+            # Use the original string client_id from the request, not the UUID from the database
             return (
                 True,
                 {
                     "user_id": auth_code.user_id,
-                    "client_id": auth_code.client_id,
+                    "client_id": client_id,  # Use string client_id from request
                     "scope": auth_code.scope,
                     "nonce": auth_code.nonce,
                     "max_age": auth_code.max_age,

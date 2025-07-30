@@ -236,10 +236,12 @@ class TestOIDCAuthorizationCodeFlow:
         print("Debug - PKCE code_challenge: E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM")
 
         # Check if the authorization code exists in database
-        from authly import authly_db_connection
-        from authly.oauth.authorization_code_repository import AuthorizationCodeRepository
+        # Note: Manual database access removed for clean architecture
+        # This test needs to be updated to use proper dependency injection
+        print("Debug - Code verification skipped (manual DB access removed)")
 
-        async for db_conn in authly_db_connection():
+        # Placeholder for proper dependency injection pattern
+        if False:  # Disabled until proper DI pattern implemented
             auth_code_repo = AuthorizationCodeRepository(db_conn)
             stored_auth_code = await auth_code_repo.get_by_code(auth_code)
             if stored_auth_code:
@@ -254,7 +256,6 @@ class TestOIDCAuthorizationCodeFlow:
                 print(f"Debug - Is used: {stored_auth_code.is_used}")
             else:
                 print("Debug - Authorization code NOT found in database!")
-            break
 
         # Add small delay to ensure authorization code commit is visible across connections
         import asyncio

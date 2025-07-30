@@ -18,7 +18,6 @@ from fastapi.security import HTTPAuthorizationCredentials
 from jose import jwt
 from psycopg_toolkit import TransactionManager
 
-from authly import Authly
 from authly.api.admin_dependencies import (
     ADMIN_SCOPES,
     get_admin_scopes,
@@ -28,6 +27,7 @@ from authly.api.admin_dependencies import (
 )
 from authly.auth.core import get_password_hash
 from authly.bootstrap.admin_seeding import bootstrap_admin_system
+from authly.core.resource_manager import AuthlyResourceManager
 from authly.tokens import TokenRepository, TokenService
 from authly.users.models import UserModel
 from authly.users.repository import UserRepository
@@ -88,7 +88,7 @@ async def test_regular_user(transaction_manager: TransactionManager) -> UserMode
 
 @pytest.fixture()
 async def admin_token_with_all_scopes(
-    initialize_authly: Authly, test_admin_user: UserModel, transaction_manager: TransactionManager
+    initialize_authly: AuthlyResourceManager, test_admin_user: UserModel, transaction_manager: TransactionManager
 ) -> str:
     """Create admin token with all admin scopes."""
     async with transaction_manager.transaction() as conn:
@@ -97,9 +97,9 @@ async def admin_token_with_all_scopes(
 
         await register_admin_scopes(conn)
 
+        config = initialize_authly.get_config()
         token_repo = TokenRepository(conn)
-        token_service = TokenService(token_repo)
-
+        token_service = TokenService(token_repo, config, None)
         all_admin_scopes = list(ADMIN_SCOPES.keys())
 
         token_pair = await token_service.create_token_pair(user=test_admin_user, scope=" ".join(all_admin_scopes))
@@ -109,7 +109,7 @@ async def admin_token_with_all_scopes(
 
 @pytest.fixture()
 async def admin_token_limited_scopes(
-    initialize_authly: Authly, test_admin_user: UserModel, transaction_manager: TransactionManager
+    initialize_authly: AuthlyResourceManager, test_admin_user: UserModel, transaction_manager: TransactionManager
 ) -> str:
     """Create admin token with limited admin scopes."""
     async with transaction_manager.transaction() as conn:
@@ -118,8 +118,9 @@ async def admin_token_limited_scopes(
 
         await register_admin_scopes(conn)
 
+        config = initialize_authly.get_config()
         token_repo = TokenRepository(conn)
-        token_service = TokenService(token_repo)
+        token_service = TokenService(token_repo, config, None)
 
         limited_scopes = ["admin:clients:read", "admin:scopes:read"]
 
@@ -130,12 +131,13 @@ async def admin_token_limited_scopes(
 
 @pytest.fixture()
 async def regular_user_token(
-    initialize_authly: Authly, test_regular_user: UserModel, transaction_manager: TransactionManager
+    initialize_authly: AuthlyResourceManager, test_regular_user: UserModel, transaction_manager: TransactionManager
 ) -> str:
     """Create token for regular user without admin scopes."""
     async with transaction_manager.transaction() as conn:
+        config = initialize_authly.get_config()
         token_repo = TokenRepository(conn)
-        token_service = TokenService(token_repo)
+        token_service = TokenService(token_repo, config, None)
 
         token_pair = await token_service.create_token_pair(
             user=test_regular_user,
@@ -196,7 +198,7 @@ class TestRequireAdminScope:
 
     @pytest.mark.asyncio
     async def test_require_admin_scope_success(
-        self, test_admin_user: UserModel, admin_token_with_all_scopes: str, initialize_authly: Authly
+        self, test_admin_user: UserModel, admin_token_with_all_scopes: str, initialize_authly: AuthlyResourceManager
     ):
         """Test require_admin_scope with valid admin and correct scope."""
         # Create the scope dependency
@@ -205,14 +207,15 @@ class TestRequireAdminScope:
         # Create mock credentials
         credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials=admin_token_with_all_scopes)
 
-        # Call the dependency
-        result = await require_clients_write(admin_user=test_admin_user, credentials=credentials)
+        # Call the dependency with actual config
+        config = initialize_authly.get_config()
+        result = await require_clients_write(admin_user=test_admin_user, credentials=credentials, config=config)
 
         assert result == test_admin_user
 
     @pytest.mark.asyncio
     async def test_require_admin_scope_missing_scope(
-        self, test_admin_user: UserModel, admin_token_limited_scopes: str, initialize_authly: Authly
+        self, test_admin_user: UserModel, admin_token_limited_scopes: str, initialize_authly: AuthlyResourceManager
     ):
         """Test require_admin_scope with admin user but missing required scope."""
         # Create dependency that requires write scope
@@ -222,13 +225,16 @@ class TestRequireAdminScope:
         credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials=admin_token_limited_scopes)
 
         with pytest.raises(HTTPException) as exc_info:
-            await require_clients_write(admin_user=test_admin_user, credentials=credentials)
+            config = initialize_authly.get_config()
+            await require_clients_write(admin_user=test_admin_user, credentials=credentials, config=config)
 
         assert exc_info.value.status_code == 403
         assert "Missing required admin scope: admin:clients:write" in exc_info.value.detail
 
     @pytest.mark.asyncio
-    async def test_require_admin_scope_invalid_token(self, test_admin_user: UserModel, initialize_authly: Authly):
+    async def test_require_admin_scope_invalid_token(
+        self, test_admin_user: UserModel, initialize_authly: AuthlyResourceManager
+    ):
         """Test require_admin_scope with invalid JWT token."""
         require_clients_read = require_admin_scope("admin:clients:read")
 
@@ -236,14 +242,15 @@ class TestRequireAdminScope:
         credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="invalid_jwt_token")
 
         with pytest.raises(HTTPException) as exc_info:
-            await require_clients_read(admin_user=test_admin_user, credentials=credentials)
+            config = initialize_authly.get_config()
+            await require_clients_read(admin_user=test_admin_user, credentials=credentials, config=config)
 
         assert exc_info.value.status_code == 401
         assert "Invalid authentication token" in exc_info.value.detail
 
     @pytest.mark.asyncio
     async def test_require_admin_scope_unknown_scope(
-        self, test_admin_user: UserModel, admin_token_with_all_scopes: str, initialize_authly: Authly
+        self, test_admin_user: UserModel, admin_token_with_all_scopes: str, initialize_authly: AuthlyResourceManager
     ):
         """Test require_admin_scope with unknown scope name."""
         # Try to create dependency with unknown scope
@@ -252,7 +259,8 @@ class TestRequireAdminScope:
         credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials=admin_token_with_all_scopes)
 
         with pytest.raises(HTTPException) as exc_info:
-            await require_unknown_scope(admin_user=test_admin_user, credentials=credentials)
+            config = initialize_authly.get_config()
+            await require_unknown_scope(admin_user=test_admin_user, credentials=credentials, config=config)
 
         assert exc_info.value.status_code == 500
         assert "Unknown admin scope: admin:unknown:scope" in exc_info.value.detail
@@ -262,7 +270,7 @@ class TestRequireAdminScope:
         self,
         test_admin_user: UserModel,  # Admin user but wrong token
         regular_user_token: str,
-        initialize_authly: Authly,
+        initialize_authly: AuthlyResourceManager,
     ):
         """Test require_admin_scope with admin user but regular user token."""
         require_clients_read = require_admin_scope("admin:clients:read")
@@ -270,7 +278,8 @@ class TestRequireAdminScope:
         credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials=regular_user_token)
 
         with pytest.raises(HTTPException) as exc_info:
-            await require_clients_read(admin_user=test_admin_user, credentials=credentials)
+            config = initialize_authly.get_config()
+            await require_clients_read(admin_user=test_admin_user, credentials=credentials, config=config)
 
         assert exc_info.value.status_code == 403
         assert "Missing required admin scope" in exc_info.value.detail
@@ -375,7 +384,7 @@ class TestTwoLayerSecurityModel:
 
     @pytest.mark.asyncio
     async def test_two_layer_security_both_checks_pass(
-        self, test_admin_user: UserModel, admin_token_with_all_scopes: str, initialize_authly: Authly
+        self, test_admin_user: UserModel, admin_token_with_all_scopes: str, initialize_authly: AuthlyResourceManager
     ):
         """Test two-layer security where both intrinsic authority and scopes pass."""
         # First layer: intrinsic authority
@@ -386,7 +395,8 @@ class TestTwoLayerSecurityModel:
         require_clients_write = require_admin_scope("admin:clients:write")
         credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials=admin_token_with_all_scopes)
 
-        scope_result = await require_clients_write(admin_user=admin_user_result, credentials=credentials)
+        config = initialize_authly.get_config()
+        scope_result = await require_clients_write(admin_user=admin_user_result, credentials=credentials, config=config)
 
         assert scope_result == test_admin_user
 
@@ -402,7 +412,7 @@ class TestTwoLayerSecurityModel:
 
     @pytest.mark.asyncio
     async def test_two_layer_security_second_layer_fails(
-        self, test_admin_user: UserModel, admin_token_limited_scopes: str, initialize_authly: Authly
+        self, test_admin_user: UserModel, admin_token_limited_scopes: str, initialize_authly: AuthlyResourceManager
     ):
         """Test two-layer security where second layer (scoped permissions) fails."""
         # First layer: should pass
@@ -417,7 +427,8 @@ class TestTwoLayerSecurityModel:
         )
 
         with pytest.raises(HTTPException) as exc_info:
-            await require_clients_write(admin_user=admin_user_result, credentials=credentials)
+            config = initialize_authly.get_config()
+            await require_clients_write(admin_user=admin_user_result, credentials=credentials, config=config)
 
         assert exc_info.value.status_code == 403
         assert "Missing required admin scope" in exc_info.value.detail

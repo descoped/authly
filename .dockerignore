@@ -99,6 +99,7 @@ docker/prometheus/
 docker/grafana/
 docker/nginx/
 docker/fluentd/
+# Keep docker/init-db-and-user.sql for database initialization
 
 # Sensitive files
 *.pem

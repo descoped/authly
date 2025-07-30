@@ -9,7 +9,7 @@ Authly is a production-ready OAuth 2.1 authentication and authorization service 
 - **✅ OAuth 2.1 Authorization Server** - Full PKCE compliance, discovery, revocation, RFC-compliant
 - **✅ OpenID Connect Core 1.0** - Complete OIDC layer with ID tokens, UserInfo, JWKS, Discovery
 - **✅ Session Management 1.0** - Complete session iframe, check session, front-channel logout
-- **✅ 551 Tests Passing** - 100% success rate including comprehensive OIDC and session management tests (221 OIDC-specific tests across 15 test files)
+- **✅ 510 Tests Passing** - 100% success rate including comprehensive OIDC and session management tests across 49 test files
 - **✅ API-First Admin System** - HTTP API + CLI with OAuth authentication and token management
 - **✅ Two-Layer Security Model** - Intrinsic authority + granular OAuth scopes
 - **✅ Bootstrap System** - Complete IAM chicken-and-egg solution with OIDC scope registration
@@ -65,7 +65,7 @@ Authly is a production-ready OAuth 2.1 authentication and authorization service 
 ### **✅ COMPLETE PROJECT STATUS**
 - **Timeline**: July 3-10, 2025 - Full implementation + consolidation completed
 - **Approach**: Incremental, maintaining backward compatibility ✅ ACHIEVED
-- **Test Success**: 439/439 tests passing (100% success rate)
+- **Test Success**: 510/510 tests passing (100% success rate)
 - **Key Files**: `.claude/CLAUDE.md`, `CHANGELOG.md`, implementation planning docs
 
 ### **✅ PROJECT CONSOLIDATION PHASE (July 10, 2025)**
@@ -137,7 +137,7 @@ All originally planned features have been implemented and tested. The project is
 3. **GDPR Compliance** - Data retention and privacy policy implementation
 
 ## 🧪 TEST EXCELLENCE ACHIEVEMENTS
-- ✅ **551 tests passing** (100% success rate) across 44 test files
+- ✅ **510 tests passing** (100% success rate) across 49 test files
 - ✅ **Real integration testing** with PostgreSQL testcontainers
 - ✅ **No mocking** - authentic database and HTTP testing
 - ✅ **Root cause analysis** - Fixed environment variable caching in middleware

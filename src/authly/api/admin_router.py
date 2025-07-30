@@ -13,7 +13,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
 from psycopg import AsyncConnection
 
-from authly import Authly
+from authly.config import AuthlyConfig
+from authly.core.dependencies import get_config, get_database_connection
 from authly.oauth.client_repository import ClientRepository
 from authly.oauth.client_service import ClientService
 from authly.oauth.models import (
@@ -33,21 +34,6 @@ logger = logging.getLogger(__name__)
 
 # Admin API Router
 admin_router = APIRouter(prefix="/admin", tags=["admin"])
-
-
-# Dependency for database connection
-async def get_db_connection() -> AsyncConnection:
-    """Get database connection from Authly singleton."""
-    authly = Authly.get_instance()
-    if not authly:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Authly service not initialized")
-
-    pool = authly.get_pool()
-    if not pool:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Database pool not available")
-
-    async with pool.connection() as conn:
-        yield conn
 
 
 # Import admin authentication dependencies
@@ -75,7 +61,9 @@ async def admin_health():
 
 @admin_router.get("/status")
 async def get_system_status(
-    conn: AsyncConnection = Depends(get_db_connection), _admin: UserModel = Depends(require_admin_system_read)
+    conn: AsyncConnection = Depends(get_database_connection),
+    config=Depends(get_config),
+    _admin: UserModel = Depends(require_admin_system_read),
 ):
     """
     Get comprehensive system status and configuration.
@@ -109,13 +97,12 @@ async def get_system_status(
         stats = {"error": str(e)}
 
     # Get configuration info (non-sensitive)
-    authly = Authly.get_instance()
     config_status = {
         "valid": True,
-        "api_prefix": authly.get_config().fastapi_api_version_prefix,
-        "jwt_algorithm": authly.get_config().algorithm,
-        "access_token_expiry_minutes": authly.get_config().access_token_expire_minutes,
-        "refresh_token_expiry_days": authly.get_config().refresh_token_expire_days,
+        "api_prefix": config.fastapi_api_version_prefix,
+        "jwt_algorithm": config.algorithm,
+        "access_token_expiry_minutes": config.access_token_expire_minutes,
+        "refresh_token_expiry_days": config.refresh_token_expire_days,
     }
 
     return {
@@ -137,7 +124,7 @@ async def list_clients(
     limit: int = 100,
     offset: int = 0,
     include_inactive: bool = False,
-    conn: AsyncConnection = Depends(get_db_connection),
+    conn: AsyncConnection = Depends(get_database_connection),
     _admin: UserModel = Depends(require_admin_client_read),
 ) -> List[OAuthClientModel]:
     """
@@ -162,7 +149,8 @@ async def list_clients(
 @admin_router.post("/clients")
 async def create_client(
     client_request: OAuthClientCreateRequest,
-    conn: AsyncConnection = Depends(get_db_connection),
+    conn: AsyncConnection = Depends(get_database_connection),
+    config: AuthlyConfig = Depends(get_config),
     _admin: UserModel = Depends(require_admin_client_write),
 ) -> OAuthClientCredentialsResponse:
     """
@@ -172,7 +160,7 @@ async def create_client(
     try:
         client_repo = ClientRepository(conn)
         scope_repo = ScopeRepository(conn)
-        client_service = ClientService(client_repo, scope_repo)
+        client_service = ClientService(client_repo, scope_repo, config)
 
         result = await client_service.create_client(client_request)
 
@@ -191,7 +179,8 @@ async def create_client(
 @admin_router.get("/clients/{client_id}")
 async def get_client(
     client_id: str,
-    conn: AsyncConnection = Depends(get_db_connection),
+    conn: AsyncConnection = Depends(get_database_connection),
+    config: AuthlyConfig = Depends(get_config),
     _admin: UserModel = Depends(require_admin_client_read),
 ) -> Dict:
     """
@@ -201,7 +190,7 @@ async def get_client(
     try:
         client_repo = ClientRepository(conn)
         scope_repo = ScopeRepository(conn)
-        client_service = ClientService(client_repo, scope_repo)
+        client_service = ClientService(client_repo, scope_repo, config)
 
         client = await client_service.get_client_by_id(client_id)
         if not client:
@@ -227,7 +216,8 @@ async def get_client(
 async def update_client(
     client_id: str,
     update_data: Dict,
-    conn: AsyncConnection = Depends(get_db_connection),
+    conn: AsyncConnection = Depends(get_database_connection),
+    config: AuthlyConfig = Depends(get_config),
     _admin: UserModel = Depends(require_admin_client_write),
 ) -> OAuthClientModel:
     """
@@ -237,7 +227,7 @@ async def update_client(
     try:
         client_repo = ClientRepository(conn)
         scope_repo = ScopeRepository(conn)
-        client_service = ClientService(client_repo, scope_repo)
+        client_service = ClientService(client_repo, scope_repo, config)
 
         updated_client = await client_service.update_client(client_id, update_data)
 
@@ -256,7 +246,8 @@ async def update_client(
 @admin_router.post("/clients/{client_id}/regenerate-secret")
 async def regenerate_client_secret(
     client_id: str,
-    conn: AsyncConnection = Depends(get_db_connection),
+    conn: AsyncConnection = Depends(get_database_connection),
+    config: AuthlyConfig = Depends(get_config),
     _admin: UserModel = Depends(require_admin_client_write),
 ) -> Dict:
     """
@@ -266,7 +257,7 @@ async def regenerate_client_secret(
     try:
         client_repo = ClientRepository(conn)
         scope_repo = ScopeRepository(conn)
-        client_service = ClientService(client_repo, scope_repo)
+        client_service = ClientService(client_repo, scope_repo, config)
 
         new_secret = await client_service.regenerate_client_secret(client_id)
 
@@ -295,7 +286,8 @@ async def regenerate_client_secret(
 @admin_router.delete("/clients/{client_id}")
 async def delete_client(
     client_id: str,
-    conn: AsyncConnection = Depends(get_db_connection),
+    conn: AsyncConnection = Depends(get_database_connection),
+    config: AuthlyConfig = Depends(get_config),
     _admin: UserModel = Depends(require_admin_client_write),
 ) -> Dict:
     """
@@ -305,7 +297,7 @@ async def delete_client(
     try:
         client_repo = ClientRepository(conn)
         scope_repo = ScopeRepository(conn)
-        client_service = ClientService(client_repo, scope_repo)
+        client_service = ClientService(client_repo, scope_repo, config)
 
         success = await client_service.deactivate_client(client_id)
 
@@ -332,7 +324,7 @@ async def delete_client(
 @admin_router.get("/clients/{client_id}/oidc")
 async def get_client_oidc_settings(
     client_id: str,
-    conn: AsyncConnection = Depends(get_db_connection),
+    conn: AsyncConnection = Depends(get_database_connection),
     _admin: UserModel = Depends(require_admin_client_read),
 ) -> Dict:
     """
@@ -377,7 +369,7 @@ async def get_client_oidc_settings(
 async def update_client_oidc_settings(
     client_id: str,
     oidc_settings: Dict,
-    conn: AsyncConnection = Depends(get_db_connection),
+    conn: AsyncConnection = Depends(get_database_connection),
     _admin: UserModel = Depends(require_admin_client_write),
 ) -> Dict:
     """
@@ -463,7 +455,7 @@ async def list_scopes(
     offset: int = 0,
     include_inactive: bool = False,
     default_only: bool = False,
-    conn: AsyncConnection = Depends(get_db_connection),
+    conn: AsyncConnection = Depends(get_database_connection),
     _admin: UserModel = Depends(require_admin_scope_read),
 ) -> List[OAuthScopeModel]:
     """
@@ -491,7 +483,7 @@ async def list_scopes(
 @admin_router.post("/scopes")
 async def create_scope(
     scope_data: Dict,
-    conn: AsyncConnection = Depends(get_db_connection),
+    conn: AsyncConnection = Depends(get_database_connection),
     _admin: UserModel = Depends(require_admin_scope_write),
 ) -> OAuthScopeModel:
     """
@@ -523,7 +515,7 @@ async def create_scope(
 
 @admin_router.get("/scopes/defaults")
 async def get_default_scopes(
-    conn: AsyncConnection = Depends(get_db_connection), _admin: UserModel = Depends(require_admin_scope_read)
+    conn: AsyncConnection = Depends(get_database_connection), _admin: UserModel = Depends(require_admin_scope_read)
 ) -> List[OAuthScopeModel]:
     """
     Get all default scopes.
@@ -546,7 +538,7 @@ async def get_default_scopes(
 @admin_router.get("/scopes/{scope_name}")
 async def get_scope(
     scope_name: str,
-    conn: AsyncConnection = Depends(get_db_connection),
+    conn: AsyncConnection = Depends(get_database_connection),
     _admin: UserModel = Depends(require_admin_scope_read),
 ) -> OAuthScopeModel:
     """
@@ -575,7 +567,7 @@ async def get_scope(
 async def update_scope(
     scope_name: str,
     update_data: Dict,
-    conn: AsyncConnection = Depends(get_db_connection),
+    conn: AsyncConnection = Depends(get_database_connection),
     _admin: UserModel = Depends(require_admin_scope_write),
 ) -> OAuthScopeModel:
     """
@@ -603,7 +595,7 @@ async def update_scope(
 @admin_router.delete("/scopes/{scope_name}")
 async def delete_scope(
     scope_name: str,
-    conn: AsyncConnection = Depends(get_db_connection),
+    conn: AsyncConnection = Depends(get_database_connection),
     _admin: UserModel = Depends(require_admin_scope_write),
 ) -> Dict:
     """
@@ -642,7 +634,7 @@ async def delete_scope(
 async def list_users(
     limit: int = 100,
     offset: int = 0,
-    conn: AsyncConnection = Depends(get_db_connection),
+    conn: AsyncConnection = Depends(get_database_connection),
     _admin: UserModel = Depends(require_admin_user_read),
 ):
     """

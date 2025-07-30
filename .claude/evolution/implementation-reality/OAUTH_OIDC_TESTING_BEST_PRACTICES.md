@@ -1,5 +1,10 @@
 # OAuth 2.1 + OIDC Testing Best Practices
 
+**Date:** 2025-07-13  
+**Status:** Knowledge Documentation  
+**Category:** Best Practices & Lessons Learned  
+**Implementation Status:** Knowledge Complete - Based on Real Implementation
+
 ## 🎯 Overview
 
 This document captures key learnings, compliance findings, and testing strategies discovered during the implementation of comprehensive OAuth 2.1 + OpenID Connect (OIDC) integration testing for the Authly authorization server.
@@ -11,7 +16,7 @@ This document captures key learnings, compliance findings, and testing strategie
 ### 1. UserInfo Endpoint Path Configuration
 
 **Issue Found**: Incorrect UserInfo endpoint path configuration
-- **Wrong**: `/api/v1/oidc/userinfo`
+- **Wrong**: `/oidc/userinfo`
 - **Correct**: `/oidc/userinfo`
 
 **Standard**: OIDC Core 1.0 Section 5.3

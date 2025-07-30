@@ -15,10 +15,13 @@ from typing import AsyncGenerator
 import uvicorn
 from fastapi import FastAPI
 
-from authly import Authly
+# Legacy Authly import removed - using AuthlyResourceManager
 from authly.app import create_production_app
 from authly.bootstrap import bootstrap_admin_system
 from authly.config import AuthlyConfig, EnvDatabaseProvider, EnvSecretProvider
+from authly.core.database import get_configuration, get_database, get_database_pool
+from authly.core.deployment_modes import DeploymentMode
+from authly.core.mode_factory import AuthlyModeFactory
 
 logger = logging.getLogger(__name__)
 
@@ -26,85 +29,64 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """
-    FastAPI lifespan context manager for proper resource management.
+    FastAPI lifespan context manager with psycopg-toolkit Database integration.
 
-    Handles startup and shutdown of database connections and other resources.
+    Uses the new AuthlyResourceManager with full psycopg-toolkit Database lifecycle
+    management while maintaining backward compatibility with existing code.
     """
-    logger.info("Starting Authly application...")
+    logger.info("Starting Authly application with psycopg-toolkit Database integration...")
 
     try:
-        # Load configuration from environment
-        secret_provider = EnvSecretProvider()
-        database_provider = EnvDatabaseProvider()
-        config = AuthlyConfig.load(secret_provider, database_provider)
+        # Phase 2: Create resource manager with mode auto-detection
+        # Force production mode for main.py entry point
+        os.environ.setdefault("AUTHLY_MODE", "production")
+        resource_manager = AuthlyModeFactory.create_resource_manager()
 
-        # Create database connection pool using psycopg-toolkit Database class
-        from urllib.parse import urlparse
+        # Validate that we're in production mode
+        if resource_manager.mode != DeploymentMode.PRODUCTION:
+            raise RuntimeError(
+                f"Production entry point detected {resource_manager.mode.value} mode - use appropriate entry point"
+            )
 
-        from psycopg_toolkit import Database, DatabaseSettings
+        logger.info(f"AuthlyResourceManager created for {resource_manager.mode.value} mode")
 
-        database_url = database_provider.get_database_config().database_url
+        # Initialize with managed Database lifecycle
+        async with get_database(resource_manager.get_config()) as database:
+            # Initialize resource manager with Database
+            await resource_manager.initialize_with_external_database(database)
 
-        # Parse database URL into settings
-        url = urlparse(database_url)
+            # Set up dependency injection without app.state
+            from authly.core.dependencies import create_resource_manager_provider, get_resource_manager
+            
+            # Create the provider and override the default dependency
+            provider = create_resource_manager_provider(resource_manager)
+            app.dependency_overrides[get_resource_manager] = provider
+            logger.info("Resource manager dependency injection configured")
 
-        # Get default port from config
-        try:
-            default_port = config.postgres_port
-        except (AttributeError, RuntimeError):
-            # Fallback for tests without full initialization
-            default_port = 5432
+            # Bootstrap admin system if enabled by mode configuration
+            if resource_manager.should_bootstrap_admin():
+                bootstrap_enabled = os.getenv("AUTHLY_BOOTSTRAP_ENABLED", "true").lower() == "true"
+                if bootstrap_enabled:
+                    try:
+                        async with resource_manager.get_pool().connection() as conn:
+                            bootstrap_results = await bootstrap_admin_system(conn)
+                            logger.info(f"Admin bootstrap completed: {bootstrap_results}")
+                    except Exception as e:
+                        logger.error(f"Admin bootstrap failed: {e}")
+                        # Continue startup even if bootstrap fails
 
-        settings = DatabaseSettings(
-            host=url.hostname,
-            port=url.port or default_port,
-            dbname=url.path.lstrip("/"),
-            user=url.username,
-            password=url.password,
-        )
-
-        # Create database with proper lifecycle management
-        db = Database(settings)
-        await db.create_pool()
-        await db.init_db()
-        pool = await db.get_pool()
-
-        # Initialize Authly singleton with pool and configuration
-        authly = Authly.initialize(pool=pool, configuration=config)
-        logger.info("Authly initialized successfully")
-
-        # Bootstrap admin system if enabled
-        bootstrap_enabled = os.getenv("AUTHLY_BOOTSTRAP_ENABLED", "true").lower() == "true"
-        if bootstrap_enabled:
-            try:
-                # Get pool from the initialized Authly instance
-                bootstrap_pool = authly.get_pool()
-                async with bootstrap_pool.connection() as conn:
-                    bootstrap_results = await bootstrap_admin_system(conn)
-                    logger.info(f"Admin bootstrap completed: {bootstrap_results}")
-            except Exception as e:
-                logger.error(f"Admin bootstrap failed: {e}")
-                # Continue startup even if bootstrap fails (for existing deployments)
-
-        # Note: Database instance is managed through Authly singleton and dependency injection
-        # Do not store state on app.state.db - use FastAPI dependency injection instead
-
-        # Application is ready
-        yield
+            logger.info(
+                f"Authly application ready - {resource_manager.mode.value} mode with psycopg-toolkit Database integration"
+            )
+            yield  # Application ready for requests
 
     except Exception as e:
         logger.error(f"Failed to initialize application: {e}")
         raise
     finally:
-        # Cleanup resources during shutdown
         logger.info("Shutting down Authly application...")
-        try:
-            # Clean up database properly
-            if hasattr(app.state, "db"):
-                await app.state.db.cleanup()
-                logger.info("Database cleanup completed")
-        except Exception as e:
-            logger.error(f"Error during shutdown: {e}")
+        # Cleanup handled by context managers and resource manager
+        logger.info("Application shutdown completed")
 
 
 def create_app() -> FastAPI:

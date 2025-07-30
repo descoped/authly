@@ -8,7 +8,12 @@ from pydantic import BaseModel, Field
 from starlette import status
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from authly.api.auth_dependencies import get_authorization_service, get_rate_limiter, oauth2_scheme
+from authly.api.auth_dependencies import (
+    get_authorization_service,
+    get_rate_limiter,
+    get_token_service_with_client,
+    oauth2_scheme,
+)
 from authly.api.users_dependencies import get_current_user, get_user_repository
 from authly.auth import verify_password
 from authly.oauth.authorization_service import AuthorizationService
@@ -66,15 +71,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
-        # Get HSTS config
-        try:
-            from authly import get_config
-
-            config = get_config()
-            hsts_max_age = config.hsts_max_age_seconds
-        except RuntimeError:
-            # Fallback for tests
-            hsts_max_age = 31536000
+        # Use standard HSTS max-age (1 year)
+        hsts_max_age = 31536000
         response.headers["Strict-Transport-Security"] = f"max-age={hsts_max_age}"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Content-Security-Policy"] = "default-src 'self'"
@@ -116,7 +114,7 @@ async def update_last_login(user_repo: UserRepository, user_id: UUID):
 async def get_access_token(
     request: TokenRequest,
     user_repo: UserRepository = Depends(get_user_repository),
-    token_service: TokenService = Depends(get_token_service),
+    token_service: TokenService = Depends(get_token_service_with_client),
     authorization_service: AuthorizationService = Depends(get_authorization_service),
     rate_limiter=Depends(get_rate_limiter),
 ):
@@ -297,7 +295,7 @@ async def _handle_refresh_token_grant(
     user_repo: UserRepository,
     token_service: TokenService,
 ) -> TokenResponse:
-    """Handle refresh_token grant type with client authentication."""
+    """Handle refresh_token grant type."""
 
     # Validate required fields for refresh token grant
     if not request.refresh_token:
@@ -306,21 +304,8 @@ async def _handle_refresh_token_grant(
         )
 
     try:
-        # Get client_id from request for ID token generation
-        client_id = None
-        if request.client_id:
-            # Convert client_id string to UUID for client lookup
-            from authly import authly_db_connection
-            from authly.oauth.client_repository import ClientRepository
-
-            async for conn in authly_db_connection():
-                client_repo = ClientRepository(conn)
-                client = await client_repo.get_by_client_id(request.client_id)
-                if client:
-                    client_id = client.id
-                break
-
-        # Refresh token pair with client_id for ID token generation
+        # Refresh token pair - client_id lookup will be handled by token service
+        client_id = request.client_id if request.client_id else None
         token_response = await token_service.refresh_token_pair(request.refresh_token, user_repo, client_id=client_id)
 
         logger.info(f"Refresh token exchanged successfully")
@@ -345,7 +330,7 @@ async def _handle_refresh_token_grant(
 async def refresh_access_token(
     request: RefreshRequest,
     user_repo: UserRepository = Depends(get_user_repository),
-    token_service: TokenService = Depends(get_token_service),
+    token_service: TokenService = Depends(get_token_service_with_client),
 ):
     """Create new token pair while invalidating old refresh token"""
 

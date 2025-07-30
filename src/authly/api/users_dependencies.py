@@ -6,9 +6,10 @@ from fastapi import Depends, HTTPException, status
 from jose import JWTError
 from psycopg_toolkit import OperationError, RecordNotFoundError
 
-from authly import authly_db_connection, get_config
 from authly.api.auth_dependencies import oauth2_scheme
 from authly.auth import decode_token
+from authly.config import AuthlyConfig
+from authly.core.dependencies import get_config, get_database_connection
 from authly.oidc.userinfo import UserInfoService
 from authly.tokens import TokenService, get_token_service
 from authly.users.models import UserModel
@@ -18,7 +19,7 @@ from authly.users.service import UserService
 logger = logging.getLogger(__name__)
 
 
-async def get_user_repository(db_connection=Depends(authly_db_connection)) -> UserRepository:
+async def get_user_repository(db_connection=Depends(get_database_connection)) -> UserRepository:
     """
     Get an instance of the UserRepository.
 
@@ -47,7 +48,7 @@ def _create_credentials_exception() -> HTTPException:
     )
 
 
-async def _validate_token_and_get_user_id(token: str, token_service: TokenService) -> UUID:
+async def _validate_token_and_get_user_id(token: str, token_service: TokenService, config: AuthlyConfig) -> UUID:
     """
     Shared token validation logic to eliminate duplication.
 
@@ -62,7 +63,6 @@ async def _validate_token_and_get_user_id(token: str, token_service: TokenServic
         HTTPException: If token is invalid, revoked, or user ID cannot be extracted
     """
     credentials_exception = _create_credentials_exception()
-    config = get_config()
 
     try:
         payload = decode_token(token, config.secret_key, config.algorithm)
@@ -121,6 +121,7 @@ async def get_current_user(
     token: Annotated[str, Depends(oauth2_scheme)],
     user_repo: UserRepository = Depends(get_user_repository),
     token_service: TokenService = Depends(get_token_service),
+    config: AuthlyConfig = Depends(get_config),
 ) -> UserModel:
     """
     Get the current authenticated user.
@@ -136,7 +137,7 @@ async def get_current_user(
     Raises:
         HTTPException: If authentication fails
     """
-    user_id = await _validate_token_and_get_user_id(token, token_service)
+    user_id = await _validate_token_and_get_user_id(token, token_service, config)
     return await _get_user_by_id(user_repo, user_id)
 
 
@@ -144,6 +145,7 @@ async def get_current_user_no_update(
     token: Annotated[str, Depends(oauth2_scheme)],
     user_repo: UserRepository = Depends(get_user_repository),
     token_service: TokenService = Depends(get_token_service),
+    config: AuthlyConfig = Depends(get_config),
 ) -> UserModel:
     """
     Get the current authenticated user without updating last login.
@@ -159,7 +161,7 @@ async def get_current_user_no_update(
     Raises:
         HTTPException: If authentication fails
     """
-    user_id = await _validate_token_and_get_user_id(token, token_service)
+    user_id = await _validate_token_and_get_user_id(token, token_service, config)
     return await _get_user_by_id(user_repo, user_id)
 
 
@@ -209,7 +211,9 @@ async def get_current_admin_user(current_user: Annotated[UserModel, Depends(get_
 
 
 async def get_token_scopes(
-    token: Annotated[str, Depends(oauth2_scheme)], token_service: TokenService = Depends(get_token_service)
+    token: Annotated[str, Depends(oauth2_scheme)],
+    token_service: TokenService = Depends(get_token_service),
+    config: AuthlyConfig = Depends(get_config),
 ) -> List[str]:
     """
     Extract scopes from JWT access token.
@@ -225,7 +229,6 @@ async def get_token_scopes(
         HTTPException: If token is invalid or does not contain valid scopes
     """
     credentials_exception = _create_credentials_exception()
-    config = get_config()
 
     try:
         # Decode token to get payload

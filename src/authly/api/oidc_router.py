@@ -14,6 +14,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from authly.api.auth_dependencies import get_client_repository
 from authly.api.oauth_router import get_discovery_service
 from authly.api.users_dependencies import get_current_user, get_token_scopes, get_userinfo_service
+from authly.core.dependencies import get_config
 from authly.oauth.client_repository import ClientRepository
 from authly.oauth.discovery_service import DiscoveryService
 from authly.oidc.discovery import OIDCDiscoveryService, OIDCServerMetadata
@@ -84,7 +85,7 @@ def get_base_url(request: Request) -> str:
                         "issuer": "https://auth.example.com",
                         "authorization_endpoint": "https://auth.example.com/api/v1/oauth/authorize",
                         "token_endpoint": "https://auth.example.com/api/v1/auth/token",
-                        "userinfo_endpoint": "https://auth.example.com/api/v1/oidc/userinfo",
+                        "userinfo_endpoint": "https://auth.example.com/oidc/userinfo",
                         "jwks_uri": "https://auth.example.com/.well-known/jwks.json",
                         "response_types_supported": ["code", "id_token", "code id_token"],
                         "id_token_signing_alg_values_supported": ["RS256", "HS256"],
@@ -322,14 +323,14 @@ async def jwks_endpoint():
         # Return with proper caching headers
         from fastapi.responses import JSONResponse
 
-        # Get cache config
+        # Get cache config from dependency injection (fallback for test compatibility)
         try:
-            from authly import get_config
+            from authly.core.dependencies import get_config
 
             config = get_config()
             cache_max_age = config.jwks_cache_max_age_seconds
-        except RuntimeError:
-            # Fallback for tests
+        except Exception:
+            # Fallback for tests or when config is not available
             cache_max_age = 3600
 
         return JSONResponse(
@@ -418,7 +419,7 @@ async def oidc_end_session(
         # Validate id_token_hint if provided
         if id_token_hint:
             try:
-                from authly import get_config
+                from authly.core.dependencies import get_config
 
                 config = get_config()
                 id_token_generator = IDTokenGenerator(config)
