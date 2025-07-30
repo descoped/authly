@@ -92,16 +92,14 @@ def admin() -> None:
 def status(output_format: str) -> None:
     """Show system status and configuration."""
     # Import here to avoid circular imports
-    # Create a mock context for the admin command
-    import click
-
+    # Import and call admin status command
     from authly.admin.cli import status as admin_status
 
     ctx = click.Context(admin_status)
-    ctx.params = {"format": output_format}
+    ctx.obj = {}  # Initialize context object
 
-    # Run the admin status command
-    asyncio.run(admin_status.callback(output_format))
+    # Call the admin command directly (it doesn't use format parameter)
+    ctx.invoke(admin_status)
 
 
 @admin.group()
@@ -114,16 +112,14 @@ def client() -> None:
 @click.option("--format", "output_format", default="table", type=click.Choice(["table", "json"]), help="Output format")
 def list_clients(output_format: str) -> None:
     """List all OAuth clients."""
-    # Create a mock context for the admin command
-    import click
-
+    # Import and call admin list clients command
     from authly.admin.client_commands import list_clients as admin_list_clients
 
     ctx = click.Context(admin_list_clients)
-    ctx.params = {"format": output_format}
+    ctx.obj = {}  # Initialize context object
 
-    # Run the admin command
-    asyncio.run(admin_list_clients.callback(output_format))
+    # Call the admin command with proper parameters
+    ctx.invoke(admin_list_clients, limit=100, offset=0, output=output_format, show_inactive=False)
 
 
 @client.command("create")
@@ -134,22 +130,36 @@ def list_clients(output_format: str) -> None:
 @click.option("--description", help="Client description")
 def create_client(name: str, client_type: str, redirect_uri: tuple, scope: tuple, description: Optional[str]) -> None:
     """Create a new OAuth client."""
-    # Create a mock context for the admin command
-    import click
-
+    # Import admin command
     from authly.admin.client_commands import create_client as admin_create_client
 
-    ctx = click.Context(admin_create_client)
-    ctx.params = {
-        "name": name,
-        "client_type": client_type,
-        "redirect_uri": redirect_uri,
-        "scope": scope,
-        "description": description,
-    }
+    # Validate that at least one redirect URI is provided for create
+    if not redirect_uri:
+        click.echo("❌ Error: At least one redirect URI is required", err=True)
+        return
 
-    # Run the admin command
-    asyncio.run(admin_create_client.callback(name, client_type, redirect_uri, scope, description))
+    # Create a proper context and invoke the admin command
+    ctx = click.Context(admin_create_client)
+    ctx.obj = {}  # Initialize context object
+
+    # Map scope tuple to space-separated string if provided
+    scope_str = " ".join(scope) if scope else None
+
+    # Call the admin command with proper parameter mapping
+    ctx.invoke(
+        admin_create_client,
+        name=name,
+        client_type=client_type,
+        redirect_uris=redirect_uri,  # Note: admin expects 'redirect_uris'
+        scope=scope_str,
+        client_uri=None,
+        logo_uri=None,
+        tos_uri=None,
+        policy_uri=None,
+        auth_method=None,  # Will use default based on client_type
+        no_pkce=False,  # Enable PKCE by default
+        output="table",
+    )
 
 
 @admin.group()
@@ -179,7 +189,7 @@ def login(username: str, password: Optional[str], scope: str, api_url: Optional[
     ctx.params = {"username": username, "password": password, "scope": scope, "api_url": api_url}
 
     # Run the admin command
-    asyncio.run(admin_login.callback(username, password, scope, api_url))
+    admin_login.callback(username, password, scope, api_url)
 
 
 @auth.command()
@@ -193,7 +203,7 @@ def logout() -> None:
     ctx = click.Context(admin_logout)
 
     # Run the admin command
-    asyncio.run(admin_logout.callback())
+    admin_logout.callback()
 
 
 @auth.command()
@@ -209,7 +219,7 @@ def whoami(verbose: bool) -> None:
     ctx.params = {"verbose": verbose}
 
     # Run the admin command
-    asyncio.run(admin_whoami.callback(verbose))
+    admin_whoami.callback(verbose)
 
 
 @auth.command()
@@ -225,7 +235,7 @@ def status(verbose: bool) -> None:
     ctx.params = {"verbose": verbose}
 
     # Run the admin command
-    asyncio.run(admin_auth_status.callback(verbose))
+    admin_auth_status.callback(verbose)
 
 
 @auth.command()
@@ -239,7 +249,7 @@ def refresh() -> None:
     ctx = click.Context(admin_refresh)
 
     # Run the admin command
-    asyncio.run(admin_refresh.callback())
+    admin_refresh.callback()
 
 
 # Add convenient aliases for common auth commands
@@ -307,16 +317,14 @@ def scope() -> None:
 @click.option("--format", "output_format", default="table", type=click.Choice(["table", "json"]), help="Output format")
 def list_scopes(output_format: str) -> None:
     """List all OAuth scopes."""
-    # Create a mock context for the admin command
-    import click
-
+    # Import and call admin scope list command
     from authly.admin.scope_commands import list_scopes as admin_list_scopes
 
     ctx = click.Context(admin_list_scopes)
-    ctx.params = {"format": output_format}
+    ctx.obj = {}  # Initialize context object
 
-    # Run the admin command
-    asyncio.run(admin_list_scopes.callback(output_format))
+    # Call the admin command with proper parameters
+    ctx.invoke(admin_list_scopes, limit=100, offset=0, output=output_format, show_inactive=False, default_only=False)
 
 
 @scope.command("create")
@@ -324,16 +332,21 @@ def list_scopes(output_format: str) -> None:
 @click.option("--description", required=True, help="Scope description")
 def create_scope(name: str, description: str) -> None:
     """Create a new OAuth scope."""
-    # Create a mock context for the admin command
-    import click
-
+    # Import and call admin scope create command
     from authly.admin.scope_commands import create_scope as admin_create_scope
 
+    # Create a proper context and invoke the admin command
     ctx = click.Context(admin_create_scope)
-    ctx.params = {"name": name, "description": description}
+    ctx.obj = {}  # Initialize context object
 
-    # Run the admin command
-    asyncio.run(admin_create_scope.callback(name, description))
+    # Call the admin command with proper parameter mapping
+    ctx.invoke(
+        admin_create_scope,
+        name=name,
+        description=description,
+        is_default=False,  # Default to not a default scope
+        output="table",  # Use table output format
+    )
 
 
 def _run_production_mode(host: str, port: int, workers: int, log_level: str, access_log: bool) -> None:

@@ -106,13 +106,13 @@ A **production-ready OAuth 2.1 + OpenID Connect 1.0 authorization server** built
 ### **Unified CLI Interface**
 ```bash
 # Start Authly server
-uv run python -m authly serve --embedded
+python -m authly serve
 
 # Admin operations
-uv run python -m authly admin login
-uv run python -m authly admin client create --name "My App" --client-type public
-uv run python -m authly admin scope create --name read --description "Read access"
-uv run python -m authly admin status
+python -m authly admin login
+python -m authly admin client create --name "My App" --client-type public --redirect-uri "http://localhost:3000/callback"
+python -m authly admin scope create --name "read" --description "Read access"
+python -m authly admin status
 ```
 
 ### **Admin Commands**

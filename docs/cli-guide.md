@@ -2,8 +2,8 @@
 
 Complete command-line interface guide for administering the Authly OAuth 2.1 + OpenID Connect 1.0 authorization server.
 
-**CLI Access**: `uv run python -m authly` (or `python -m authly` if virtual environment is activated)  
-**Admin Commands**: `uv run python -m authly admin`  
+**CLI Access**: `python -m authly`  
+**Admin Commands**: `python -m authly admin`  
 **Architecture**: API-first (CLI uses HTTP API exclusively)  
 **Resource Mode**: Unified resource manager with `AUTHLY_MODE=cli` for optimal performance
 
@@ -78,7 +78,7 @@ The Authly CLI uses a unified resource manager architecture that automatically o
 
 ```python
 # CLI mode automatically configured when running admin commands
-AUTHLY_MODE=cli uv run python -m authly admin status
+AUTHLY_MODE=cli python -m authly admin status
 ```
 
 **CLI Mode Characteristics**:
@@ -106,11 +106,11 @@ The CLI automatically detects and sets optimal resource mode:
 
 ```bash
 # Automatic CLI mode (recommended)
-uv run python -m authly admin client list
+python -m authly admin client list
 
 # Manual override (advanced usage)
-AUTHLY_MODE=production uv run python -m authly admin status  # Uses production settings
-AUTHLY_MODE=testing uv run python -m authly admin status     # Uses testing settings
+AUTHLY_MODE=production python -m authly admin status  # Uses production settings
+AUTHLY_MODE=testing python -m authly admin status     # Uses testing settings
 ```
 
 **Mode Aliases Supported**:
@@ -148,29 +148,36 @@ async with resource_manager.get_database().connection() as conn:
 
 ### **Start Authly Server**
 
-#### **uv run python -m authly serve**
-Start the Authly web service. Use `--embedded` for development mode with automatic PostgreSQL container.
+#### **python -m authly serve**
+Start the Authly web service.
 
 **Options**:
 ```bash
---host TEXT        Host to bind (default: 0.0.0.0)
---port INTEGER     Port to bind (default: 8000)
---workers INTEGER  Number of worker processes
---reload           Enable auto-reload for development
---embedded         Start with embedded PostgreSQL container
---dev              Enable development mode with debug logging
+--host TEXT                     Host to bind to (default: 0.0.0.0)
+--port INTEGER                  Port to bind to (default: 8000)
+--workers INTEGER               Number of worker processes (default: 1)
+--embedded                      Run with embedded PostgreSQL container
+--seed                          Seed test data (only with --embedded)
+--log-level TEXT                Logging level (default: info)
+--access-log / --no-access-log  Enable/disable access logging (default: enabled)
 ```
 
 **Examples**:
 ```bash
 # Production server
-uv run python -m authly serve --host 0.0.0.0 --port 8000
+python -m authly serve --host 0.0.0.0 --port 8000
 
-# Development with embedded database (recommended for local development)
-uv run python -m authly serve --embedded
+# Development with embedded database
+python -m authly serve --embedded
+
+# Development with embedded database and test data
+python -m authly serve --embedded --seed
 
 # Multi-worker production
-uv run python -m authly serve --workers 4
+python -m authly serve --workers 4
+
+# Custom logging
+python -m authly serve --log-level debug --no-access-log
 ```
 
 **Environment Variables**:
@@ -193,18 +200,16 @@ AUTHLY_ADMIN_API_ENABLED="true"
 
 ## 👑 **Admin Commands**
 
-All admin commands use the format: `uv run python -m authly admin COMMAND`
-
-> **Note**: If you have already activated the virtual environment with `source .venv/bin/activate`, you can omit `uv run` and use `python -m authly admin COMMAND` directly.
+All admin commands use the format: `python -m authly admin COMMAND`
 
 ### **Authentication**
 
-#### **uv run python -m authly admin login**
+#### **python -m authly admin login**
 Authenticate with the Authly admin API.
 
 **Interactive Login**:
 ```bash
-$ uv run python -m authly admin login
+$ python -m authly admin login
 Username: admin
 Password: [hidden]
 ✓ Successfully logged in as admin
@@ -221,39 +226,103 @@ Token stored securely in ~/.authly/tokens.json
 **Examples**:
 ```bash
 # Interactive login (recommended)
-uv run python -m authly admin login
+python -m authly admin login
 
 # Non-interactive (CI/CD environments only)
-uv run python -m authly admin login --username admin --password "$ADMIN_PASSWORD"
+python -m authly admin login --username admin --password "$ADMIN_PASSWORD"
 
 # Custom API URL
-uv run python -m authly admin login --api-url "https://auth.mycompany.com"
+python -m authly admin login --api-url "https://auth.mycompany.com"
 ```
 
-#### **uv run python -m authly admin logout**
+#### **python -m authly admin logout**
 Logout from the admin API and clear stored tokens.
 
 ```bash
-$ uv run python -m authly admin logout
+$ python -m authly admin logout
 ✓ Successfully logged out
 Tokens cleared from ~/.authly/tokens.json
 ```
 
-#### **uv run python -m authly admin whoami**
+#### **python -m authly admin whoami**
 Show current authentication status.
 
 ```bash
-$ uv run python -m authly admin whoami
+$ python -m authly admin whoami
 ✓ Authenticated as: admin
-✓ Token expires: 2025-07-10 15:30:00 UTC
+✓ Token expires: 2025-07-30 15:30:00 UTC
 ✓ Scopes: admin:clients:read, admin:clients:write, admin:scopes:read, admin:scopes:write
+```
+
+#### **python -m authly admin auth refresh**
+Refresh authentication tokens.
+
+```bash
+$ python -m authly admin auth refresh
+✓ Token refreshed successfully
+New expiration: 2025-07-30 16:30:00 UTC
+Token verified - authentication active
+```
+
+#### **python -m authly admin auth status**
+Show authentication and API status.
+
+```bash
+$ python -m authly admin auth status
+✓ API Health: healthy
+API URL: http://localhost:8000
+✓ Authentication: Logged in
+Database: Connected
+OAuth clients: 2
+OAuth scopes: 17
+```
+
+**Options**:
+```bash
+--verbose, -v    Show detailed token information
+```
+
+**Examples**:
+```bash
+# Basic auth status
+python -m authly admin auth status
+
+# Detailed auth status with token info
+python -m authly admin auth status --verbose
+```
+
+### **Authentication Command Group**
+
+All authentication commands are also available through the `auth` subgroup for organized access:
+
+#### **python -m authly admin auth [COMMAND]**
+
+**Available Commands**:
+```bash
+login    Login to the Authly Admin API
+logout   Logout from the Authly Admin API  
+whoami   Show current authentication status
+status   Show authentication and API status
+refresh  Refresh authentication tokens
+```
+
+**Examples**:
+```bash
+# These commands are equivalent to the direct admin aliases:
+python -m authly admin auth login     # Same as: python -m authly admin login
+python -m authly admin auth logout    # Same as: python -m authly admin logout
+python -m authly admin auth whoami    # Same as: python -m authly admin whoami
+
+# Additional auth-specific commands:
+python -m authly admin auth status    # Authentication and API status
+python -m authly admin auth refresh   # Refresh authentication tokens
 ```
 
 ---
 
 ### **OAuth Client Management**
 
-#### **uv run python -m authly admin client create**
+#### **python -m authly admin client create**
 Create a new OAuth 2.1 client.
 
 **Required Options**:
@@ -276,20 +345,20 @@ Create a new OAuth 2.1 client.
 **Examples**:
 ```bash
 # Basic confidential client
-uv run python -m authly admin client create \
+python -m authly admin client create \
   --name "My Web App" \
   --client-type confidential \
   --redirect-uri "https://myapp.com/callback"
 
 # Public client with multiple redirect URIs
-uv run python -m authly admin client create \
+python -m authly admin client create \
   --name "My Mobile App" \
   --client-type public \
   --redirect-uri "myapp://callback" \
   --redirect-uri "http://localhost:3000/callback"
 
 # Client with metadata and scopes
-uv run python -m authly admin client create \
+python -m authly admin client create \
   --name "Enterprise App" \
   --client-type confidential \
   --redirect-uri "https://enterprise.com/oauth/callback" \
@@ -314,7 +383,7 @@ Status: active
 ⚠️  Save the client secret securely - it cannot be retrieved again!
 ```
 
-#### **uv run python -m authly admin client list**
+#### **python -m authly admin client list**
 List OAuth clients.
 
 **Options**:
@@ -328,16 +397,16 @@ List OAuth clients.
 **Examples**:
 ```bash
 # List active clients
-uv run python -m authly admin client list
+python -m authly admin client list
 
 # Show all clients including inactive
-uv run python -m authly admin client list --show-inactive
+python -m authly admin client list --show-inactive
 
 # JSON output for scripting
-uv run python -m authly admin client list --output json
+python -m authly admin client list --output json
 
 # Paginated listing
-uv run python -m authly admin client list --limit 10 --offset 20
+python -m authly admin client list --limit 10 --offset 20
 ```
 
 **Table Output**:
@@ -352,159 +421,11 @@ uv run python -m authly admin client list --limit 10 --offset 20
 Total: 2 clients
 ```
 
-#### **uv run python -m authly admin client show CLIENT_ID**
-Show detailed information about a specific client.
-
-**Arguments**:
-```bash
-CLIENT_ID    UUID or client_id of the OAuth client
-```
-
-**Options**:
-```bash
---output [table|json]  Output format (default: table)
---show-secret          Show client secret (confidential clients only)
-```
-
-**Examples**:
-```bash
-# Show client details
-uv run python -m authly admin client show 7f9a8b2c-1234-5678-9abc-def012345678
-
-# Show with client secret
-uv run python -m authly admin client show my-web-app --show-secret
-
-# JSON output
-uv run python -m authly admin client show my-web-app --output json
-```
-
-**Output**:
-```bash
-OAuth Client Details
-
-Client ID: 7f9a8b2c-1234-5678-9abc-def012345678
-Name: My Web App
-Type: confidential
-Status: active
-Created: 2025-07-10 10:00:00 UTC
-Updated: 2025-07-10 10:00:00 UTC
-
-Redirect URIs:
-  • https://myapp.com/callback
-
-Assigned Scopes:
-  • read - Read access to user data
-  • write - Write access to user data
-
-Client Metadata:
-  • Client URI: https://myapp.com
-  • Logo URI: https://myapp.com/logo.png
-  • Contacts: admin@myapp.com
-```
-
-#### **uv run python -m authly admin client update CLIENT_ID**
-Update an existing OAuth client.
-
-**Arguments**:
-```bash
-CLIENT_ID    UUID or client_id of the OAuth client
-```
-
-**Options**:
-```bash
---name TEXT            Update client name
---add-redirect-uri TEXT    Add redirect URI
---remove-redirect-uri TEXT Remove redirect URI
---add-scope TEXT       Add scope to client
---remove-scope TEXT    Remove scope from client
---client-uri TEXT      Update client homepage URL
---logo-uri TEXT        Update client logo URL
---activate             Activate the client
---deactivate          Deactivate the client
-```
-
-**Examples**:
-```bash
-# Update client name
-uv run python -m authly admin client update my-web-app --name "Updated Web App"
-
-# Add redirect URI
-uv run python -m authly admin client update my-web-app \
-  --add-redirect-uri "https://myapp.com/oauth/callback"
-
-# Add multiple scopes
-uv run python -m authly admin client update my-web-app \
-  --add-scope "profile" \
-  --add-scope "email"
-
-# Deactivate client
-uv run python -m authly admin client update my-web-app --deactivate
-```
-
-#### **uv run python -m authly admin client regenerate-secret CLIENT_ID**
-Regenerate client secret for confidential clients.
-
-**Arguments**:
-```bash
-CLIENT_ID    UUID or client_id of the OAuth client
-```
-
-**Options**:
-```bash
---confirm    Skip confirmation prompt
-```
-
-**Examples**:
-```bash
-# Interactive regeneration
-uv run python -m authly admin client regenerate-secret my-web-app
-
-# Skip confirmation
-uv run python -m authly admin client regenerate-secret my-web-app --confirm
-```
-
-**Output**:
-```bash
-⚠️  This will invalidate the current client secret!
-   All applications using this client must be updated.
-
-Continue? [y/N]: y
-
-✓ Client secret regenerated successfully
-
-New Client Secret: cs_9z8y7x6w5v4u3t2s1r0q...
-
-⚠️  Save this secret securely - it cannot be retrieved again!
-```
-
-#### **uv run python -m authly admin client delete CLIENT_ID**
-Delete (deactivate) an OAuth client.
-
-**Arguments**:
-```bash
-CLIENT_ID    UUID or client_id of the OAuth client
-```
-
-**Options**:
-```bash
---confirm    Skip confirmation prompt
---permanent  Permanently delete instead of deactivating
-```
-
-**Examples**:
-```bash
-# Soft delete (deactivate)
-uv run python -m authly admin client delete my-web-app
-
-# Permanent deletion
-uv run python -m authly admin client delete my-web-app --permanent --confirm
-```
-
 ---
 
 ### **OAuth Scope Management**
 
-#### **uv run python -m authly admin scope create**
+#### **python -m authly admin scope create**
 Create a new OAuth scope.
 
 **Required Options**:
@@ -521,18 +442,18 @@ Create a new OAuth scope.
 **Examples**:
 ```bash
 # Basic scope
-uv run python -m authly admin scope create \
+python -m authly admin scope create \
   --name "read" \
   --description "Read access to user data"
 
 # Default scope
-uv run python -m authly admin scope create \
+python -m authly admin scope create \
   --name "profile" \
   --description "Access to user profile information" \
   --default
 ```
 
-#### **uv run python -m authly admin scope list**
+#### **python -m authly admin scope list**
 List OAuth scopes.
 
 **Options**:
@@ -544,13 +465,13 @@ List OAuth scopes.
 **Examples**:
 ```bash
 # List active scopes
-uv run python -m authly admin scope list
+python -m authly admin scope list
 
 # Include inactive scopes
-uv run python -m authly admin scope list --show-inactive
+python -m authly admin scope list --show-inactive
 
 # JSON output
-uv run python -m authly admin scope list --output json
+python -m authly admin scope list --output json
 ```
 
 **Output**:
@@ -566,69 +487,11 @@ uv run python -m authly admin scope list --output json
 Total: 3 scopes (2 active, 1 default)
 ```
 
-#### **uv run python -m authly admin scope show SCOPE_NAME**
-Show detailed information about a specific scope.
-
-**Arguments**:
-```bash
-SCOPE_NAME    Name of the OAuth scope
-```
-
-**Examples**:
-```bash
-# Show scope details
-uv run python -m authly admin scope show read
-```
-
-#### **uv run python -m authly admin scope update SCOPE_NAME**
-Update an existing OAuth scope.
-
-**Arguments**:
-```bash
-SCOPE_NAME    Name of the OAuth scope
-```
-
-**Options**:
-```bash
---description TEXT     Update description
---set-default         Make this a default scope
---unset-default       Remove default scope status
---activate            Activate the scope
---deactivate         Deactivate the scope
-```
-
-**Examples**:
-```bash
-# Update description
-uv run python -m authly admin scope update read \
-  --description "Read access to user data and profile"
-
-# Make default scope
-uv run python -m authly admin scope update profile --set-default
-
-# Deactivate scope
-uv run python -m authly admin scope update old-scope --deactivate
-```
-
-#### **uv run python -m authly admin scope delete SCOPE_NAME**
-Delete (deactivate) an OAuth scope.
-
-**Arguments**:
-```bash
-SCOPE_NAME    Name of the OAuth scope
-```
-
-**Options**:
-```bash
---confirm     Skip confirmation prompt
---permanent   Permanently delete instead of deactivating
-```
-
 ---
 
 ### **System Status & Information**
 
-#### **uv run python -m authly admin status**
+#### **python -m authly admin status**
 Show system status and configuration.
 
 **Options**:
@@ -640,13 +503,13 @@ Show system status and configuration.
 **Examples**:
 ```bash
 # Basic status
-uv run python -m authly admin status
+python -m authly admin status
 
 # Verbose status with details
-uv run python -m authly admin status --verbose
+python -m authly admin status --verbose
 
 # JSON output for monitoring
-uv run python -m authly admin status --output json
+python -m authly admin status --output json
 ```
 
 **Output**:
@@ -724,12 +587,12 @@ The CLI automatically sets `AUTHLY_MODE=cli` when running admin commands:
 
 ```bash
 # These commands automatically use CLI mode
-uv run python -m authly admin login
-uv run python -m authly admin client list
-uv run python -m authly admin status
+python -m authly admin login
+python -m authly admin client list
+python -m authly admin status
 
 # Manual mode override (advanced usage)
-AUTHLY_MODE=production uv run python -m authly admin status
+AUTHLY_MODE=production python -m authly admin status
 ```
 
 ### **CLI Configuration File**
@@ -778,11 +641,11 @@ Admin tokens are securely stored in `~/.authly/tokens.json`:
 #### **JSON Output for Scripts**
 ```bash
 # Get client list in JSON format
-clients=$(uv run python -m authly admin client list --output json)
+clients=$(python -m authly admin client list --output json)
 echo "$clients" | jq '.clients[].client_id'
 
 # Create client and extract client_id
-client_info=$(uv run python -m authly admin client create \
+client_info=$(python -m authly admin client create \
   --name "Automated Client" \
   --client-type confidential \
   --redirect-uri "https://example.com/callback" \
@@ -800,7 +663,7 @@ scopes=("read" "write" "delete" "admin")
 descriptions=("Read access" "Write access" "Delete access" "Admin access")
 
 for i in "${!scopes[@]}"; do
-  uv run python -m authly admin scope create \
+  python -m authly admin scope create \
     --name "${scopes[$i]}" \
     --description "${descriptions[$i]}"
 done
@@ -813,12 +676,12 @@ done
 - name: Setup Authly Admin
   run: |
     # Non-interactive login for CI
-    uv run python -m authly admin login \
+    python -m authly admin login \
       --username "${{ secrets.AUTHLY_ADMIN_USER }}" \
       --password "${{ secrets.AUTHLY_ADMIN_PASS }}"
     
     # Create deployment client
-    uv run python -m authly admin client create \
+    python -m authly admin client create \
       --name "Production Deploy" \
       --client-type confidential \
       --redirect-uri "${{ env.PRODUCTION_CALLBACK_URL }}" \
@@ -837,7 +700,7 @@ done
 
 #### **Error Output**
 ```bash
-$ uv run python -m authly admin client show invalid-client
+$ python -m authly admin client show invalid-client
 ❌ Error: Client not found
 Client ID 'invalid-client' does not exist or has been deleted.
 
@@ -850,10 +713,10 @@ Exit code: 4
 ```bash
 # Enable verbose output with resource manager details
 export AUTHLY_LOG_LEVEL=DEBUG
-uv run python -m authly admin status --verbose
+python -m authly admin status --verbose
 
 # Show resource mode detection
-uv run python -c "
+python -c "
 from authly.core.mode_factory import AuthlyModeFactory
 print(f'Detected mode: {AuthlyModeFactory.detect_mode()}')
 print(f'CLI mode check: {AuthlyModeFactory.is_cli_mode()}')
@@ -861,32 +724,32 @@ print(f'CLI mode check: {AuthlyModeFactory.is_cli_mode()}')
 
 # Show HTTP requests
 export AUTHLY_DEBUG_HTTP=true
-uv run python -m authly admin client list
+python -m authly admin client list
 ```
 
 #### **CLI Mode Testing**
 ```bash
 # Test CLI mode resource management
-AUTHLY_MODE=cli uv run python -m authly admin status
+AUTHLY_MODE=cli python -m authly admin status
 
 # Compare with other modes (requires running server)
-AUTHLY_MODE=production uv run python -m authly admin status
-AUTHLY_MODE=embedded uv run python -m authly admin status
+AUTHLY_MODE=production python -m authly admin status
+AUTHLY_MODE=embedded python -m authly admin status
 
 # Force different pool settings for testing
-AUTHLY_MODE=testing uv run python -m authly admin status --verbose
+AUTHLY_MODE=testing python -m authly admin status --verbose
 ```
 
 #### **API Connection Testing**
 ```bash
 # Test API connectivity with CLI mode
-uv run python -m authly admin status
+python -m authly admin status
 
 # Test authentication with resource manager info
-uv run python -m authly admin whoami
+python -m authly admin whoami
 
 # Show detailed connection and resource info
-uv run python -m authly admin status --verbose
+python -m authly admin status --verbose
 ```
 
 ---
@@ -920,23 +783,23 @@ uv run python -m authly admin status --verbose
 #### **Database Connection Issues**
 ```bash
 # Check CLI mode is using correct database
-AUTHLY_LOG_LEVEL=DEBUG uv run python -m authly admin status
+AUTHLY_LOG_LEVEL=DEBUG python -m authly admin status
 
 # Test with different pool settings
-AUTHLY_MODE=testing uv run python -m authly admin status  # Larger pool for testing
+AUTHLY_MODE=testing python -m authly admin status  # Larger pool for testing
 ```
 
 #### **Resource Manager Issues**
 ```bash
 # Verify mode detection
-uv run python -c "
+python -c "
 from authly.core.mode_factory import AuthlyModeFactory
 print(f'Current mode: {AuthlyModeFactory.detect_mode()}')
 print(f'Pool settings: {AuthlyModeFactory.get_pool_settings(AuthlyModeFactory.detect_mode())}')
 "
 
 # Force CLI mode explicitly
-AUTHLY_MODE=cli uv run python -m authly admin client list
+AUTHLY_MODE=cli python -m authly admin client list
 ```
 
 #### **Admin API Connection Issues**
@@ -945,7 +808,7 @@ AUTHLY_MODE=cli uv run python -m authly admin client list
 curl -s http://localhost:8000/admin/health | jq
 
 # Test with verbose logging
-AUTHLY_LOG_LEVEL=DEBUG uv run python -m authly admin status --verbose
+AUTHLY_LOG_LEVEL=DEBUG python -m authly admin status --verbose
 ```
 
 ### **Performance Optimization**
@@ -957,7 +820,7 @@ For frequent CLI operations, consider these optimizations:
 export AUTHLY_MODE=cli
 
 # Batch operations in scripts
-uv run python -m authly admin client list --output json | jq '.clients[].client_id'
+python -m authly admin client list --output json | jq '.clients[].client_id'
 
 # Use connection pooling benefits
 # CLI mode maintains connections for up to 1 minute for rapid successive commands
