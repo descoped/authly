@@ -198,53 +198,66 @@ class AdminAPIClient:
                 if "already exists" in error_message.lower() or "duplicate" in error_message.lower():
                     # Extract scope name from error or request data
                     scope_name = self._extract_scope_name_from_error(error_message, response)
-                    raise AdminAPIError(f"Scope '{scope_name}' already exists. Please choose a different name.")
+                    raise AdminAPIError(
+                        f"Scope '{scope_name}' already exists. Please choose a different name.", status_code=400
+                    )
                 elif "invalid" in error_message.lower():
-                    raise AdminAPIError(f"Invalid scope data: {error_message}")
+                    raise AdminAPIError(f"Invalid scope data: {error_message}", status_code=400)
                 else:
                     raise AdminAPIError(
-                        f"Invalid scope request: {error_message or 'Please check your input and try again.'}"
+                        f"Invalid scope request: {error_message or 'Please check your input and try again.'}",
+                        status_code=400,
                     )
 
             elif "client" in path.lower():
                 if "already exists" in error_message.lower() or "duplicate" in error_message.lower():
                     client_name = self._extract_client_name_from_error(error_message, response)
-                    raise AdminAPIError(f"Client '{client_name}' already exists. Please choose a different name.")
+                    raise AdminAPIError(
+                        f"Client '{client_name}' already exists. Please choose a different name.", status_code=400
+                    )
                 elif "redirect" in error_message.lower():
-                    raise AdminAPIError(f"Invalid redirect URI: {error_message}")
+                    raise AdminAPIError(f"Invalid redirect URI: {error_message}", status_code=400)
                 else:
                     raise AdminAPIError(
-                        f"Invalid client request: {error_message or 'Please check your input and try again.'}"
+                        f"Invalid client request: {error_message or 'Please check your input and try again.'}",
+                        status_code=400,
                     )
 
             else:
-                raise AdminAPIError(f"Bad request: {error_message or 'Please check your input and try again.'}")
+                raise AdminAPIError(
+                    f"Bad request: {error_message or 'Please check your input and try again.'}", status_code=400
+                )
 
         elif status_code == 401:
-            raise AdminAPIError("Authentication failed. Please login again with 'python -m authly admin login'.")
+            raise AdminAPIError(
+                "Authentication failed. Please login again with 'python -m authly admin login'.", status_code=401
+            )
 
         elif status_code == 403:
-            raise AdminAPIError("Access denied. You don't have permission to perform this operation.")
+            raise AdminAPIError("Access denied. You don't have permission to perform this operation.", status_code=403)
 
         elif status_code == 404:
             if "scope" in path.lower():
-                raise AdminAPIError("Scope not found.")
+                raise AdminAPIError("Scope not found.", status_code=404)
             elif "client" in path.lower():
-                raise AdminAPIError("Client not found.")
+                raise AdminAPIError("Client not found.", status_code=404)
             else:
-                raise AdminAPIError("Resource not found.")
+                raise AdminAPIError("Resource not found.", status_code=404)
 
         elif status_code == 409:
-            raise AdminAPIError(f"Resource conflict: {error_message or 'The resource already exists.'}")
+            raise AdminAPIError(
+                f"Resource conflict: {error_message or 'The resource already exists.'}", status_code=409
+            )
 
         elif status_code >= 500:
             raise AdminAPIError(
-                f"Server error: {error_message or 'The server encountered an error. Please try again later.'}"
+                f"Server error: {error_message or 'The server encountered an error. Please try again later.'}",
+                status_code=status_code,
             )
 
         else:
             # Fallback for other status codes
-            raise AdminAPIError(f"Request failed: {error_message or f'HTTP {status_code}'}")
+            raise AdminAPIError(f"Request failed: {error_message or f'HTTP {status_code}'}", status_code=status_code)
 
     def _extract_scope_name_from_error(self, error_message: str, response: httpx.Response) -> str:
         """Extract scope name from error message or request."""

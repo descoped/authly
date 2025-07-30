@@ -11,7 +11,7 @@ import pytest
 from httpx import HTTPStatusError
 from psycopg_toolkit import TransactionManager
 
-from authly.admin.api_client import AdminAPIClient
+from authly.admin.api_client import AdminAPIClient, AdminAPIError
 from authly.auth.core import get_password_hash
 from authly.oauth.models import ClientType, OAuthClientCreateRequest
 from authly.users.models import UserModel
@@ -231,7 +231,10 @@ class TestAdminAPIClientIntegration:
     async def test_invalid_credentials(self, test_server):
         """Test login with invalid credentials."""
         async with AdminAPIClient(base_url=test_server.base_url) as client:
-            with pytest.raises(HTTPStatusError) as exc_info:
+            with pytest.raises(AdminAPIError) as exc_info:
                 await client.login(username="invalid_user", password="wrong_password")
 
-            assert exc_info.value.response.status_code == 401
+            # Verify it's an authentication error with user-friendly message
+            assert exc_info.value.status_code == 401
+            assert "Authentication failed" in exc_info.value.message
+            assert "python -m authly admin login" in exc_info.value.message

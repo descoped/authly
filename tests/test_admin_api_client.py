@@ -114,6 +114,7 @@ class TestAdminAPIClient:
         """Test login functionality."""
         # Mock response
         mock_response = MagicMock()
+        mock_response.status_code = 200
         mock_response.json.return_value = {
             "access_token": "new_access_token",
             "refresh_token": "new_refresh_token",
@@ -158,6 +159,7 @@ class TestAdminAPIClient:
 
         # Mock revoke responses
         mock_response = MagicMock()
+        mock_response.status_code = 200
         mock_httpx_client.request.return_value = mock_response
 
         # Logout
@@ -181,6 +183,7 @@ class TestAdminAPIClient:
 
         # Mock response
         mock_response = MagicMock()
+        mock_response.status_code = 200
         mock_response.json.return_value = {
             "access_token": "new_access_token",
             "token_type": "Bearer",
@@ -235,6 +238,7 @@ class TestAdminAPIClient:
 
         # Mock response
         mock_response = MagicMock()
+        mock_response.status_code = 200
         mock_response.json.return_value = [
             {
                 "id": "550e8400-e29b-41d4-a716-446655440000",
@@ -275,6 +279,7 @@ class TestAdminAPIClient:
 
         # Mock responses for create_client workflow
         create_response = MagicMock()
+        create_response.status_code = 200
         create_response.json.return_value = {
             "client_id": "new_client_id",
             "client_secret": "super_secret_value",
@@ -283,6 +288,7 @@ class TestAdminAPIClient:
         }
 
         get_response = MagicMock()
+        get_response.status_code = 200
         get_response.json.return_value = {
             "id": "550e8400-e29b-41d4-a716-446655440001",
             "client_id": "new_client_id",
