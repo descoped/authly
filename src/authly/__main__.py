@@ -264,7 +264,7 @@ def login(username: str, password: Optional[str], scope: str, api_url: Optional[
     ctx.params = {"username": username, "password": password, "scope": scope, "api_url": api_url}
 
     # Run the admin command
-    asyncio.run(admin_login.callback(username, password, scope, api_url))
+    admin_login.callback(username, password, scope, api_url)
 
 
 @admin.command()
@@ -278,7 +278,7 @@ def logout() -> None:
     ctx = click.Context(admin_logout)
 
     # Run the admin command
-    asyncio.run(admin_logout.callback())
+    admin_logout.callback()
 
 
 @admin.command()
@@ -294,7 +294,7 @@ def whoami(verbose: bool) -> None:
     ctx.params = {"verbose": verbose}
 
     # Run the admin command
-    asyncio.run(admin_whoami.callback(verbose))
+    admin_whoami.callback(verbose)
 
 
 @admin.group()
