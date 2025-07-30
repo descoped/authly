@@ -305,12 +305,28 @@ We welcome contributions! Please see our contributing guidelines and code of con
 ### **Development Setup**
 1. Clone the repository
 2. Install dependencies: `uv sync --all-groups`
-3. Run tests: `pytest`
-4. Start development server: `uv run python -m authly serve --embedded`
+3. Install git hooks (recommended): `.githooks/install-hooks.sh`
+4. Run tests: `pytest`
+5. Start development server: `uv run python -m authly serve --embedded`
+
+### **Git Hooks (Auto-Fix)**
+```bash
+# Install git hooks with auto-fixing capabilities
+.githooks/install-hooks.sh
+
+# Features:
+# ✅ Auto-fix ruff linting issues
+# ✅ Auto-format code with ruff
+# ✅ Re-stage fixed files automatically
+
+# Disable auto-fixing (if needed)
+export AUTHLY_NO_AUTO_FIX=true
+```
 
 ### **Development Commands**
 - **Linting**: `uv run ruff check .`
 - **Formatting**: `uv run ruff format .`
+- **Auto-fix linting**: `uv run ruff check --fix .`
 - **Validate Renovate config**: `npx --yes --package renovate -- renovate-config-validator .github/renovate.json`
 
 ### **Quality Standards**

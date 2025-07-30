@@ -54,10 +54,25 @@ print_status "Running ruff check..."
 if uv run ruff check $STAGED_FILES; then
     print_success "Ruff check passed!"
 else
-    print_error "Ruff check failed!"
-    print_error "Please fix the linting errors and try again"
-    print_error "You can run: uv run ruff check --fix $STAGED_FILES"
-    exit 1
+    if [[ "${AUTHLY_NO_AUTO_FIX:-false}" == "true" ]]; then
+        print_error "Ruff check failed!"
+        print_error "Please fix the linting errors and try again"
+        print_error "You can run: uv run ruff check --fix $STAGED_FILES"
+        exit 1
+    else
+        print_status "Auto-fixing ruff issues..."
+        if uv run ruff check --fix $STAGED_FILES; then
+            # Re-stage the fixed files
+            for file in $STAGED_FILES; do
+                git add "$file"
+            done
+            print_success "Ruff issues auto-fixed and re-staged!"
+        else
+            print_error "Some ruff issues could not be auto-fixed!"
+            print_error "Please fix the remaining errors manually and try again"
+            exit 1
+        fi
+    fi
 fi
 
 # Check if files need formatting
@@ -69,11 +84,13 @@ if echo "$FORMAT_CHECK" | grep -q "Would reformat"; then
     echo "$FORMAT_CHECK" | grep "Would reformat" | sed 's/^/  - /'
     echo
     
-    # Ask user if they want to auto-format
-    read -p "$(echo -e "${YELLOW}Auto-format these files? [y/N]:${NC} ")" -n 1 -r
-    echo
-    
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
+    # Auto-format files (can be disabled with AUTHLY_NO_AUTO_FIX=true)
+    if [[ "${AUTHLY_NO_AUTO_FIX:-false}" == "true" ]]; then
+        print_error "Auto-formatting disabled by AUTHLY_NO_AUTO_FIX=true"
+        print_error "Please run: uv run ruff format $STAGED_FILES"
+        print_error "Then add the changes and commit again"
+        exit 1
+    else
         print_status "Auto-formatting files..."
         uv run ruff format $STAGED_FILES
         
@@ -85,12 +102,7 @@ if echo "$FORMAT_CHECK" | grep -q "Would reformat"; then
             fi
         done
         
-        print_success "Files formatted and re-staged!"
-    else
-        print_error "Commit aborted due to formatting issues"
-        print_error "Please run: uv run ruff format $STAGED_FILES"
-        print_error "Then add the changes and commit again"
-        exit 1
+        print_success "Files auto-formatted and re-staged!"
     fi
 else
     print_success "Code formatting check passed!"
