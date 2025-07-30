@@ -9,7 +9,7 @@ from typing import Dict, Optional
 import click
 from fastapi import HTTPException
 
-from authly.admin.api_client import AdminAPIClient
+from authly.admin.api_client import AdminAPIClient, AdminAPIError
 
 
 def get_api_url() -> str:
@@ -69,6 +69,9 @@ def create_scope(ctx: click.Context, name: str, description: Optional[str], is_d
                     click.echo(f"  Active: {'✅ Yes' if result.is_active else '❌ No'}")
                     click.echo(f"  Created: {result.created_at}")
 
+            except AdminAPIError as e:
+                click.echo(f"❌ {e.message}", err=True)
+                sys.exit(1)
             except Exception as e:
                 click.echo(f"❌ Error creating scope: {e}", err=True)
                 sys.exit(1)
@@ -129,6 +132,9 @@ def list_scopes(ctx: click.Context, limit: int, offset: int, output: str, show_i
 
                     click.echo(f"\nTotal: {len(scopes)} scope(s)")
 
+            except AdminAPIError as e:
+                click.echo(f"❌ {e.message}", err=True)
+                sys.exit(1)
             except Exception as e:
                 click.echo(f"❌ Error listing scopes: {e}", err=True)
                 sys.exit(1)
@@ -168,6 +174,9 @@ def show_scope(ctx: click.Context, scope_name: str, output: str):
                     click.echo(f"Created: {scope.created_at}")
                     click.echo(f"Updated: {scope.updated_at}")
 
+            except AdminAPIError as e:
+                click.echo(f"❌ {e.message}", err=True)
+                sys.exit(1)
             except Exception as e:
                 if "404" in str(e):
                     click.echo(f"❌ Scope not found: {scope_name}", err=True)
@@ -254,6 +263,9 @@ def update_scope(
                 click.echo(f"  Default: {'✅ Yes' if updated_scope.is_default else '❌ No'}")
                 click.echo(f"  Active: {'✅ Yes' if updated_scope.is_active else '❌ No'}")
 
+            except AdminAPIError as e:
+                click.echo(f"❌ {e.message}", err=True)
+                sys.exit(1)
             except Exception as e:
                 click.echo(f"❌ Error updating scope: {e}", err=True)
                 sys.exit(1)
@@ -294,6 +306,9 @@ def delete_scope(ctx: click.Context, scope_name: str, confirm: bool):
                 click.echo("✅ Scope deactivated successfully!")
                 click.echo(f"  Message: {result.get('message', 'Scope deleted')}")
 
+            except AdminAPIError as e:
+                click.echo(f"❌ {e.message}", err=True)
+                sys.exit(1)
             except Exception as e:
                 if "404" in str(e):
                     click.echo("❌ Scope not found or cannot be deactivated", err=True)
@@ -342,6 +357,9 @@ def show_defaults(ctx: click.Context, output: str):
 
                     click.echo(f"Total: {len(default_scopes)} default scope(s)")
 
+            except AdminAPIError as e:
+                click.echo(f"❌ {e.message}", err=True)
+                sys.exit(1)
             except Exception as e:
                 click.echo(f"❌ Error getting default scopes: {e}", err=True)
                 sys.exit(1)

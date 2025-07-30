@@ -28,6 +28,16 @@ from authly.oauth.models import (
 logger = logging.getLogger(__name__)
 
 
+class AdminAPIError(Exception):
+    """Custom exception for Admin API errors with user-friendly messages."""
+
+    def __init__(self, message: str, status_code: Optional[int] = None, response_body: Optional[str] = None):
+        self.message = message
+        self.status_code = status_code
+        self.response_body = response_body
+        super().__init__(message)
+
+
 class TokenInfo(BaseModel):
     """Token information with expiration tracking."""
 
@@ -160,8 +170,117 @@ class AdminAPIClient:
 
         response = await self.client.request(method=method, url=url, json=json_data, params=params, headers=headers)
 
-        response.raise_for_status()
+        # Handle HTTP errors with meaningful messages
+        if response.status_code >= 400:
+            await self._handle_api_error(response, method, path)
+
         return response
+
+    async def _handle_api_error(self, response: httpx.Response, method: str, path: str) -> None:
+        """Handle API errors and raise meaningful exceptions."""
+        status_code = response.status_code
+
+        # Try to get error details from response body
+        try:
+            error_data = response.json()
+            error_message = error_data.get("detail", "")
+            if isinstance(error_message, list) and error_message:
+                # Handle FastAPI validation errors
+                error_message = error_message[0].get("msg", str(error_message[0]))
+            elif not error_message:
+                error_message = error_data.get("message", "")
+        except (ValueError, KeyError):
+            error_message = response.text or ""
+
+        # Provide context-specific error messages
+        if status_code == 400:
+            if "scope" in path.lower():
+                if "already exists" in error_message.lower() or "duplicate" in error_message.lower():
+                    # Extract scope name from error or request data
+                    scope_name = self._extract_scope_name_from_error(error_message, response)
+                    raise AdminAPIError(f"Scope '{scope_name}' already exists. Please choose a different name.")
+                elif "invalid" in error_message.lower():
+                    raise AdminAPIError(f"Invalid scope data: {error_message}")
+                else:
+                    raise AdminAPIError(
+                        f"Invalid scope request: {error_message or 'Please check your input and try again.'}"
+                    )
+
+            elif "client" in path.lower():
+                if "already exists" in error_message.lower() or "duplicate" in error_message.lower():
+                    client_name = self._extract_client_name_from_error(error_message, response)
+                    raise AdminAPIError(f"Client '{client_name}' already exists. Please choose a different name.")
+                elif "redirect" in error_message.lower():
+                    raise AdminAPIError(f"Invalid redirect URI: {error_message}")
+                else:
+                    raise AdminAPIError(
+                        f"Invalid client request: {error_message or 'Please check your input and try again.'}"
+                    )
+
+            else:
+                raise AdminAPIError(f"Bad request: {error_message or 'Please check your input and try again.'}")
+
+        elif status_code == 401:
+            raise AdminAPIError("Authentication failed. Please login again with 'python -m authly admin login'.")
+
+        elif status_code == 403:
+            raise AdminAPIError("Access denied. You don't have permission to perform this operation.")
+
+        elif status_code == 404:
+            if "scope" in path.lower():
+                raise AdminAPIError("Scope not found.")
+            elif "client" in path.lower():
+                raise AdminAPIError("Client not found.")
+            else:
+                raise AdminAPIError("Resource not found.")
+
+        elif status_code == 409:
+            raise AdminAPIError(f"Resource conflict: {error_message or 'The resource already exists.'}")
+
+        elif status_code >= 500:
+            raise AdminAPIError(
+                f"Server error: {error_message or 'The server encountered an error. Please try again later.'}"
+            )
+
+        else:
+            # Fallback for other status codes
+            raise AdminAPIError(f"Request failed: {error_message or f'HTTP {status_code}'}")
+
+    def _extract_scope_name_from_error(self, error_message: str, response: httpx.Response) -> str:
+        """Extract scope name from error message or request."""
+        # Try to get scope name from error message
+        if "'" in error_message:
+            parts = error_message.split("'")
+            if len(parts) >= 2:
+                return parts[1]
+
+        # Fallback: try to get from request data
+        try:
+            if hasattr(response, "request") and response.request.content:
+                request_data = json.loads(response.request.content)
+                return request_data.get("scope_name", "unknown")
+        except:
+            pass
+
+        return "unknown"
+
+    def _extract_client_name_from_error(self, error_message: str, response: httpx.Response) -> str:
+        """Extract client name from error message or request."""
+        # Try to get client name from error message
+        if "'" in error_message:
+            parts = error_message.split("'")
+            if len(parts) >= 2:
+                return parts[1]
+
+        # Fallback: try to get from request data
+        try:
+            if hasattr(response, "request") and response.request.content:
+                request_data = json.loads(response.request.content)
+                return request_data.get("client_name", "unknown")
+        except:
+            pass
+
+        return "unknown"
 
     async def login(self, username: str, password: str, scope: Optional[str] = None) -> TokenInfo:
         """

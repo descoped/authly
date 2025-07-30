@@ -9,7 +9,7 @@ from typing import Dict, List, Optional
 import click
 from fastapi import HTTPException
 
-from authly.admin.api_client import AdminAPIClient
+from authly.admin.api_client import AdminAPIClient, AdminAPIError
 from authly.oauth.models import ClientType, OAuthClientCreateRequest, TokenEndpointAuthMethod
 
 
@@ -158,6 +158,9 @@ def create_client(
                     else:
                         click.echo("  Client Secret: None (public client)")
 
+            except AdminAPIError as e:
+                click.echo(f"❌ {e.message}", err=True)
+                sys.exit(1)
             except Exception as e:
                 click.echo(f"❌ Error creating client: {e}", err=True)
                 sys.exit(1)
@@ -215,6 +218,9 @@ def list_clients(ctx: click.Context, limit: int, offset: int, output: str, show_
 
                     click.echo(f"\nTotal: {len(clients)} client(s)")
 
+            except AdminAPIError as e:
+                click.echo(f"❌ {e.message}", err=True)
+                sys.exit(1)
             except Exception as e:
                 click.echo(f"❌ Error listing clients: {e}", err=True)
                 sys.exit(1)
@@ -281,6 +287,9 @@ def show_client(ctx: click.Context, client_id: str, output: str):
                     if client_details.policy_uri:
                         click.echo(f"Privacy Policy: {client_details.policy_uri}")
 
+            except AdminAPIError as e:
+                click.echo(f"❌ {e.message}", err=True)
+                sys.exit(1)
             except Exception as e:
                 if "404" in str(e):
                     click.echo(f"❌ Client not found: {client_id}", err=True)
@@ -365,6 +374,9 @@ def update_client(
                 click.echo(f"  Name: {updated_client.client_name}")
                 click.echo(f"  Active: {'✅ Yes' if updated_client.is_active else '❌ No'}")
 
+            except AdminAPIError as e:
+                click.echo(f"❌ {e.message}", err=True)
+                sys.exit(1)
             except Exception as e:
                 click.echo(f"❌ Error updating client: {e}", err=True)
                 sys.exit(1)
@@ -406,6 +418,9 @@ def regenerate_secret(ctx: click.Context, client_id: str, confirm: bool):
                 click.echo(f"  New Secret: {credentials.client_secret}")
                 click.echo("  ⚠️  Store the new secret securely - it won't be shown again!")
 
+            except AdminAPIError as e:
+                click.echo(f"❌ {e.message}", err=True)
+                sys.exit(1)
             except Exception as e:
                 if "404" in str(e):
                     click.echo("❌ Client not found", err=True)
@@ -451,6 +466,9 @@ def delete_client(ctx: click.Context, client_id: str, confirm: bool):
                 click.echo("✅ Client deactivated successfully!")
                 click.echo(f"  Message: {result.get('message', 'Client deleted')}")
 
+            except AdminAPIError as e:
+                click.echo(f"❌ {e.message}", err=True)
+                sys.exit(1)
             except Exception as e:
                 if "404" in str(e):
                     click.echo("❌ Client not found", err=True)

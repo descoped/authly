@@ -12,7 +12,7 @@ from typing import Optional
 
 import click
 
-from authly.admin.api_client import AdminAPIClient
+from authly.admin.api_client import AdminAPIClient, AdminAPIError
 
 
 def get_api_url() -> str:

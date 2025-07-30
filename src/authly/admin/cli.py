@@ -41,10 +41,10 @@ def main(ctx: click.Context, config: Optional[Path], verbose: bool, dry_run: boo
     Manage OAuth 2.1 clients and scopes for your Authly instance.
 
     Examples:
-        authly-admin client create --name "My App" --type public
-        authly-admin scope create --name read --description "Read access"
-        authly-admin client list
-        authly-admin scope list
+        python -m authly admin client create --name "My App" --client-type public --redirect-uri "http://localhost:3000/callback"
+        python -m authly admin scope create --name read --description "Read access"
+        python -m authly admin client list
+        python -m authly admin scope list
     """
     # Ensure context object exists
     ctx.ensure_object(dict)
@@ -81,7 +81,7 @@ def status_impl(verbose: bool):
                 # Check authentication status
                 if not client.is_authenticated:
                     click.echo("⚠️  Authentication: Not logged in")
-                    click.echo("   Use 'authly-admin login' to authenticate for detailed status")
+                    click.echo("   Use 'python -m authly admin login' to authenticate for detailed status")
                     return
 
                 # Get detailed status (requires authentication)
@@ -123,22 +123,21 @@ def status_impl(verbose: bool):
                         click.echo(f"  {var_name}: {status_text}")
 
                 # Service statistics
-                clients_info = status.get("clients", {})
-                scopes_info = status.get("scopes", {})
+                stats = status.get("statistics", {})
 
                 click.echo(f"\nService Statistics:")
-                click.echo(f"  OAuth Clients: {clients_info.get('total', 'Unknown')}")
-                click.echo(f"  OAuth Scopes: {scopes_info.get('total', 'Unknown')}")
+                click.echo(f"  OAuth Clients: {stats.get('oauth_clients', 'Unknown')}")
+                click.echo(f"  OAuth Scopes: {stats.get('oauth_scopes', 'Unknown')}")
 
-                if scopes_info.get("total", 0) == 0:
+                if stats.get("oauth_scopes", 0) == 0:
                     click.echo("\n⚠️  No scopes configured. Consider adding basic scopes:")
-                    click.echo("   authly-admin scope create --name read --description 'Read access'")
-                    click.echo("   authly-admin scope create --name write --description 'Write access'")
+                    click.echo("   python -m authly admin scope create --name read --description 'Read access'")
+                    click.echo("   python -m authly admin scope create --name write --description 'Write access'")
 
             except Exception as e:
                 if "401" in str(e) or "403" in str(e):
                     click.echo("❌ Authentication: Invalid or expired credentials")
-                    click.echo("   Use 'authly-admin login' to authenticate")
+                    click.echo("   Use 'python -m authly admin login' to authenticate")
                 else:
                     click.echo(f"❌ Error connecting to API: {e}")
                     click.echo(f"   Check that the API server is running at {api_url}")
