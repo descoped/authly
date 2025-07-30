@@ -46,14 +46,15 @@ class TestResourceManagerIntegration:
         """Test that fastapi-testing infrastructure is correctly set up."""
         # Test that dependency injection is properly configured
         app = resource_manager_server.app
-        
+
         # Test that dependency overrides are working
         assert len(app.dependency_overrides) > 0
-        
+
         # Test that resource manager is accessible through dependency injection
         from authly.core.dependencies import get_resource_manager
+
         assert get_resource_manager in app.dependency_overrides
-        
+
         # Get resource manager through the overridden dependency
         rm = app.dependency_overrides[get_resource_manager]()
         assert rm == test_resource_manager

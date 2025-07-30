@@ -30,7 +30,7 @@ class DeferredOAuth2PasswordBearer:
         try:
             # Try to get from the global resource manager instance
             from authly.core.dependencies import _resource_manager_instance
-            
+
             if _resource_manager_instance is not None:
                 config = _resource_manager_instance.get_config()
                 return f"{config.fastapi_api_version_prefix}/auth/token"

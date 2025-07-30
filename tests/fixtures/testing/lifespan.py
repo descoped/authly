@@ -59,7 +59,7 @@ async def resource_manager_test_server(
 
     # Set up dependency injection without app.state
     from authly.core.dependencies import create_resource_manager_provider, get_resource_manager
-    
+
     # Create the provider and override the default dependency
     provider = create_resource_manager_provider(test_resource_manager)
     app.dependency_overrides[get_resource_manager] = provider

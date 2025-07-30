@@ -57,7 +57,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
             # Set up dependency injection without app.state
             from authly.core.dependencies import create_resource_manager_provider, get_resource_manager
-            
+
             # Create the provider and override the default dependency
             provider = create_resource_manager_provider(resource_manager)
             app.dependency_overrides[get_resource_manager] = provider

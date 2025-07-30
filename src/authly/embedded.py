@@ -165,9 +165,10 @@ async def run_embedded_server(host: str = "0.0.0.0", port: int = 8000, seed: boo
 
         # Create FastAPI application with resource manager
         app = create_embedded_app(config, database_url, seed)
-        
+
         # Set up dependency injection without app.state
         from authly.core.dependencies import create_resource_manager_provider, get_resource_manager
+
         provider = create_resource_manager_provider(resource_manager)
         app.dependency_overrides[get_resource_manager] = provider
 
