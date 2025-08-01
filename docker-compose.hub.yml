@@ -1,0 +1,235 @@
+# Docker Compose using images from Docker Hub
+# Usage: docker-compose -f docker-compose.hub.yml up -d
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:17-alpine
+    container_name: authly-postgres-hub
+    environment:
+      POSTGRES_DB: authly
+      POSTGRES_USER: authly
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-authly_dev_password}
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
+    volumes:
+      - postgres_hub_data:/var/lib/postgresql/data
+      - ./docker/init-db-and-user.sql:/docker-entrypoint-initdb.d/01-init-db.sql:ro
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    networks:
+      - authly_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U authly -d authly"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  # Redis Cache (for session management and rate limiting)
+  redis:
+    image: redis:8-alpine
+    container_name: authly-redis-hub
+    command: redis-server --requirepass ${REDIS_PASSWORD:-redis_dev_password}
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_dev_password}
+    volumes:
+      - redis_hub_data:/data
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    networks:
+      - authly_network
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli --no-auth-warning -a ${REDIS_PASSWORD:-redis_dev_password} ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  # Authly Application (from Docker Hub)
+  authly:
+    image: descoped/authly:${AUTHLY_VERSION:-latest}
+    container_name: authly-app-hub
+    environment:
+      # Resource Manager Configuration
+      AUTHLY_MODE: "production"
+      AUTHLY_BOOTSTRAP_ENABLED: ${AUTHLY_BOOTSTRAP_ENABLED:-true}
+      
+      # Database Configuration
+      DATABASE_URL: "postgresql://authly:${POSTGRES_PASSWORD:-authly_dev_password}@postgres:5432/authly"
+      
+      # Redis Configuration (optional)
+      AUTHLY_REDIS_URL: "redis://:${REDIS_PASSWORD:-redis_dev_password}@redis:6379/0"
+      AUTHLY_REDIS_RATE_LIMIT: ${AUTHLY_REDIS_RATE_LIMIT:-true}
+      AUTHLY_REDIS_CACHE: ${AUTHLY_REDIS_CACHE:-true}
+      AUTHLY_REDIS_SESSION: ${AUTHLY_REDIS_SESSION:-false}
+      
+      # JWT Configuration
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-dev-secret-key-change-in-production}
+      JWT_REFRESH_SECRET_KEY: ${JWT_REFRESH_SECRET_KEY:-dev-refresh-secret-key-change-in-production}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      
+      # Token Expiration
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-60}
+      REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-7}
+      
+      # Rate Limiting
+      RATE_LIMIT_MAX_REQUESTS: ${RATE_LIMIT_MAX_REQUESTS:-100}
+      RATE_LIMIT_WINDOW_SECONDS: ${RATE_LIMIT_WINDOW_SECONDS:-60}
+      
+      # API Configuration
+      AUTHLY_API_VERSION_PREFIX: ${AUTHLY_API_VERSION_PREFIX:-/api/v1}
+      DEFAULT_API_URL: ${DEFAULT_API_URL:-http://localhost:8000}
+      DEFAULT_ISSUER_URL: ${DEFAULT_ISSUER_URL:-http://localhost:8000}
+      
+      # Security
+      RSA_KEY_SIZE: ${RSA_KEY_SIZE:-2048}
+      TOKEN_HEX_LENGTH: ${TOKEN_HEX_LENGTH:-32}
+      AUTHORIZATION_CODE_LENGTH: ${AUTHORIZATION_CODE_LENGTH:-32}
+      CLIENT_SECRET_LENGTH: ${CLIENT_SECRET_LENGTH:-32}
+      
+      # Pagination
+      DEFAULT_PAGE_SIZE: ${DEFAULT_PAGE_SIZE:-100}
+      MAX_PAGE_SIZE: ${MAX_PAGE_SIZE:-100}
+      
+      # Field Validation
+      USERNAME_MIN_LENGTH: ${USERNAME_MIN_LENGTH:-1}
+      USERNAME_MAX_LENGTH: ${USERNAME_MAX_LENGTH:-50}
+      PASSWORD_MIN_LENGTH: ${PASSWORD_MIN_LENGTH:-8}
+      
+      # Logging Configuration
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      AUTHLY_LOG_LEVEL: ${AUTHLY_LOG_LEVEL:-INFO}
+      
+      # Admin API Configuration
+      AUTHLY_ADMIN_API_ENABLED: ${AUTHLY_ADMIN_API_ENABLED:-true}
+      AUTHLY_ADMIN_API_LOCALHOST_ONLY: ${AUTHLY_ADMIN_API_LOCALHOST_ONLY:-false}
+      AUTHLY_ADMIN_USERNAME: ${AUTHLY_ADMIN_USERNAME:-admin}
+      AUTHLY_ADMIN_PASSWORD: ${AUTHLY_ADMIN_PASSWORD:-admin123}
+      AUTHLY_ADMIN_EMAIL: ${AUTHLY_ADMIN_EMAIL:-admin@localhost}
+      AUTHLY_ADMIN_ALLOW_LOCALHOST: ${AUTHLY_ADMIN_ALLOW_LOCALHOST:-true}
+    ports:
+      - "${AUTHLY_PORT:-8000}:8000"
+    networks:
+      - authly_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    volumes:
+      # Mount logs directory for persistent logging
+      - authly_hub_logs:/app/logs
+
+  # Development Database Admin (pgAdmin)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: authly-pgadmin-hub
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@authly.dev}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    ports:
+      - "${PGADMIN_PORT:-5050}:80"
+    volumes:
+      - pgadmin_hub_data:/var/lib/pgadmin
+      - ./docker-compose/pgadmin/servers.json:/pgadmin4/servers.json:ro
+    networks:
+      - authly_network
+    depends_on:
+      - postgres
+    restart: unless-stopped
+    profiles:
+      - admin
+
+  # Redis Commander (Redis Web UI)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: authly-redis-commander-hub
+    environment:
+      REDIS_HOSTS: "authly:redis://:${REDIS_PASSWORD:-redis_dev_password}@redis:6379/0"
+      HTTP_USER: ${REDIS_COMMANDER_USER:-admin}
+      HTTP_PASSWORD: ${REDIS_COMMANDER_PASSWORD:-admin}
+    ports:
+      - "${REDIS_COMMANDER_PORT:-8081}:8081"
+    networks:
+      - authly_network
+    depends_on:
+      - redis
+    restart: unless-stopped
+    profiles:
+      - admin
+
+  # Prometheus Monitoring
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: authly-prometheus-hub
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./docker-compose/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_hub_data:/prometheus
+    networks:
+      - authly_network
+    restart: unless-stopped
+    profiles:
+      - monitoring
+
+  # Grafana Dashboards
+  grafana:
+    image: grafana/grafana:latest
+    container_name: authly-grafana-hub
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    volumes:
+      - grafana_hub_data:/var/lib/grafana
+      - ./docker-compose/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ./docker-compose/grafana/provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - authly_network
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    profiles:
+      - monitoring
+
+# Networks
+networks:
+  authly_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16
+
+# Volumes
+volumes:
+  postgres_hub_data:
+    driver: local
+  redis_hub_data:
+    driver: local
+  authly_hub_logs:
+    driver: local
+  pgadmin_hub_data:
+    driver: local
+  prometheus_hub_data:
+    driver: local
+  grafana_hub_data:
+    driver: local
