@@ -45,19 +45,20 @@ STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
 
-async def get_discovery_service() -> DiscoveryService:
+async def get_discovery_service(scope_repo: "ScopeRepository" = Depends(get_scope_repository)) -> DiscoveryService:
     """
     Get an instance of the DiscoveryService.
 
-    Note: Scope repository is acquired dynamically to handle cases
-    where database is not available (e.g., testing).
+    Uses FastAPI dependency injection to properly get the scope repository
+    with a database connection.
+
+    Args:
+        scope_repo: Injected scope repository with database connection
+
+    Returns:
+        DiscoveryService: Service with proper database connection
     """
-    try:
-        scope_repo = await get_scope_repository()
-        return DiscoveryService(scope_repo)
-    except Exception:
-        # Return service without scope repo for fallback
-        return DiscoveryService(None)
+    return DiscoveryService(scope_repo)
 
 
 def _build_issuer_url(request: Request) -> str:

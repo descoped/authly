@@ -155,7 +155,7 @@ services:
     image: rediscommander/redis-commander:latest
     container_name: authly-redis-commander-hub
     environment:
-      REDIS_HOSTS: "authly:redis://:${REDIS_PASSWORD:-redis_dev_password}@redis:6379/0"
+      REDIS_HOSTS: "local:redis:6379:0:${REDIS_PASSWORD:-redis_dev_password}"
       HTTP_USER: ${REDIS_COMMANDER_USER:-admin}
       HTTP_PASSWORD: ${REDIS_COMMANDER_PASSWORD:-admin}
     ports:

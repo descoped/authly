@@ -46,6 +46,8 @@ Features and capabilities for enterprise deployment:
 - **[Deployment Guide](../../docs/deployment-guide.md)** - Production deployment instructions
 - **[Docker Configuration](../../docker/)** - Container deployment and database setup
 - **[Monitoring Setup](../../docs/monitoring-guide.md)** - Production observability
+- **[Docker Compose Production Fixes](docker-compose-production-fixes.md)** - Complete Docker deployment solution ✅
+- **[Structured Logging Implementation](structured-logging-implementation.md)** - Enterprise observability system ✅
 
 #### **Docker/CI Pipeline Configuration**
 **Environment Variables for CI/CD:**

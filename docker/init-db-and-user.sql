@@ -6,6 +6,73 @@
 -- Domains: CORE (authentication), OAUTH (OAuth 2.1), OIDC (OpenID Connect 1.0), GDPR (compliance)
 -- ===========================================================================================================
 
+-- ===========================================================================================================
+-- ENVIRONMENT DETECTION AND USER CREATION
+-- ===========================================================================================================
+-- This script works in both production (Docker Compose) and test (testcontainer) environments
+-- Production: Creates 'authly' user with POSTGRES_PASSWORD, grants on 'authly' database
+-- Test: Uses existing 'test' user, works with 'authly_test' database
+
+-- Check if we're in a testcontainer environment (test user exists, authly_test database)
+DO
+$env_setup$
+DECLARE
+    is_test_env BOOLEAN := FALSE;
+    current_db TEXT;
+    postgres_pwd TEXT;
+BEGIN
+    -- Get current database name
+    SELECT current_database() INTO current_db;
+    
+    -- Check if we're in test environment (authly_test database exists)
+    IF current_db = 'authly_test' THEN
+        is_test_env := TRUE;
+        RAISE NOTICE 'Detected test environment (database: %)', current_db;
+    ELSE
+        is_test_env := FALSE;
+        RAISE NOTICE 'Detected production environment (database: %)', current_db;
+    END IF;
+    
+    -- Only create authly user in production environment
+    IF NOT is_test_env THEN
+        -- Check if authly user already exists
+        IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'authly') THEN
+            -- Try to get POSTGRES_PASSWORD, fallback to default if not available
+            BEGIN
+                SELECT current_setting('POSTGRES_PASSWORD') INTO postgres_pwd;
+            EXCEPTION
+                WHEN undefined_object THEN
+                    postgres_pwd := 'authly_default_password';
+                    RAISE NOTICE 'POSTGRES_PASSWORD not found, using default password';
+            END;
+            
+            -- Create authly user
+            EXECUTE format('CREATE ROLE authly WITH LOGIN PASSWORD %L', postgres_pwd);
+            RAISE NOTICE 'Created authly user for production environment';
+            
+            -- Grant connect permission on current database
+            EXECUTE format('GRANT CONNECT ON DATABASE %I TO authly', current_db);
+            GRANT USAGE ON SCHEMA public TO authly;
+            GRANT CREATE ON SCHEMA public TO authly;
+            GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO authly;
+            GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO authly;
+            GRANT ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public TO authly;
+            
+            -- Grant permissions on future objects
+            ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO authly;
+            ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO authly;
+            ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO authly;
+            
+            RAISE NOTICE 'Granted permissions to authly user';
+        ELSE
+            RAISE NOTICE 'authly user already exists, skipping creation';
+        END IF;
+    ELSE
+        RAISE NOTICE 'Test environment detected, using existing test user';
+    END IF;
+END
+$env_setup$;
+
 -- Enable required extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 

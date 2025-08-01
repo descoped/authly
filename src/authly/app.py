@@ -18,7 +18,9 @@ from authly.api.admin_middleware import setup_admin_middleware
 from authly.api.admin_router import admin_router
 from authly.api.oauth_discovery_router import oauth_discovery_router
 from authly.api.password_change import router as password_change_router
+from authly.api.security_middleware import setup_security_middleware
 from authly.config import AuthlyConfig
+from authly.logging.middleware import LoggingMiddleware
 
 
 def create_app(
@@ -47,6 +49,12 @@ def create_app(
     """
     # Create FastAPI app
     app = FastAPI(title=title, version=version, description=description, lifespan=lifespan)
+
+    # Add logging middleware first (to capture all requests)
+    app.add_middleware(LoggingMiddleware)
+
+    # Setup security headers middleware (before other middleware)
+    setup_security_middleware(app)
 
     # Setup admin security middleware
     setup_admin_middleware(app)

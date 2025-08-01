@@ -2,9 +2,9 @@ global:
   scrape_interval: 15s
   evaluation_interval: 15s
 
+# Recording rules for common queries
 rule_files:
-  # - "first_rules.yml"
-  # - "second_rules.yml"
+  - "/etc/prometheus/rules/*.yml"
 
 scrape_configs:
   # Prometheus itself
@@ -50,7 +50,3 @@ alerting:
     - static_configs:
         - targets:
           # - alertmanager:9093
-
-# Recording rules for common queries
-rule_files:
-  - "/etc/prometheus/rules/*.yml"

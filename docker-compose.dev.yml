@@ -95,7 +95,7 @@ services:
     image: rediscommander/redis-commander:latest
     container_name: authly-redis-commander
     environment:
-      REDIS_HOSTS: "authly:redis://:redis_dev_password@redis:6379/0"
+      REDIS_HOSTS: "local:redis:6379:0:redis_dev_password"
       HTTP_USER: admin
       HTTP_PASSWORD: admin
     ports:
@@ -105,6 +105,8 @@ services:
     depends_on:
       - redis
     restart: unless-stopped
+    profiles:
+      - admin
 
   # Mailhog (Email testing)
   mailhog:
@@ -116,6 +118,14 @@ services:
     networks:
       - authly_network
     restart: unless-stopped
+
+# Networks (inherited from base)
+networks:
+  authly_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
 
 # Development-specific volumes
 volumes:

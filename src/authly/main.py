@@ -116,14 +116,18 @@ def create_app() -> FastAPI:
 
 def setup_logging():
     """Configure logging for production deployment"""
-    log_level = os.getenv("LOG_LEVEL", "INFO").upper()
-    log_format = os.getenv("LOG_FORMAT", "%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    from authly.logging.setup import get_service_version, setup_structured_logging
 
-    logging.basicConfig(level=getattr(logging, log_level), format=log_format)
+    # Determine if we should use JSON logging
+    json_logging = os.getenv("LOG_JSON", "true").lower() in ("true", "1", "yes")
 
-    # Set specific logger levels
-    logging.getLogger("uvicorn").setLevel(logging.INFO)
-    logging.getLogger("authly").setLevel(log_level)
+    # Setup structured logging
+    setup_structured_logging(
+        service_name="authly",
+        service_version=get_service_version(),
+        json_format=json_logging,
+        include_location=os.getenv("LOG_INCLUDE_LOCATION", "false").lower() in ("true", "1", "yes"),
+    )
 
 
 async def main():

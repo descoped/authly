@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 from psycopg_toolkit import TransactionManager
 
 from authly.api.oauth_discovery_router import oauth_discovery_router
+from authly.api.oauth_router import get_discovery_service
 from authly.core.resource_manager import AuthlyResourceManager
 from authly.oauth.discovery_models import OAuthServerMetadata
 from authly.oauth.discovery_service import DiscoveryService
@@ -184,6 +185,13 @@ class TestDiscoveryEndpoint:
     def test_discovery_endpoint_basic(self):
         """Test basic discovery endpoint functionality."""
         app = FastAPI()
+
+        # Mock the discovery service dependency to avoid database dependency
+        async def mock_get_discovery_service():
+            return DiscoveryService()
+
+        # Override the dependency
+        app.dependency_overrides[get_discovery_service] = mock_get_discovery_service
         app.include_router(oauth_discovery_router)
 
         client = TestClient(app)
@@ -212,6 +220,13 @@ class TestDiscoveryEndpoint:
     def test_discovery_endpoint_content_type(self):
         """Test discovery endpoint returns JSON content type."""
         app = FastAPI()
+
+        # Mock the discovery service dependency to avoid database dependency
+        async def mock_get_discovery_service():
+            return DiscoveryService()
+
+        # Override the dependency
+        app.dependency_overrides[get_discovery_service] = mock_get_discovery_service
         app.include_router(oauth_discovery_router)
 
         client = TestClient(app)
@@ -242,6 +257,12 @@ class TestDiscoveryEndpoint:
 
         # Now test the endpoint
         app = FastAPI()
+
+        # Mock the discovery service dependency to avoid connection issues in test app
+        async def mock_get_discovery_service():
+            return DiscoveryService()
+
+        app.dependency_overrides[get_discovery_service] = mock_get_discovery_service
         app.include_router(oauth_discovery_router)
 
         client = TestClient(app)
@@ -259,6 +280,12 @@ class TestDiscoveryEndpoint:
     def test_discovery_endpoint_url_building(self):
         """Test that discovery endpoint builds URLs correctly."""
         app = FastAPI()
+
+        # Mock the discovery service dependency to avoid database dependency
+        async def mock_get_discovery_service():
+            return DiscoveryService()
+
+        app.dependency_overrides[get_discovery_service] = mock_get_discovery_service
         app.include_router(oauth_discovery_router)
 
         client = TestClient(app)
@@ -279,6 +306,12 @@ class TestDiscoveryEndpoint:
     def test_discovery_endpoint_error_handling(self):
         """Test discovery endpoint error handling."""
         app = FastAPI()
+
+        # Mock the discovery service dependency to avoid database dependency
+        async def mock_get_discovery_service():
+            return DiscoveryService()
+
+        app.dependency_overrides[get_discovery_service] = mock_get_discovery_service
         app.include_router(oauth_discovery_router)
 
         client = TestClient(app)

@@ -47,13 +47,18 @@ services:
   # Authly Application (Production)
   authly:
     environment:
-      # Production Database (using secrets file references)
-      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
-      DATABASE_URL: "postgresql://authly:@postgres:5432/authly"
+      # Production Database (using Docker secrets - requires application support)
+      DATABASE_HOST: "postgres"
+      DATABASE_PORT: "5432"
+      DATABASE_NAME: "authly"
+      DATABASE_USER: "authly"
+      POSTGRES_PASSWORD_FILE: "/run/secrets/postgres_password"
       
-      # Production Redis (using secrets file references)
-      REDIS_PASSWORD_FILE: /run/secrets/redis_password
-      REDIS_URL: "redis://@redis:6379/0"
+      # Production Redis (using Docker secrets - requires application support)
+      REDIS_HOST: "redis"
+      REDIS_PORT: "6379"
+      REDIS_DB: "0"
+      REDIS_PASSWORD_FILE: "/run/secrets/redis_password"
       
       # Production JWT Secrets (using secrets)
       JWT_SECRET_KEY_FILE: /run/secrets/jwt_secret_key
