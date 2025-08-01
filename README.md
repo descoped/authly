@@ -6,6 +6,9 @@
 [![Python Version](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Release](https://img.shields.io/github/v/release/descoped/authly)](https://github.com/descoped/authly/releases)
+[![PyPI - Version](https://img.shields.io/pypi/v/authly?color=blue)](https://pypi.org/project/authly/)
+[![Docker Hub](https://img.shields.io/docker/v/descoped/authly?label=Docker%20Hub&color=blue)](https://hub.docker.com/r/descoped/authly/tags)
+
 
 A **production-ready OAuth 2.1 + OpenID Connect 1.0 authorization server** built with FastAPI and PostgreSQL. Authly provides enterprise-grade security, comprehensive testing (510 tests passing), and professional administration tools.
 
