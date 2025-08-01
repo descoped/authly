@@ -13,6 +13,7 @@ from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
 from fastapi.staticfiles import StaticFiles
 
+from authly._version import __version__
 from authly.api import auth_router, health_router, oauth_router, oidc_router, users_router
 from authly.api.admin_middleware import setup_admin_middleware
 from authly.api.admin_router import admin_router
@@ -26,8 +27,8 @@ from authly.logging.middleware import LoggingMiddleware
 def create_app(
     config: Optional[AuthlyConfig] = None,
     title: str = "Authly Authentication Service",
-    version: str = "0.1.5",
-    description: str = "Production-ready authentication and authorization service",
+    version: str = __version__,
+    description: str = "Production-ready authentication and authorization service with OAuth 2.1 support",
     lifespan: Optional[AsyncGenerator] = None,
     static_path: Optional[str] = None,
     api_prefix: Optional[str] = None,
@@ -132,7 +133,7 @@ def create_production_app(lifespan: AsyncGenerator) -> FastAPI:
     """
     return create_app(
         title="Authly Authentication Service",
-        version="0.1.5",
+        version=__version__,
         description="Production-ready authentication and authorization service with OAuth 2.1 support",
         lifespan=lifespan,
     )
@@ -153,7 +154,7 @@ def create_embedded_app(config: AuthlyConfig, database_url: str, seed: bool = Fa
     app = create_app(
         config=config,
         title="Authly Auth API (Embedded)",
-        version="0.1.5",
+        version=__version__,
         description="Authly Authentication and Authorization Service - Embedded Development Mode",
         api_prefix=config.fastapi_api_version_prefix,
     )

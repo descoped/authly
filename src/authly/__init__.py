@@ -32,4 +32,5 @@ __all__ = [
     "AuthlyResourceManager",
 ]
 
-__version__ = "0.2.0"
+# Import version dynamically
+from authly._version import __version__
