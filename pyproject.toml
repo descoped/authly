@@ -1,6 +1,6 @@
 [project]
 name = "authly"
-version = "0.5.4"
+version = "0.5.5"
 description = "Authorization & User Token Handling Layer for You"
 authors = [
     { name = "Ove Ranheim", email = "oranheim@gmail.com" }
