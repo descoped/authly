@@ -2,7 +2,6 @@ from authly.api.auth_dependencies import RateLimiter, get_rate_limiter, oauth2_s
 from authly.api.auth_router import (
     LoginAttemptTracker,
     RefreshRequest,
-    SecurityHeadersMiddleware,
     TokenRequest,
     TokenResponse,
     TokenRevocationRequest,
@@ -51,7 +50,6 @@ __all__ = [
     "RefreshRequest",
     "TokenResponse",
     "TokenRevocationRequest",
-    "SecurityHeadersMiddleware",
     "LoginAttemptTracker",
     "login_tracker",
     "update_last_login",

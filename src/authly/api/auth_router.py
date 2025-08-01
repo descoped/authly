@@ -66,19 +66,6 @@ class TokenResponse(BaseModel):
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-# Security Headers Middleware
-class SecurityHeadersMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
-        response = await call_next(request)
-        response.headers["X-Content-Type-Options"] = "nosniff"
-        # Use standard HSTS max-age (1 year)
-        hsts_max_age = 31536000
-        response.headers["Strict-Transport-Security"] = f"max-age={hsts_max_age}"
-        response.headers["X-Frame-Options"] = "DENY"
-        response.headers["Content-Security-Policy"] = "default-src 'self'"
-        return response
-
-
 class LoginAttemptTracker:
     def __init__(self):
         self.attempts: Dict[str, Dict[str, Union[int, Optional[datetime]]]] = {}

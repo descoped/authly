@@ -88,9 +88,10 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
                 hsts_value += "; preload"
             response.headers["Strict-Transport-Security"] = hsts_value
 
-        # Content Security Policy
-        if self.csp_enabled and self.csp_policy:
-            response.headers["Content-Security-Policy"] = self.csp_policy
+        # Content Security Policy - with path-specific policies
+        if self.csp_enabled:
+            csp_policy = self._get_path_specific_csp(request.url.path)
+            response.headers["Content-Security-Policy"] = csp_policy
 
         # X-Frame-Options - Clickjacking protection
         response.headers["X-Frame-Options"] = self.frame_options
@@ -131,6 +132,37 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "style-src 'self' 'unsafe-inline'; "
             "img-src 'self' data:; "
             "font-src 'self'; "
+            "connect-src 'self'; "
+            "media-src 'none'; "
+            "object-src 'none'; "
+            "child-src 'none'; "
+            "frame-src 'none'; "
+            "worker-src 'none'; "
+            "manifest-src 'none'; "
+            "base-uri 'self'; "
+            "form-action 'self'; "
+            "frame-ancestors 'none'; "
+            "upgrade-insecure-requests"
+        )
+
+    def _get_path_specific_csp(self, path: str) -> str:
+        """Get Content Security Policy based on the request path."""
+        # Documentation endpoints need to load external CDN resources
+        if path in ["/docs", "/redoc"]:
+            return self._get_docs_csp()
+
+        # Use default CSP for all other paths
+        return self.csp_policy
+
+    def _get_docs_csp(self) -> str:
+        """Get CSP policy for documentation endpoints (/docs, /redoc)."""
+        # Relaxed CSP for Swagger UI and ReDoc that need external CDN resources
+        return (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' cdn.jsdelivr.net; "
+            "style-src 'self' 'unsafe-inline' cdn.jsdelivr.net; "
+            "img-src 'self' data: fastapi.tiangolo.com; "
+            "font-src 'self' cdn.jsdelivr.net; "
             "connect-src 'self'; "
             "media-src 'none'; "
             "object-src 'none'; "
