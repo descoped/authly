@@ -1,6 +1,6 @@
 [project]
 name = "authly"
-version = "0.5.1"
+version = "0.5.2"
 description = "Authorization & User Token Handling Layer for You"
 authors = [
     { name = "Ove Ranheim", email = "oranheim@gmail.com" }
@@ -39,6 +39,9 @@ dependencies = [
 [dependency-groups]
 redis = [
     "redis>=5.2.0",
+]
+embedded = [
+    "testcontainers[postgres]>=4.10.0",
 ]
 dev = [
     "ruff>=0.8.6",

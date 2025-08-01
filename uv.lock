@@ -36,7 +36,7 @@ wheels = [
 
 [[package]]
 name = "authly"
-version = "0.5.1"
+version = "0.5.2"
 source = { editable = "." }
 dependencies = [
     { name = "bcrypt" },
@@ -63,6 +63,9 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "ruff" },
+]
+embedded = [
+    { name = "testcontainers" },
 ]
 redis = [
     { name = "redis" },
@@ -101,6 +104,7 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [{ name = "ruff", specifier = ">=0.8.6" }]
+embedded = [{ name = "testcontainers", extras = ["postgres"], specifier = ">=4.10.0" }]
 redis = [{ name = "redis", specifier = ">=5.2.0" }]
 test = [
     { name = "fastapi-testing", specifier = ">=0.2.0" },
