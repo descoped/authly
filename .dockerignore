@@ -63,7 +63,6 @@ htmlcov/
 .env.dev
 .env.example
 docker-compose*.yml
-Dockerfile
 
 # Build artifacts
 # dist/ - commented out to allow wheel builds
