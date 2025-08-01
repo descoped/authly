@@ -40,13 +40,24 @@ RUN python3 -c "import tomllib; version=tomllib.load(open('pyproject.toml', 'rb'
 RUN mkdir -p /tmp/wheels
 
 # Copy wheel files if they exist (will be provided by CI or local build)
-COPY dist/*.whl /tmp/wheels/
+# Use a shell command to handle optional copying
+COPY . /tmp/context/
+RUN if [ -d "/tmp/context/dist" ] && ls /tmp/context/dist/*.whl >/dev/null 2>&1; then \
+      echo "📦 Found wheel files, copying..."; \
+      cp /tmp/context/dist/*.whl /tmp/wheels/; \
+      echo "true" > /tmp/has_wheels; \
+    else \
+      echo "🔨 No wheel files found, will build from source..."; \
+      echo "false" > /tmp/has_wheels; \
+    fi && \
+    # Copy only the source code we need \
+    cp -r /tmp/context/src /app/ && \
+    rm -rf /tmp/context
 
-# Copy source code (needed for source builds)
-COPY src/ /app/src/
+# Source code is already copied above
 
-# Install authly - conditional approach
-RUN if [ "$USE_WHEEL" = "true" ] && ls /tmp/wheels/*.whl >/dev/null 2>&1; then \
+# Install authly - conditional approach based on wheel detection
+RUN if [ -f "/tmp/has_wheels" ] && [ "$(cat /tmp/has_wheels)" = "true" ] && ls /tmp/wheels/*.whl >/dev/null 2>&1; then \
       echo "🎯 Installing authly from wheel..."; \
       cd /tmp/wheels && uv pip install --system $(ls -t *.whl | head -1); \
       mkdir -p /app/.venv; \
