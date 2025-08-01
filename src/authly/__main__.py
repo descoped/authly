@@ -42,7 +42,13 @@ def cli(ctx: click.Context, version: bool) -> None:
     admin capabilities and embedded development support.
     """
     if version:
-        click.echo("Authly Authentication Service v0.1.5")
+        try:
+            from importlib.metadata import version as get_version
+
+            authly_version = get_version("authly")
+        except Exception:
+            authly_version = "unknown"
+        click.echo(f"Authly Authentication Service v{authly_version}")
         return
 
     # If no subcommand is provided, default to serve mode
