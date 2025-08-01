@@ -43,6 +43,8 @@ class AuthlyResourceManager:
         self._database: Optional[Database] = None
         self._pool: Optional[AsyncConnectionPool] = None
         self._transaction_manager: Optional[TransactionManager] = None
+        self._redis_client = None
+        self._redis_pool = None
         self._self_managed = False
 
         logger.info(f"Initializing AuthlyResourceManager for {mode.value} mode")
@@ -320,6 +322,104 @@ class AuthlyResourceManager:
             AuthlyConfig: The application configuration instance
         """
         return self.config
+
+    # Redis Connection Management (Optional)
+
+    async def initialize_redis(self) -> bool:
+        """Initialize Redis connection if configured.
+
+        Returns:
+            True if Redis was successfully initialized, False if disabled or failed
+        """
+        if not self.config.redis_enabled:
+            logger.debug("Redis disabled via configuration")
+            return False
+
+        if not self.config.redis_url:
+            logger.debug("Redis URL not configured")
+            return False
+
+        try:
+            # Import Redis only when needed
+            import redis.asyncio as redis
+
+            # Create Redis connection pool
+            self._redis_pool = redis.ConnectionPool.from_url(
+                self.config.redis_url,
+                max_connections=self.config.redis_connection_pool_size,
+                socket_connect_timeout=self.config.redis_connection_timeout,
+                socket_keepalive=self.config.redis_socket_keepalive,
+                decode_responses=True,
+            )
+
+            # Create Redis client
+            self._redis_client = redis.Redis(connection_pool=self._redis_pool)
+
+            # Test connection
+            await self._redis_client.ping()
+
+            logger.info("Redis connection initialized successfully")
+            return True
+
+        except ImportError:
+            logger.warning("Redis dependency not available. Install with: uv add --group redis authly")
+            return False
+        except Exception as e:
+            logger.error(f"Failed to initialize Redis connection: {e}")
+            self._redis_client = None
+            self._redis_pool = None
+            return False
+
+    async def cleanup_redis(self) -> None:
+        """Cleanup Redis connections."""
+        if self._redis_client:
+            try:
+                await self._redis_client.aclose()
+            except Exception as e:
+                logger.error(f"Error closing Redis client: {e}")
+            finally:
+                self._redis_client = None
+
+        if self._redis_pool:
+            try:
+                await self._redis_pool.aclose()
+            except Exception as e:
+                logger.error(f"Error closing Redis pool: {e}")
+            finally:
+                self._redis_pool = None
+
+    def get_redis_client(self):
+        """Get Redis client if available.
+
+        Returns:
+            Redis client instance or None if not configured/available
+        """
+        return self._redis_client
+
+    @property
+    def redis_available(self) -> bool:
+        """Check if Redis is available and connected.
+
+        Returns:
+            True if Redis client is available and connected
+        """
+        return self._redis_client is not None
+
+    async def test_redis_connection(self) -> bool:
+        """Test Redis connection health.
+
+        Returns:
+            True if Redis is accessible, False otherwise
+        """
+        if not self._redis_client:
+            return False
+
+        try:
+            await self._redis_client.ping()
+            return True
+        except Exception as e:
+            logger.error(f"Redis connection test failed: {e}")
+            return False
 
     # Mode-Specific Behavior
 

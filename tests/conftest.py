@@ -45,6 +45,14 @@ async def test_resource_manager(
     # Initialize with the test Database instance
     await resource_manager.initialize_with_external_database(_database_instance)
 
+    # Initialize Redis (will be disabled in test config by default)
+    await resource_manager.initialize_redis()
+
+    # Initialize backend factory for tests
+    from authly.core.backend_factory import initialize_backend_factory
+
+    initialize_backend_factory(resource_manager)
+
     yield resource_manager
 
     # No cleanup needed - Database lifecycle is managed by _database_instance fixture
@@ -61,6 +69,14 @@ async def initialize_authly(
     """
     resource_manager = AuthlyResourceManager.for_testing(test_config)
     await resource_manager.initialize_with_external_database(_database_instance)
+
+    # Initialize Redis (will be disabled in test config by default)
+    await resource_manager.initialize_redis()
+
+    # Initialize backend factory for tests
+    from authly.core.backend_factory import initialize_backend_factory
+
+    initialize_backend_factory(resource_manager)
 
     yield resource_manager
 

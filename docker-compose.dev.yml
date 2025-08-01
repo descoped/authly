@@ -35,8 +35,11 @@ services:
       # Development Database
       DATABASE_URL: "postgresql://authly:authly_dev_password@postgres:5432/authly"
       
-      # Development Redis (optional)
-      REDIS_URL: "redis://:redis_dev_password@redis:6379/0"
+      # Development Redis (optional - enable features for testing)
+      AUTHLY_REDIS_URL: "redis://:redis_dev_password@redis:6379/0"
+      AUTHLY_REDIS_RATE_LIMIT: "true"
+      AUTHLY_REDIS_CACHE: "true"
+      AUTHLY_REDIS_SESSION: "false"  # Keep sessions in database for development
       
       # Development JWT Secrets (INSECURE - for development only)
       JWT_SECRET_KEY: "dev-secret-key-do-not-use-in-production"

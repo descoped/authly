@@ -54,6 +54,13 @@ class AuthlyConfig:
     _password_min_length: int
     _postgres_port: int
     _bootstrap_dev_mode: bool
+    _redis_url: Optional[str]
+    _redis_rate_limit_enabled: bool
+    _redis_cache_enabled: bool
+    _redis_session_enabled: bool
+    _redis_connection_pool_size: int
+    _redis_connection_timeout: int
+    _redis_socket_keepalive: bool
     _secrets: Optional[SecureSecrets] = None
 
     def __del__(self):
@@ -111,6 +118,14 @@ class AuthlyConfig:
             _postgres_port=int(os.getenv("POSTGRES_PORT", "5432")),
             _bootstrap_dev_mode=os.getenv("AUTHLY_BOOTSTRAP_DEV_MODE", "false").lower() == "true",
             _database_url=db_config.database_url,
+            # Redis configuration (optional)
+            _redis_url=os.getenv("AUTHLY_REDIS_URL"),
+            _redis_rate_limit_enabled=os.getenv("AUTHLY_REDIS_RATE_LIMIT", "false").lower() == "true",
+            _redis_cache_enabled=os.getenv("AUTHLY_REDIS_CACHE", "false").lower() == "true",
+            _redis_session_enabled=os.getenv("AUTHLY_REDIS_SESSION", "false").lower() == "true",
+            _redis_connection_pool_size=int(os.getenv("AUTHLY_REDIS_POOL_SIZE", "10")),
+            _redis_connection_timeout=int(os.getenv("AUTHLY_REDIS_TIMEOUT", "5")),
+            _redis_socket_keepalive=os.getenv("AUTHLY_REDIS_KEEPALIVE", "true").lower() == "true",
         )
 
         config._secrets = SecureSecrets(secrets_path)
@@ -230,6 +245,46 @@ class AuthlyConfig:
     def database_url(self) -> str:
         """Get database connection URL."""
         return self._database_url
+
+    @property
+    def redis_url(self) -> Optional[str]:
+        """Get Redis connection URL (optional)."""
+        return self._redis_url
+
+    @property
+    def redis_rate_limit_enabled(self) -> bool:
+        """Check if Redis rate limiting is enabled."""
+        return self._redis_rate_limit_enabled and self._redis_url is not None
+
+    @property
+    def redis_cache_enabled(self) -> bool:
+        """Check if Redis caching is enabled."""
+        return self._redis_cache_enabled and self._redis_url is not None
+
+    @property
+    def redis_session_enabled(self) -> bool:
+        """Check if Redis session storage is enabled."""
+        return self._redis_session_enabled and self._redis_url is not None
+
+    @property
+    def redis_connection_pool_size(self) -> int:
+        """Get Redis connection pool size."""
+        return self._redis_connection_pool_size
+
+    @property
+    def redis_connection_timeout(self) -> int:
+        """Get Redis connection timeout."""
+        return self._redis_connection_timeout
+
+    @property
+    def redis_socket_keepalive(self) -> bool:
+        """Check if Redis socket keepalive is enabled."""
+        return self._redis_socket_keepalive
+
+    @property
+    def redis_enabled(self) -> bool:
+        """Check if any Redis features are enabled."""
+        return self.redis_rate_limit_enabled or self.redis_cache_enabled or self.redis_session_enabled
 
     def get_masked_database_url(self) -> str:
         """Get database URL with password masked for safe logging."""

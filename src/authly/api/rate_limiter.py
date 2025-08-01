@@ -1,35 +1,63 @@
-from datetime import datetime, timedelta
-from typing import Dict, Optional
+"""Rate limiter with configurable backend support.
 
-from fastapi import HTTPException
-from starlette import status
+This module provides rate limiting functionality with support for both
+memory-based and Redis-based backends, allowing flexible deployment
+configurations.
+"""
+
+import logging
+from typing import Optional
+
+from authly.core.backend_factory import get_rate_limit_backend
+from authly.core.backends import RateLimitBackend
+
+logger = logging.getLogger(__name__)
 
 
 class RateLimiter:
-    def __init__(self, max_requests: int = 5, window_seconds: int = 60):
-        """
-        Initialize rate limiter with fixed limits.
+    """Rate limiter with configurable backend support."""
+
+    def __init__(self, max_requests: int = 5, window_seconds: int = 60, backend: Optional[RateLimitBackend] = None):
+        """Initialize rate limiter with configurable backend.
 
         Args:
             max_requests: Maximum requests allowed per window (default 5)
             window_seconds: Time window in seconds (default 60)
+            backend: Optional backend implementation (will be auto-created if None)
         """
         self.max_requests = max_requests
         self.window_seconds = window_seconds
-        self.requests: Dict[str, list[datetime]] = {}
+        self._backend = backend
+
+    async def _get_backend(self) -> RateLimitBackend:
+        """Get backend implementation, creating it if necessary."""
+        if self._backend is None:
+            self._backend = await get_rate_limit_backend()
+        return self._backend
 
     async def check_rate_limit(self, key: str) -> bool:
-        now = datetime.now()
-        window_start = now - timedelta(seconds=self.window_seconds)
+        """Check if request is within rate limit.
 
-        if key not in self.requests:
-            self.requests[key] = []
+        Args:
+            key: Unique identifier for the rate limit (e.g., IP address, user ID)
 
-        # Clean old requests
-        self.requests[key] = [t for t in self.requests[key] if t > window_start]
+        Returns:
+            True if request is allowed
 
-        if len(self.requests[key]) >= self.max_requests:
-            raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Rate limit exceeded")
+        Raises:
+            HTTPException: When rate limit is exceeded
+        """
+        backend = await self._get_backend()
+        return await backend.check_rate_limit(key, self.max_requests, self.window_seconds)
 
-        self.requests[key].append(now)
-        return True
+    async def reset_rate_limit(self, key: str) -> bool:
+        """Reset rate limit for a specific key.
+
+        Args:
+            key: Unique identifier for the rate limit
+
+        Returns:
+            True if reset was successful
+        """
+        backend = await self._get_backend()
+        return await backend.reset_rate_limit(key)

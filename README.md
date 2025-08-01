@@ -175,6 +175,30 @@ uv run python -m authly admin scope create \
   --description "Read access to user data"
 ```
 
+### **Optional Redis Integration**
+For distributed deployments and enhanced performance:
+
+```bash
+# Install Redis support
+uv add --group redis authly
+
+# Configure Redis features
+export AUTHLY_REDIS_URL="redis://localhost:6379/0"
+export AUTHLY_REDIS_RATE_LIMIT="true"  # Distributed rate limiting
+export AUTHLY_REDIS_CACHE="true"       # High-performance caching
+
+# Start with Redis integration
+python -m authly serve
+```
+
+**Redis Features:**
+- **Distributed Rate Limiting** - Shared across multiple server instances  
+- **High-Performance Caching** - JWKS keys, discovery metadata, sessions
+- **Automatic Fallback** - Works without Redis, falls back to memory backends
+- **Configuration-Driven** - Enable specific features as needed
+
+See the [Redis Integration Guide](docs/redis-integration.md) for complete configuration options.
+
 ---
 
 ## 📚 **Documentation**

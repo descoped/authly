@@ -55,6 +55,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             # Initialize resource manager with Database
             await resource_manager.initialize_with_external_database(database)
 
+            # Initialize Redis if configured
+            redis_initialized = await resource_manager.initialize_redis()
+            if redis_initialized:
+                logger.info("Redis integration enabled")
+            else:
+                logger.info("Redis integration disabled - using memory backends")
+
+            # Initialize backend factory
+            from authly.core.backend_factory import initialize_backend_factory
+
+            initialize_backend_factory(resource_manager)
+
             # Set up dependency injection without app.state
             from authly.core.dependencies import create_resource_manager_provider, get_resource_manager
 
@@ -85,6 +97,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         raise
     finally:
         logger.info("Shutting down Authly application...")
+        # Cleanup Redis connections if initialized
+        if "resource_manager" in locals():
+            await resource_manager.cleanup_redis()
         # Cleanup handled by context managers and resource manager
         logger.info("Application shutdown completed")
 

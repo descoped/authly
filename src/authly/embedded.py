@@ -163,6 +163,18 @@ async def run_embedded_server(host: str = "0.0.0.0", port: int = 8000, seed: boo
         resource_manager = AuthlyModeFactory.create_resource_manager(config, DeploymentMode.EMBEDDED)
         await resource_manager.initialize_with_external_database(db)
 
+        # Initialize Redis if configured
+        redis_initialized = await resource_manager.initialize_redis()
+        if redis_initialized:
+            logger.info("Redis integration enabled for embedded mode")
+        else:
+            logger.info("Redis integration disabled - using memory backends")
+
+        # Initialize backend factory
+        from authly.core.backend_factory import initialize_backend_factory
+
+        initialize_backend_factory(resource_manager)
+
         # Create FastAPI application with resource manager
         app = create_embedded_app(config, database_url, seed)
 
@@ -186,6 +198,7 @@ async def run_embedded_server(host: str = "0.0.0.0", port: int = 8000, seed: boo
             try:
                 # Cleanup resource manager first
                 if resource_manager:
+                    await resource_manager.cleanup_redis()
                     await resource_manager.cleanup()
 
                 # Clean up database with timeout from config
