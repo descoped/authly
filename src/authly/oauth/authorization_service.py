@@ -6,6 +6,7 @@ Handles authorization code generation, validation, and OAuth 2.1 authorization f
 import hashlib
 import logging
 import secrets
+import time
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Tuple
 from uuid import UUID
@@ -27,6 +28,16 @@ from authly.oauth.models import (
 from authly.oauth.scope_repository import ScopeRepository
 
 logger = logging.getLogger(__name__)
+
+# Import metrics for OAuth flow tracking
+try:
+    from authly.monitoring.metrics import metrics
+
+    METRICS_ENABLED = True
+except ImportError:
+    logger.debug("Metrics collection not available in authorization service")
+    METRICS_ENABLED = False
+    metrics = None
 
 
 class AuthorizationService:
@@ -54,6 +65,7 @@ class AuthorizationService:
         Returns:
             Tuple of (is_valid, error_code, client_model)
         """
+        start_time = time.time()
         try:
             # Validate response type (OAuth 2.1 only supports 'code')
             if request.response_type != ResponseType.CODE:
@@ -106,10 +118,25 @@ class AuthorizationService:
                     # and has given consent for the requested scopes
                     logger.info(f"OIDC prompt=none request for client {request.client_id}")
 
+            # Track successful authorization request validation
+            if METRICS_ENABLED and metrics:
+                metrics.track_oauth_authorization_request(
+                    client_id=request.client_id, status="validated", response_type=request.response_type.value
+                )
+
             return True, None, client
 
         except Exception as e:
             logger.error(f"Error validating authorization request: {e}")
+
+            # Track failed authorization request validation
+            if METRICS_ENABLED and metrics:
+                metrics.track_oauth_authorization_request(
+                    client_id=getattr(request, "client_id", "unknown"),
+                    status="validation_error",
+                    response_type=getattr(request, "response_type", ResponseType.CODE).value,
+                )
+
             return False, AuthorizationError.SERVER_ERROR, None
 
     async def generate_authorization_code(self, consent_request: UserConsentRequest) -> Optional[str]:
@@ -122,6 +149,7 @@ class AuthorizationService:
         Returns:
             Generated authorization code or None if failed
         """
+        start_time = time.time()
         try:
             if not consent_request.approved:
                 return None
@@ -167,12 +195,35 @@ class AuthorizationService:
             created_code = await self.auth_code_repo.create_authorization_code(auth_code_data)
             if created_code:
                 logger.info(f"Generated authorization code for client {consent_request.client_id}")
+
+                # Track successful authorization code generation
+                if METRICS_ENABLED and metrics:
+                    duration = time.time() - start_time
+                    metrics.track_oauth_authorization_request(
+                        client_id=consent_request.client_id, status="code_generated", response_type="code"
+                    )
+
                 return auth_code
+
+            # Track failed authorization code creation
+            if METRICS_ENABLED and metrics:
+                metrics.track_oauth_authorization_request(
+                    client_id=consent_request.client_id, status="code_creation_failed", response_type="code"
+                )
 
             return None
 
         except Exception as e:
             logger.error(f"Error generating authorization code: {e}")
+
+            # Track authorization code generation error
+            if METRICS_ENABLED and metrics:
+                metrics.track_oauth_authorization_request(
+                    client_id=getattr(consent_request, "client_id", "unknown"),
+                    status="code_generation_error",
+                    response_type="code",
+                )
+
             return None
 
     async def exchange_authorization_code(
@@ -190,33 +241,71 @@ class AuthorizationService:
         Returns:
             Tuple of (success, code_data, error_message)
         """
+        start_time = time.time()
         try:
             # Get authorization code
             auth_code = await self.auth_code_repo.get_by_code(code)
             if not auth_code:
+                # Track invalid authorization code
+                if METRICS_ENABLED and metrics:
+                    metrics.track_oauth_authorization_request(
+                        client_id=client_id, status="invalid_code", response_type="code"
+                    )
                 return False, None, "Invalid authorization code"
 
             # Validate code is not expired or used
             if not auth_code.is_valid():
+                # Track expired/used authorization code
+                if METRICS_ENABLED and metrics:
+                    metrics.track_oauth_authorization_request(
+                        client_id=client_id, status="expired_code", response_type="code"
+                    )
                 return False, None, "Authorization code expired or already used"
 
             # Get client UUID for comparison
             client_uuid = await self._get_client_uuid(client_id)
             if not client_uuid or auth_code.client_id != client_uuid:
+                # Track client mismatch
+                if METRICS_ENABLED and metrics:
+                    metrics.track_oauth_authorization_request(
+                        client_id=client_id, status="client_mismatch", response_type="code"
+                    )
                 return False, None, "Invalid client for authorization code"
 
             # Validate redirect URI matches
             if auth_code.redirect_uri != redirect_uri:
+                # Track redirect URI mismatch
+                if METRICS_ENABLED and metrics:
+                    metrics.track_oauth_authorization_request(
+                        client_id=client_id, status="redirect_mismatch", response_type="code"
+                    )
                 return False, None, "Redirect URI mismatch"
 
             # Verify PKCE code verifier
             if not self._verify_pkce_challenge(code_verifier, auth_code.code_challenge):
+                # Track PKCE verification failure
+                if METRICS_ENABLED and metrics:
+                    metrics.track_oauth_authorization_request(
+                        client_id=client_id, status="pkce_failed", response_type="code"
+                    )
                 return False, None, "Invalid PKCE code verifier"
 
             # Mark code as used
             success = await self.auth_code_repo.consume_authorization_code(code)
             if not success:
+                # Track code consumption failure
+                if METRICS_ENABLED and metrics:
+                    metrics.track_oauth_authorization_request(
+                        client_id=client_id, status="consumption_failed", response_type="code"
+                    )
                 return False, None, "Failed to consume authorization code"
+
+            # Track successful authorization code exchange
+            if METRICS_ENABLED and metrics:
+                duration = time.time() - start_time
+                metrics.track_oauth_authorization_request(
+                    client_id=client_id, status="code_exchanged", response_type="code"
+                )
 
             # Return code data for token generation with OpenID Connect parameters
             # Use the original string client_id from the request, not the UUID from the database
@@ -235,6 +324,13 @@ class AuthorizationService:
 
         except Exception as e:
             logger.error(f"Error exchanging authorization code: {e}")
+
+            # Track authorization code exchange error
+            if METRICS_ENABLED and metrics:
+                metrics.track_oauth_authorization_request(
+                    client_id=client_id, status="exchange_error", response_type="code"
+                )
+
             return False, None, "Server error"
 
     async def create_authorization_response(

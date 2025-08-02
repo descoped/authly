@@ -2,6 +2,7 @@
 
 import logging
 import secrets
+import time
 from typing import Dict, List, Optional
 from uuid import UUID
 
@@ -25,6 +26,16 @@ from authly.oauth.models import (
 from authly.oauth.scope_repository import ScopeRepository
 
 logger = logging.getLogger(__name__)
+
+# Import metrics for client operation tracking
+try:
+    from authly.monitoring.metrics import metrics
+
+    METRICS_ENABLED = True
+except ImportError:
+    logger.debug("Metrics collection not available in client service")
+    METRICS_ENABLED = False
+    metrics = None
 
 
 class ClientService:
@@ -53,6 +64,8 @@ class ClientService:
         Raises:
             HTTPException: If validation fails or client creation errors
         """
+        start_time = time.time()
+
         try:
             # Generate unique client_id
             client_id = f"client_{secrets.token_urlsafe(16)}"
@@ -160,6 +173,16 @@ class ClientService:
 
             logger.info(f"Created OAuth client: {client_id} ({request.client_type.value})")
 
+            # Track successful client creation
+            if METRICS_ENABLED and metrics:
+                duration = time.time() - start_time
+                metrics.track_client_operation(
+                    operation="create_client",
+                    status="success",
+                    client_type=request.client_type.value,
+                    duration=duration,
+                )
+
             return OAuthClientCredentialsResponse(
                 client_id=client_id,
                 client_secret=client_secret,  # Only returned once during creation
@@ -167,9 +190,30 @@ class ClientService:
                 client_name=request.client_name,
             )
 
-        except HTTPException:
+        except HTTPException as e:
+            # Track validation errors
+            if METRICS_ENABLED and metrics:
+                duration = time.time() - start_time
+                metrics.track_client_operation(
+                    operation="create_client",
+                    status="validation_error",
+                    client_type=request.client_type.value,
+                    duration=duration,
+                )
             raise
         except Exception as e:
+            # Track general creation errors
+            if METRICS_ENABLED and metrics:
+                duration = time.time() - start_time
+                metrics.track_client_operation(
+                    operation="create_client",
+                    status="error",
+                    client_type=getattr(request, "client_type", "unknown").value
+                    if hasattr(getattr(request, "client_type", None), "value")
+                    else "unknown",
+                    duration=duration,
+                )
+
             logger.error(f"Error creating OAuth client: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create OAuth client"
@@ -192,11 +236,24 @@ class ClientService:
         Returns:
             OAuthClientModel if authenticated, None if authentication fails
         """
+        start_time = time.time()
+
         try:
             # Get client from database
             client = await self._client_repo.get_by_client_id(client_id)
             if not client or not client.is_active:
                 logger.warning(f"Client authentication failed - client not found or inactive: {client_id}")
+
+                # Track client not found or inactive
+                if METRICS_ENABLED and metrics:
+                    duration = time.time() - start_time
+                    metrics.track_client_operation(
+                        operation="authenticate_client",
+                        status="client_not_found",
+                        client_id=client_id,
+                        auth_method=auth_method.value,
+                        duration=duration,
+                    )
                 return None
 
             # Check if auth method matches client configuration
@@ -204,39 +261,158 @@ class ClientService:
                 logger.warning(
                     f"Auth method mismatch for client {client_id}: expected {client.token_endpoint_auth_method}, got {auth_method}"
                 )
+
+                # Track auth method mismatch
+                if METRICS_ENABLED and metrics:
+                    duration = time.time() - start_time
+                    metrics.track_client_operation(
+                        operation="authenticate_client",
+                        status="auth_method_mismatch",
+                        client_id=client_id,
+                        client_type=client.client_type.value,
+                        auth_method=auth_method.value,
+                        duration=duration,
+                    )
                 return None
 
             # Handle public clients (no secret verification)
             if client.client_type == ClientType.PUBLIC:
                 if client_secret is not None:
                     logger.warning(f"Public client {client_id} provided secret when none expected")
+
+                    # Track public client providing secret
+                    if METRICS_ENABLED and metrics:
+                        duration = time.time() - start_time
+                        metrics.track_client_operation(
+                            operation="authenticate_client",
+                            status="public_client_secret_provided",
+                            client_id=client_id,
+                            client_type=client.client_type.value,
+                            auth_method=auth_method.value,
+                            duration=duration,
+                        )
                     return None
+
                 if auth_method != TokenEndpointAuthMethod.NONE:
                     logger.warning(f"Public client {client_id} used invalid auth method: {auth_method}")
+
+                    # Track public client invalid auth method
+                    if METRICS_ENABLED and metrics:
+                        duration = time.time() - start_time
+                        metrics.track_client_operation(
+                            operation="authenticate_client",
+                            status="public_client_invalid_auth",
+                            client_id=client_id,
+                            client_type=client.client_type.value,
+                            auth_method=auth_method.value,
+                            duration=duration,
+                        )
                     return None
+
+                # Track successful public client authentication
+                if METRICS_ENABLED and metrics:
+                    duration = time.time() - start_time
+                    metrics.track_client_operation(
+                        operation="authenticate_client",
+                        status="success",
+                        client_id=client_id,
+                        client_type=client.client_type.value,
+                        auth_method=auth_method.value,
+                        duration=duration,
+                    )
                 return client
 
             # Handle confidential clients (secret verification required)
             if client.client_type == ClientType.CONFIDENTIAL:
                 if client_secret is None:
                     logger.warning(f"Confidential client {client_id} missing required secret")
+
+                    # Track missing secret for confidential client
+                    if METRICS_ENABLED and metrics:
+                        duration = time.time() - start_time
+                        metrics.track_client_operation(
+                            operation="authenticate_client",
+                            status="confidential_client_missing_secret",
+                            client_id=client_id,
+                            client_type=client.client_type.value,
+                            auth_method=auth_method.value,
+                            duration=duration,
+                        )
                     return None
 
                 if not client.client_secret_hash:
                     logger.error(f"Confidential client {client_id} has no stored secret hash")
+
+                    # Track missing secret hash
+                    if METRICS_ENABLED and metrics:
+                        duration = time.time() - start_time
+                        metrics.track_client_operation(
+                            operation="authenticate_client",
+                            status="confidential_client_no_hash",
+                            client_id=client_id,
+                            client_type=client.client_type.value,
+                            auth_method=auth_method.value,
+                            duration=duration,
+                        )
                     return None
 
                 # Verify client secret
                 if not verify_password(client_secret, client.client_secret_hash):
                     logger.warning(f"Invalid client secret for confidential client: {client_id}")
+
+                    # Track invalid secret
+                    if METRICS_ENABLED and metrics:
+                        duration = time.time() - start_time
+                        metrics.track_client_operation(
+                            operation="authenticate_client",
+                            status="invalid_secret",
+                            client_id=client_id,
+                            client_type=client.client_type.value,
+                            auth_method=auth_method.value,
+                            duration=duration,
+                        )
                     return None
 
+                # Track successful confidential client authentication
+                if METRICS_ENABLED and metrics:
+                    duration = time.time() - start_time
+                    metrics.track_client_operation(
+                        operation="authenticate_client",
+                        status="success",
+                        client_id=client_id,
+                        client_type=client.client_type.value,
+                        auth_method=auth_method.value,
+                        duration=duration,
+                    )
                 return client
 
             logger.error(f"Unknown client type for client {client_id}: {client.client_type}")
+
+            # Track unknown client type
+            if METRICS_ENABLED and metrics:
+                duration = time.time() - start_time
+                metrics.track_client_operation(
+                    operation="authenticate_client",
+                    status="unknown_client_type",
+                    client_id=client_id,
+                    client_type=str(client.client_type),
+                    auth_method=auth_method.value,
+                    duration=duration,
+                )
             return None
 
         except Exception as e:
+            # Track authentication error
+            if METRICS_ENABLED and metrics:
+                duration = time.time() - start_time
+                metrics.track_client_operation(
+                    operation="authenticate_client",
+                    status="error",
+                    client_id=client_id,
+                    auth_method=auth_method.value,
+                    duration=duration,
+                )
+
             logger.error(f"Error authenticating client {client_id}: {e}")
             return None
 

@@ -276,6 +276,77 @@ class AuthlyMetrics:
         """Track requests per OAuth client."""
         self.oauth_client_requests_total.labels(client_id=client_id, endpoint=endpoint).inc()
 
+    # Extended metrics for detailed OAuth service tracking
+    def track_token_operation(
+        self,
+        operation: str,
+        status: str,
+        client_id: str = "unknown",
+        token_type: str = "unknown",
+        duration: float = 0.0,
+        is_oidc: bool = False,
+        extra_data: Optional[Dict] = None,
+    ):
+        """
+        Track token service operations with detailed context.
+
+        Args:
+            operation: The operation being performed (create_token_pair, refresh_token_pair, revoke_token)
+            status: Operation status (success, error, invalid_token, etc.)
+            client_id: OAuth client identifier
+            token_type: Type of token (access, refresh, pair)
+            duration: Operation duration in seconds
+            is_oidc: Whether this is an OIDC operation
+            extra_data: Additional operation-specific data
+        """
+        # Use existing OAuth token metrics but with extended labels
+        grant_type = "unknown"
+        if operation == "create_token_pair":
+            grant_type = "authorization_code" if client_id != "unknown" else "password"
+        elif operation == "refresh_token_pair":
+            grant_type = "refresh_token"
+        elif operation == "revoke_token":
+            grant_type = "revocation"
+
+        # Track via existing OAuth token request metric
+        self.track_oauth_token_request(grant_type, client_id, status, duration)
+
+        # Track OIDC operations as security events if applicable
+        if is_oidc:
+            self.track_security_event(f"oidc_{operation}", "info")
+
+    def track_client_operation(
+        self,
+        operation: str,
+        status: str,
+        client_id: str = "unknown",
+        client_type: str = "unknown",
+        auth_method: str = "unknown",
+        duration: float = 0.0,
+    ):
+        """
+        Track client service operations.
+
+        Args:
+            operation: The operation being performed (create_client, authenticate_client)
+            status: Operation status (success, error, validation_error, etc.)
+            client_id: OAuth client identifier
+            client_type: Type of client (public, confidential)
+            auth_method: Authentication method used
+            duration: Operation duration in seconds
+        """
+        # Track client operations as client requests
+        self.track_client_request(client_id, operation)
+
+        # Track authentication events
+        if operation == "authenticate_client":
+            auth_status = "success" if status == "success" else "failed"
+            self.track_login_attempt(auth_status, auth_method, client_id)
+
+        # Track security events for authentication failures
+        if status in ["invalid_secret", "client_not_found", "auth_method_mismatch"]:
+            self.track_security_event(f"client_{status}", "warning")
+
 
 # Global metrics instance
 metrics = AuthlyMetrics()

@@ -1,5 +1,6 @@
 import logging
 import secrets
+import time
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, List, Optional
 from uuid import UUID, uuid4
@@ -21,6 +22,16 @@ from authly.tokens.repository import TokenRepository
 from authly.users import UserModel, UserRepository
 
 logger = logging.getLogger(__name__)
+
+# Import metrics for token operation tracking
+try:
+    from authly.monitoring.metrics import metrics
+
+    METRICS_ENABLED = True
+except ImportError:
+    logger.debug("Metrics collection not available in token service")
+    METRICS_ENABLED = False
+    metrics = None
 
 
 class TokenService:
@@ -107,6 +118,9 @@ class TokenService:
         Raises:
             HTTPException: If token creation fails
         """
+        start_time = time.time()
+        is_oidc = self._is_oidc_request(scope)
+
         try:
             # Generate unique JTIs for both tokens
             access_jti = secrets.token_hex(self._config.token_hex_length)
@@ -170,8 +184,20 @@ class TokenService:
 
             # Generate ID token if this is an OIDC request
             id_token = None
-            if self._is_oidc_request(scope) and client_id:
+            if is_oidc and client_id:
                 id_token = await self._generate_id_token(user, scope, client_id, oidc_params)
+
+            # Track successful token pair creation
+            if METRICS_ENABLED and metrics:
+                duration = time.time() - start_time
+                metrics.track_token_operation(
+                    operation="create_token_pair",
+                    status="success",
+                    client_id=client_id or "unknown",
+                    token_type="pair",
+                    duration=duration,
+                    is_oidc=is_oidc,
+                )
 
             return TokenPairResponse(
                 access_token=access_token,
@@ -181,7 +207,20 @@ class TokenService:
                 id_token=id_token,
             )
 
-        except Exception:
+        except Exception as e:
+            # Track failed token pair creation
+            if METRICS_ENABLED and metrics:
+                duration = time.time() - start_time
+                metrics.track_token_operation(
+                    operation="create_token_pair",
+                    status="error",
+                    client_id=client_id or "unknown",
+                    token_type="pair",
+                    duration=duration,
+                    is_oidc=is_oidc,
+                )
+
+            logger.error(f"Error creating token pair for user {user.id}: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not create authentication tokens"
             )
@@ -202,35 +241,90 @@ class TokenService:
         Raises:
             HTTPException: If token refresh fails
         """
+        start_time = time.time()
+
         try:
             # Decode the provided refresh token
             payload = jwt.decode(refresh_token, self._config.refresh_secret_key, algorithms=[self._config.algorithm])
 
             # Validate token type and extract claims
             if payload.get("type") != "refresh":
+                # Track invalid token type
+                if METRICS_ENABLED and metrics:
+                    duration = time.time() - start_time
+                    metrics.track_token_operation(
+                        operation="refresh_token_pair",
+                        status="invalid_type",
+                        client_id=client_id or "unknown",
+                        token_type="refresh",
+                        duration=duration,
+                    )
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid token type")
 
             user_id = payload.get("sub")
             token_jti = payload.get("jti")
 
             if not user_id or not token_jti:
+                # Track invalid token claims
+                if METRICS_ENABLED and metrics:
+                    duration = time.time() - start_time
+                    metrics.track_token_operation(
+                        operation="refresh_token_pair",
+                        status="invalid_claims",
+                        client_id=client_id or "unknown",
+                        token_type="refresh",
+                        duration=duration,
+                    )
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid token claims")
 
             # Verify token is valid in store and get original token to retrieve scope
             original_token = await self.get_token(token_jti)
             if not original_token or not await self.is_token_valid(token_jti):
+                # Track invalid or expired token
+                if METRICS_ENABLED and metrics:
+                    duration = time.time() - start_time
+                    metrics.track_token_operation(
+                        operation="refresh_token_pair",
+                        status="invalid_or_expired",
+                        client_id=client_id or "unknown",
+                        token_type="refresh",
+                        duration=duration,
+                    )
                 raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token is invalid or expired")
 
             # Extract scope from original token for preservation
             original_scope = original_token.scope
+            is_oidc = self._is_oidc_request(original_scope)
 
             # Get the user
             try:
                 user = await user_repo.get_by_id(UUID(user_id))
             except (ValueError, RecordNotFoundError):
+                # Track user not found
+                if METRICS_ENABLED and metrics:
+                    duration = time.time() - start_time
+                    metrics.track_token_operation(
+                        operation="refresh_token_pair",
+                        status="user_not_found",
+                        client_id=client_id or "unknown",
+                        token_type="refresh",
+                        duration=duration,
+                        is_oidc=is_oidc,
+                    )
                 raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
 
             if not user.is_active:
+                # Track inactive user
+                if METRICS_ENABLED and metrics:
+                    duration = time.time() - start_time
+                    metrics.track_token_operation(
+                        operation="refresh_token_pair",
+                        status="user_inactive",
+                        client_id=client_id or "unknown",
+                        token_type="refresh",
+                        duration=duration,
+                        is_oidc=is_oidc,
+                    )
                 raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User is inactive")
 
             # Generate new JTIs for both tokens
@@ -296,9 +390,21 @@ class TokenService:
 
             # Generate ID token if this is an OIDC request
             id_token = None
-            if self._is_oidc_request(original_scope) and client_id:
+            if is_oidc and client_id:
                 # For refresh tokens, we don't have original OIDC params, so pass None
                 id_token = await self._generate_id_token(user, original_scope, client_id, None)
+
+            # Track successful token refresh
+            if METRICS_ENABLED and metrics:
+                duration = time.time() - start_time
+                metrics.track_token_operation(
+                    operation="refresh_token_pair",
+                    status="success",
+                    client_id=client_id or "unknown",
+                    token_type="refresh",
+                    duration=duration,
+                    is_oidc=is_oidc,
+                )
 
             return TokenPairResponse(
                 access_token=new_access_token,
@@ -312,8 +418,29 @@ class TokenService:
             # Let HTTPExceptions pass through
             raise
         except JWTError:
+            # Track JWT error
+            if METRICS_ENABLED and metrics:
+                duration = time.time() - start_time
+                metrics.track_token_operation(
+                    operation="refresh_token_pair",
+                    status="jwt_error",
+                    client_id=client_id or "unknown",
+                    token_type="refresh",
+                    duration=duration,
+                )
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
-        except Exception:
+        except Exception as e:
+            # Track general refresh error
+            if METRICS_ENABLED and metrics:
+                duration = time.time() - start_time
+                metrics.track_token_operation(
+                    operation="refresh_token_pair",
+                    status="error",
+                    client_id=client_id or "unknown",
+                    token_type="refresh",
+                    duration=duration,
+                )
+            logger.error(f"Error refreshing token pair: {e}")
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not refresh tokens")
 
     async def logout_user_session(self, access_token: str, user_id: UUID) -> int:
@@ -365,6 +492,8 @@ class TokenService:
             - If revoking an access token, only revokes that specific token
             - Returns False for invalid tokens (don't raise exceptions per RFC 7009)
         """
+        start_time = time.time()
+
         try:
             # Try to decode as access token first (most common case)
             token_payload = None
@@ -386,6 +515,15 @@ class TokenService:
                         token_payload = decode_token(token, self._config.secret_key, self._config.algorithm)
                         token_type = TokenType.ACCESS
                     except ValueError:
+                        # Track invalid token
+                        if METRICS_ENABLED and metrics:
+                            duration = time.time() - start_time
+                            metrics.track_token_operation(
+                                operation="revoke_token",
+                                status="invalid_token",
+                                token_type=token_type_hint or "unknown",
+                                duration=duration,
+                            )
                         return False
             else:
                 # Try access token first (default case)
@@ -399,25 +537,59 @@ class TokenService:
                         if token_payload.get("type") == "refresh":
                             token_type = TokenType.REFRESH
                     except ValueError:
+                        # Track invalid token
+                        if METRICS_ENABLED and metrics:
+                            duration = time.time() - start_time
+                            metrics.track_token_operation(
+                                operation="revoke_token",
+                                status="invalid_token",
+                                token_type=token_type_hint or "unknown",
+                                duration=duration,
+                            )
                         return False
 
             if token_payload is None or token_type is None:
+                # Track decode failure
+                if METRICS_ENABLED and metrics:
+                    duration = time.time() - start_time
+                    metrics.track_token_operation(
+                        operation="revoke_token",
+                        status="decode_failed",
+                        token_type=token_type_hint or "unknown",
+                        duration=duration,
+                    )
                 return False
 
             # Extract JTI from token
             jti = token_payload.get("jti")
             if not jti:
+                # Track missing JTI
+                if METRICS_ENABLED and metrics:
+                    duration = time.time() - start_time
+                    metrics.track_token_operation(
+                        operation="revoke_token", status="missing_jti", token_type=token_type.value, duration=duration
+                    )
                 return False
 
             # Check if token exists and is valid in database
             if not await self.is_token_valid(jti):
                 # Token doesn't exist or already invalidated
+                # Track already revoked
+                if METRICS_ENABLED and metrics:
+                    duration = time.time() - start_time
+                    metrics.track_token_operation(
+                        operation="revoke_token",
+                        status="already_revoked",
+                        token_type=token_type.value,
+                        duration=duration,
+                    )
                 return False
 
             # Revoke the token
             success = await self.invalidate_token(jti)
 
             # If this is a refresh token, also revoke related access tokens
+            related_tokens_revoked = 0
             if success and token_type == TokenType.REFRESH:
                 user_id = token_payload.get("sub")
                 if user_id:
@@ -426,17 +598,49 @@ class TokenService:
                         # Invalidate all access tokens for this user
                         # This is a simplified approach - a more sophisticated implementation
                         # could track token families or authorization grants
-                        await self.invalidate_user_tokens(user_uuid, TokenType.ACCESS)
-                        logger.info(f"Revoked refresh token and related access tokens for user {user_uuid}")
+                        related_tokens_revoked = await self.invalidate_user_tokens(user_uuid, TokenType.ACCESS)
+                        logger.info(
+                            f"Revoked refresh token and {related_tokens_revoked} related access tokens for user {user_uuid}"
+                        )
                     except (ValueError, TypeError):
                         logger.warning(f"Invalid user ID in refresh token: {user_id}")
 
             if success:
                 logger.info(f"Successfully revoked {token_type.value} token with JTI: {jti}")
 
+                # Track successful revocation
+                if METRICS_ENABLED and metrics:
+                    duration = time.time() - start_time
+                    metrics.track_token_operation(
+                        operation="revoke_token",
+                        status="success",
+                        token_type=token_type.value,
+                        duration=duration,
+                        extra_data={"related_tokens_revoked": related_tokens_revoked}
+                        if related_tokens_revoked > 0
+                        else None,
+                    )
+            else:
+                # Track revocation failure
+                if METRICS_ENABLED and metrics:
+                    duration = time.time() - start_time
+                    metrics.track_token_operation(
+                        operation="revoke_token",
+                        status="revocation_failed",
+                        token_type=token_type.value,
+                        duration=duration,
+                    )
+
             return success
 
         except Exception as e:
+            # Track general error
+            if METRICS_ENABLED and metrics:
+                duration = time.time() - start_time
+                metrics.track_token_operation(
+                    operation="revoke_token", status="error", token_type=token_type_hint or "unknown", duration=duration
+                )
+
             # Log error but don't raise exception per RFC 7009
             logger.error(f"Error during token revocation: {str(e)}")
             return False
