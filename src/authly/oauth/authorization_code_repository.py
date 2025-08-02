@@ -14,6 +14,25 @@ from authly.oauth.models import OAuthAuthorizationCodeModel
 
 logger = logging.getLogger(__name__)
 
+# Import database metrics tracking
+try:
+    from authly.monitoring.metrics import DatabaseTimer
+
+    METRICS_ENABLED = True
+except ImportError:
+    # Create a no-op context manager for graceful fallback
+    class DatabaseTimer:
+        def __init__(self, operation: str):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            pass
+
+    METRICS_ENABLED = False
+
 
 class AuthorizationCodeRepository(BaseRepository[OAuthAuthorizationCodeModel, UUID]):
     """Repository for OAuth 2.1 authorization code management with PKCE support"""
@@ -30,29 +49,32 @@ class AuthorizationCodeRepository(BaseRepository[OAuthAuthorizationCodeModel, UU
         """
         Create a new authorization code from dictionary data.
         """
-        try:
-            # Set timestamps if not provided
-            insert_data = code_data.copy()
-            now = datetime.now(timezone.utc)
-            if "created_at" not in insert_data:
-                insert_data["created_at"] = now
-            if "is_used" not in insert_data:
-                insert_data["is_used"] = False
+        with DatabaseTimer("authorization_code_create"):
+            try:
+                # Set timestamps if not provided
+                insert_data = code_data.copy()
+                now = datetime.now(timezone.utc)
+                if "created_at" not in insert_data:
+                    insert_data["created_at"] = now
+                if "is_used" not in insert_data:
+                    insert_data["is_used"] = False
 
-            # Build insert query
-            insert_query = PsycopgHelper.build_insert_query(table_name="oauth_authorization_codes", data=insert_data)
+                # Build insert query
+                insert_query = PsycopgHelper.build_insert_query(
+                    table_name="oauth_authorization_codes", data=insert_data
+                )
 
-            async with self.db_connection.cursor(row_factory=dict_row) as cur:
-                await cur.execute(insert_query + SQL(" RETURNING *"), list(insert_data.values()))
-                result = await cur.fetchone()
-                if result:
-                    return OAuthAuthorizationCodeModel(**result)
+                async with self.db_connection.cursor(row_factory=dict_row) as cur:
+                    await cur.execute(insert_query + SQL(" RETURNING *"), list(insert_data.values()))
+                    result = await cur.fetchone()
+                    if result:
+                        return OAuthAuthorizationCodeModel(**result)
 
-            raise OperationError("Failed to create authorization code - no result returned")
+                raise OperationError("Failed to create authorization code - no result returned")
 
-        except Exception as e:
-            logger.error(f"Error in create_authorization_code: {e}")
-            raise OperationError(f"Failed to create authorization code: {str(e)}") from e
+            except Exception as e:
+                logger.error(f"Error in create_authorization_code: {e}")
+                raise OperationError(f"Failed to create authorization code: {str(e)}") from e
 
     async def create_authorization_code_with_params(
         self,
@@ -102,17 +124,18 @@ class AuthorizationCodeRepository(BaseRepository[OAuthAuthorizationCodeModel, UU
 
     async def get_by_code(self, code: str) -> Optional[OAuthAuthorizationCodeModel]:
         """Get authorization code by code value"""
-        try:
-            query = PsycopgHelper.build_select_query(
-                table_name="oauth_authorization_codes", where_clause={"code": code}
-            )
-            async with self.db_connection.cursor(row_factory=dict_row) as cur:
-                await cur.execute(query, [code])
-                result = await cur.fetchone()
-                return OAuthAuthorizationCodeModel(**result) if result else None
-        except Exception as e:
-            logger.error(f"Error in get_by_code: {e}")
-            raise OperationError(f"Failed to get authorization code: {str(e)}") from e
+        with DatabaseTimer("authorization_code_read_by_code"):
+            try:
+                query = PsycopgHelper.build_select_query(
+                    table_name="oauth_authorization_codes", where_clause={"code": code}
+                )
+                async with self.db_connection.cursor(row_factory=dict_row) as cur:
+                    await cur.execute(query, [code])
+                    result = await cur.fetchone()
+                    return OAuthAuthorizationCodeModel(**result) if result else None
+            except Exception as e:
+                logger.error(f"Error in get_by_code: {e}")
+                raise OperationError(f"Failed to get authorization code: {str(e)}") from e
 
     async def consume_authorization_code(self, code: str) -> Optional[OAuthAuthorizationCodeModel]:
         """
@@ -126,25 +149,26 @@ class AuthorizationCodeRepository(BaseRepository[OAuthAuthorizationCodeModel, UU
         Mark authorization code as used and return it.
         This operation is atomic to prevent race conditions.
         """
-        try:
-            now = datetime.now(timezone.utc)
+        with DatabaseTimer("authorization_code_consume"):
+            try:
+                now = datetime.now(timezone.utc)
 
-            # Update code as used and return the record
-            query = """
-                UPDATE oauth_authorization_codes 
-                SET is_used = true, used_at = %s
-                WHERE code = %s AND is_used = false
-                RETURNING *
-            """
+                # Update code as used and return the record
+                query = """
+                    UPDATE oauth_authorization_codes 
+                    SET is_used = true, used_at = %s
+                    WHERE code = %s AND is_used = false
+                    RETURNING *
+                """
 
-            async with self.db_connection.cursor(row_factory=dict_row) as cur:
-                await cur.execute(query, [now, code])
-                result = await cur.fetchone()
-                return OAuthAuthorizationCodeModel(**result) if result else None
+                async with self.db_connection.cursor(row_factory=dict_row) as cur:
+                    await cur.execute(query, [now, code])
+                    result = await cur.fetchone()
+                    return OAuthAuthorizationCodeModel(**result) if result else None
 
-        except Exception as e:
-            logger.error(f"Error in use_authorization_code: {e}")
-            raise OperationError(f"Failed to use authorization code: {str(e)}") from e
+            except Exception as e:
+                logger.error(f"Error in use_authorization_code: {e}")
+                raise OperationError(f"Failed to use authorization code: {str(e)}") from e
 
     async def validate_and_consume_code(
         self, code: str, client_id: UUID, redirect_uri: str, code_verifier: str
@@ -250,110 +274,116 @@ class AuthorizationCodeRepository(BaseRepository[OAuthAuthorizationCodeModel, UU
         if before_datetime is None:
             before_datetime = datetime.now(timezone.utc)
 
-        try:
-            query = "DELETE FROM oauth_authorization_codes WHERE expires_at < %s"
+        with DatabaseTimer("authorization_code_cleanup"):
+            try:
+                query = "DELETE FROM oauth_authorization_codes WHERE expires_at < %s"
 
-            async with self.db_connection.cursor() as cur:
-                await cur.execute(query, [before_datetime])
-                deleted_count = cur.rowcount
+                async with self.db_connection.cursor() as cur:
+                    await cur.execute(query, [before_datetime])
+                    deleted_count = cur.rowcount
 
-            if deleted_count > 0:
-                logger.info(f"Cleaned up {deleted_count} expired authorization codes")
+                if deleted_count > 0:
+                    logger.info(f"Cleaned up {deleted_count} expired authorization codes")
 
-            return deleted_count
+                return deleted_count
 
-        except Exception as e:
-            logger.error(f"Error in cleanup_expired_codes: {e}")
-            raise OperationError(f"Failed to cleanup expired codes: {str(e)}") from e
+            except Exception as e:
+                logger.error(f"Error in cleanup_expired_codes: {e}")
+                raise OperationError(f"Failed to cleanup expired codes: {str(e)}") from e
 
     async def get_codes_for_user(self, user_id: UUID, limit: int = 10) -> List[OAuthAuthorizationCodeModel]:
         """Get recent authorization codes for a user (for debugging/auditing)"""
-        try:
-            query = """
-                SELECT * FROM oauth_authorization_codes 
-                WHERE user_id = %s 
-                ORDER BY created_at DESC 
-                LIMIT %s
-            """
+        with DatabaseTimer("authorization_code_list_user"):
+            try:
+                query = """
+                    SELECT * FROM oauth_authorization_codes 
+                    WHERE user_id = %s 
+                    ORDER BY created_at DESC 
+                    LIMIT %s
+                """
 
-            async with self.db_connection.cursor(row_factory=dict_row) as cur:
-                await cur.execute(query, [user_id, limit])
-                results = await cur.fetchall()
-                return [OAuthAuthorizationCodeModel(**result) for result in results]
+                async with self.db_connection.cursor(row_factory=dict_row) as cur:
+                    await cur.execute(query, [user_id, limit])
+                    results = await cur.fetchall()
+                    return [OAuthAuthorizationCodeModel(**result) for result in results]
 
-        except Exception as e:
-            logger.error(f"Error in get_codes_for_user: {e}")
-            raise OperationError(f"Failed to get codes for user: {str(e)}") from e
+            except Exception as e:
+                logger.error(f"Error in get_codes_for_user: {e}")
+                raise OperationError(f"Failed to get codes for user: {str(e)}") from e
 
     async def get_codes_for_client(self, client_id: UUID, limit: int = 10) -> List[OAuthAuthorizationCodeModel]:
         """Get recent authorization codes for a client (for debugging/auditing)"""
-        try:
-            query = """
-                SELECT * FROM oauth_authorization_codes 
-                WHERE client_id = %s 
-                ORDER BY created_at DESC 
-                LIMIT %s
-            """
+        with DatabaseTimer("authorization_code_list_client"):
+            try:
+                query = """
+                    SELECT * FROM oauth_authorization_codes 
+                    WHERE client_id = %s 
+                    ORDER BY created_at DESC 
+                    LIMIT %s
+                """
 
-            async with self.db_connection.cursor(row_factory=dict_row) as cur:
-                await cur.execute(query, [client_id, limit])
-                results = await cur.fetchall()
-                return [OAuthAuthorizationCodeModel(**result) for result in results]
+                async with self.db_connection.cursor(row_factory=dict_row) as cur:
+                    await cur.execute(query, [client_id, limit])
+                    results = await cur.fetchall()
+                    return [OAuthAuthorizationCodeModel(**result) for result in results]
 
-        except Exception as e:
-            logger.error(f"Error in get_codes_for_client: {e}")
-            raise OperationError(f"Failed to get codes for client: {str(e)}") from e
+            except Exception as e:
+                logger.error(f"Error in get_codes_for_client: {e}")
+                raise OperationError(f"Failed to get codes for client: {str(e)}") from e
 
     async def revoke_codes_for_user(self, user_id: UUID) -> int:
         """Revoke all unused authorization codes for a user"""
-        try:
-            now = datetime.now(timezone.utc)
-            query = """
-                UPDATE oauth_authorization_codes 
-                SET is_used = true, used_at = %s
-                WHERE user_id = %s AND is_used = false
-            """
+        with DatabaseTimer("authorization_code_revoke_user"):
+            try:
+                now = datetime.now(timezone.utc)
+                query = """
+                    UPDATE oauth_authorization_codes 
+                    SET is_used = true, used_at = %s
+                    WHERE user_id = %s AND is_used = false
+                """
 
-            async with self.db_connection.cursor() as cur:
-                await cur.execute(query, [now, user_id])
-                return cur.rowcount
+                async with self.db_connection.cursor() as cur:
+                    await cur.execute(query, [now, user_id])
+                    return cur.rowcount
 
-        except Exception as e:
-            logger.error(f"Error in revoke_codes_for_user: {e}")
-            raise OperationError(f"Failed to revoke codes for user: {str(e)}") from e
+            except Exception as e:
+                logger.error(f"Error in revoke_codes_for_user: {e}")
+                raise OperationError(f"Failed to revoke codes for user: {str(e)}") from e
 
     async def revoke_codes_for_client(self, client_id: UUID) -> int:
         """Revoke all unused authorization codes for a client"""
-        try:
-            now = datetime.now(timezone.utc)
-            query = """
-                UPDATE oauth_authorization_codes 
-                SET is_used = true, used_at = %s
-                WHERE client_id = %s AND is_used = false
-            """
+        with DatabaseTimer("authorization_code_revoke_client"):
+            try:
+                now = datetime.now(timezone.utc)
+                query = """
+                    UPDATE oauth_authorization_codes 
+                    SET is_used = true, used_at = %s
+                    WHERE client_id = %s AND is_used = false
+                """
 
-            async with self.db_connection.cursor() as cur:
-                await cur.execute(query, [now, client_id])
-                return cur.rowcount
+                async with self.db_connection.cursor() as cur:
+                    await cur.execute(query, [now, client_id])
+                    return cur.rowcount
 
-        except Exception as e:
-            logger.error(f"Error in revoke_codes_for_client: {e}")
-            raise OperationError(f"Failed to revoke codes for client: {str(e)}") from e
+            except Exception as e:
+                logger.error(f"Error in revoke_codes_for_client: {e}")
+                raise OperationError(f"Failed to revoke codes for client: {str(e)}") from e
 
     async def count_active_codes(self) -> int:
         """Count active (unused and not expired) authorization codes"""
-        try:
-            now = datetime.now(timezone.utc)
-            query = """
-                SELECT COUNT(*) FROM oauth_authorization_codes 
-                WHERE is_used = false AND expires_at > %s
-            """
+        with DatabaseTimer("authorization_code_count"):
+            try:
+                now = datetime.now(timezone.utc)
+                query = """
+                    SELECT COUNT(*) FROM oauth_authorization_codes 
+                    WHERE is_used = false AND expires_at > %s
+                """
 
-            async with self.db_connection.cursor() as cur:
-                await cur.execute(query, [now])
-                result = await cur.fetchone()
-                return result[0] if result else 0
+                async with self.db_connection.cursor() as cur:
+                    await cur.execute(query, [now])
+                    result = await cur.fetchone()
+                    return result[0] if result else 0
 
-        except Exception as e:
-            logger.error(f"Error in count_active_codes: {e}")
-            raise OperationError(f"Failed to count active codes: {str(e)}") from e
+            except Exception as e:
+                logger.error(f"Error in count_active_codes: {e}")
+                raise OperationError(f"Failed to count active codes: {str(e)}") from e

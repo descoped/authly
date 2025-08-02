@@ -14,6 +14,25 @@ from authly.oauth.models import OAuthClientModel
 
 logger = logging.getLogger(__name__)
 
+# Import database metrics tracking
+try:
+    from authly.monitoring.metrics import DatabaseTimer
+
+    METRICS_ENABLED = True
+except ImportError:
+    # Create a no-op context manager for graceful fallback
+    class DatabaseTimer:
+        def __init__(self, operation: str):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            pass
+
+    METRICS_ENABLED = False
+
 
 class ClientRepository(BaseRepository[OAuthClientModel, UUID]):
     """Repository for OAuth 2.1 client management with PostgreSQL storage"""
@@ -46,81 +65,85 @@ class ClientRepository(BaseRepository[OAuthClientModel, UUID]):
 
     async def get_by_client_id(self, client_id: str) -> Optional[OAuthClientModel]:
         """Get OAuth client by client_id"""
-        try:
-            # Explicitly cast parameter to varchar to avoid UUID conversion issues
-            query = "SELECT * FROM oauth_clients WHERE client_id = %s::varchar AND is_active = true"
-            async with self.db_connection.cursor(row_factory=dict_row) as cur:
-                await cur.execute(query, [str(client_id)])  # Ensure it's a string
-                result = await cur.fetchone()
-                if result:
-                    result = dict(result)
-                    result = self._process_client_result(result)
-                    return OAuthClientModel(**result)
-                return None
-        except Exception as e:
-            logger.error(f"Error in get_by_client_id: {e}")
-            raise OperationError(f"Failed to get client by client_id: {str(e)}") from e
+        with DatabaseTimer("client_read_by_id"):
+            try:
+                # Explicitly cast parameter to varchar to avoid UUID conversion issues
+                query = "SELECT * FROM oauth_clients WHERE client_id = %s::varchar AND is_active = true"
+                async with self.db_connection.cursor(row_factory=dict_row) as cur:
+                    await cur.execute(query, [str(client_id)])  # Ensure it's a string
+                    result = await cur.fetchone()
+                    if result:
+                        result = dict(result)
+                        result = self._process_client_result(result)
+                        return OAuthClientModel(**result)
+                    return None
+            except Exception as e:
+                logger.error(f"Error in get_by_client_id: {e}")
+                raise OperationError(f"Failed to get client by client_id: {str(e)}") from e
 
     async def create_client(self, client_data: dict) -> OAuthClientModel:
         """Create a new OAuth client"""
-        try:
-            # Prepare data for insertion
-            insert_data = client_data.copy()
+        with DatabaseTimer("client_create"):
+            try:
+                # Prepare data for insertion
+                insert_data = client_data.copy()
 
-            # Handle client secret hashing
-            if "client_secret" in insert_data:
-                client_secret = insert_data.pop("client_secret")
-                if client_secret:  # Only hash if secret is provided
-                    insert_data["client_secret_hash"] = get_password_hash(client_secret)
-                else:
-                    insert_data["client_secret_hash"] = None
+                # Handle client secret hashing
+                if "client_secret" in insert_data:
+                    client_secret = insert_data.pop("client_secret")
+                    if client_secret:  # Only hash if secret is provided
+                        insert_data["client_secret_hash"] = get_password_hash(client_secret)
+                    else:
+                        insert_data["client_secret_hash"] = None
 
-            # Handle array fields for PostgreSQL
-            if "redirect_uris" in insert_data:
-                insert_data["redirect_uris"] = list(insert_data["redirect_uris"])
-            if "grant_types" in insert_data:
-                insert_data["grant_types"] = [
-                    gt.value if hasattr(gt, "value") else str(gt) for gt in insert_data["grant_types"]
-                ]
-            if "response_types" in insert_data:
-                insert_data["response_types"] = [
-                    rt.value if hasattr(rt, "value") else str(rt) for rt in insert_data["response_types"]
-                ]
+                # Handle array fields for PostgreSQL
+                if "redirect_uris" in insert_data:
+                    insert_data["redirect_uris"] = list(insert_data["redirect_uris"])
+                if "grant_types" in insert_data:
+                    insert_data["grant_types"] = [
+                        gt.value if hasattr(gt, "value") else str(gt) for gt in insert_data["grant_types"]
+                    ]
+                if "response_types" in insert_data:
+                    insert_data["response_types"] = [
+                        rt.value if hasattr(rt, "value") else str(rt) for rt in insert_data["response_types"]
+                    ]
 
-            # Handle OIDC array fields
-            if "request_uris" in insert_data:
-                insert_data["request_uris"] = list(insert_data["request_uris"]) if insert_data["request_uris"] else []
-            if "contacts" in insert_data:
-                insert_data["contacts"] = list(insert_data["contacts"]) if insert_data["contacts"] else []
+                # Handle OIDC array fields
+                if "request_uris" in insert_data:
+                    insert_data["request_uris"] = (
+                        list(insert_data["request_uris"]) if insert_data["request_uris"] else []
+                    )
+                if "contacts" in insert_data:
+                    insert_data["contacts"] = list(insert_data["contacts"]) if insert_data["contacts"] else []
 
-            # Build insert query with database-generated timestamps for consistency
-            # Remove any manually set timestamps to use NOW() from database
-            insert_data.pop("created_at", None)
-            insert_data.pop("updated_at", None)
+                # Build insert query with database-generated timestamps for consistency
+                # Remove any manually set timestamps to use NOW() from database
+                insert_data.pop("created_at", None)
+                insert_data.pop("updated_at", None)
 
-            # Build columns and values for the insert
-            columns = list(insert_data.keys()) + ["created_at", "updated_at"]
-            values_placeholders = ["%s"] * len(insert_data) + ["NOW()", "NOW()"]
-            values = list(insert_data.values())
+                # Build columns and values for the insert
+                columns = list(insert_data.keys()) + ["created_at", "updated_at"]
+                values_placeholders = ["%s"] * len(insert_data) + ["NOW()", "NOW()"]
+                values = list(insert_data.values())
 
-            insert_query = SQL("INSERT INTO oauth_clients ({}) VALUES ({})").format(
-                SQL(", ").join(SQL('"{}"'.format(col)) for col in columns),
-                SQL(", ").join(SQL(placeholder) for placeholder in values_placeholders),
-            )
+                insert_query = SQL("INSERT INTO oauth_clients ({}) VALUES ({})").format(
+                    SQL(", ").join(SQL('"{}"'.format(col)) for col in columns),
+                    SQL(", ").join(SQL(placeholder) for placeholder in values_placeholders),
+                )
 
-            async with self.db_connection.cursor(row_factory=dict_row) as cur:
-                await cur.execute(insert_query + SQL(" RETURNING *"), values)
-                result = await cur.fetchone()
-                if result:
-                    result = dict(result)
-                    result = self._process_client_result(result)
-                    return OAuthClientModel(**result)
+                async with self.db_connection.cursor(row_factory=dict_row) as cur:
+                    await cur.execute(insert_query + SQL(" RETURNING *"), values)
+                    result = await cur.fetchone()
+                    if result:
+                        result = dict(result)
+                        result = self._process_client_result(result)
+                        return OAuthClientModel(**result)
 
-            raise OperationError("Failed to create client - no result returned")
+                raise OperationError("Failed to create client - no result returned")
 
-        except Exception as e:
-            logger.error(f"Error in create_client: {e}")
-            raise OperationError(f"Failed to create client: {str(e)}") from e
+            except Exception as e:
+                logger.error(f"Error in create_client: {e}")
+                raise OperationError(f"Failed to create client: {str(e)}") from e
 
     async def update_client(self, client_id: UUID, update_data: dict) -> OAuthClientModel:
         """Update an existing OAuth client"""

@@ -13,6 +13,25 @@ from authly.oauth.models import OAuthScopeModel
 
 logger = logging.getLogger(__name__)
 
+# Import database metrics tracking
+try:
+    from authly.monitoring.metrics import DatabaseTimer
+
+    METRICS_ENABLED = True
+except ImportError:
+    # Create a no-op context manager for graceful fallback
+    class DatabaseTimer:
+        def __init__(self, operation: str):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            pass
+
+    METRICS_ENABLED = False
+
 
 class ScopeRepository(BaseRepository[OAuthScopeModel, UUID]):
     """Repository for OAuth 2.1 scope management with PostgreSQL storage"""
@@ -24,128 +43,136 @@ class ScopeRepository(BaseRepository[OAuthScopeModel, UUID]):
 
     async def get_by_scope_name(self, scope_name: str) -> Optional[OAuthScopeModel]:
         """Get scope by scope name"""
-        try:
-            query = PsycopgHelper.build_select_query(table_name="oauth_scopes", where_clause={"scope_name": scope_name})
-            async with self.db_connection.cursor(row_factory=dict_row) as cur:
-                await cur.execute(query, [scope_name])
-                result = await cur.fetchone()
-                return OAuthScopeModel(**result) if result else None
-        except Exception as e:
-            logger.error(f"Error in get_by_scope_name: {e}")
-            raise OperationError(f"Failed to get scope by name: {str(e)}") from e
+        with DatabaseTimer("scope_read_by_name"):
+            try:
+                query = PsycopgHelper.build_select_query(
+                    table_name="oauth_scopes", where_clause={"scope_name": scope_name}
+                )
+                async with self.db_connection.cursor(row_factory=dict_row) as cur:
+                    await cur.execute(query, [scope_name])
+                    result = await cur.fetchone()
+                    return OAuthScopeModel(**result) if result else None
+            except Exception as e:
+                logger.error(f"Error in get_by_scope_name: {e}")
+                raise OperationError(f"Failed to get scope by name: {str(e)}") from e
 
     async def get_by_scope_names(self, scope_names: List[str]) -> List[OAuthScopeModel]:
         """Get multiple scopes by their names"""
         if not scope_names:
             return []
 
-        try:
-            placeholders = ", ".join(["%s"] * len(scope_names))
-            query = f"""
-                SELECT * FROM oauth_scopes 
-                WHERE scope_name IN ({placeholders}) AND is_active = true
-                ORDER BY scope_name
-            """
+        with DatabaseTimer("scope_read_by_names"):
+            try:
+                placeholders = ", ".join(["%s"] * len(scope_names))
+                query = f"""
+                    SELECT * FROM oauth_scopes 
+                    WHERE scope_name IN ({placeholders}) AND is_active = true
+                    ORDER BY scope_name
+                """
 
-            async with self.db_connection.cursor(row_factory=dict_row) as cur:
-                await cur.execute(query, scope_names)
-                results = await cur.fetchall()
-                return [OAuthScopeModel(**result) for result in results]
+                async with self.db_connection.cursor(row_factory=dict_row) as cur:
+                    await cur.execute(query, scope_names)
+                    results = await cur.fetchall()
+                    return [OAuthScopeModel(**result) for result in results]
 
-        except Exception as e:
-            logger.error(f"Error in get_by_scope_names: {e}")
-            raise OperationError(f"Failed to get scopes by names: {str(e)}") from e
+            except Exception as e:
+                logger.error(f"Error in get_by_scope_names: {e}")
+                raise OperationError(f"Failed to get scopes by names: {str(e)}") from e
 
     async def create_scope(self, scope_data: dict) -> OAuthScopeModel:
         """Create a new OAuth scope"""
-        try:
-            # Set timestamps
-            insert_data = scope_data.copy()
-            now = datetime.now(timezone.utc)
-            insert_data["created_at"] = now
-            insert_data["updated_at"] = now
+        with DatabaseTimer("scope_create"):
+            try:
+                # Set timestamps
+                insert_data = scope_data.copy()
+                now = datetime.now(timezone.utc)
+                insert_data["created_at"] = now
+                insert_data["updated_at"] = now
 
-            # Build insert query
-            insert_query = PsycopgHelper.build_insert_query(table_name="oauth_scopes", data=insert_data)
+                # Build insert query
+                insert_query = PsycopgHelper.build_insert_query(table_name="oauth_scopes", data=insert_data)
 
-            async with self.db_connection.cursor(row_factory=dict_row) as cur:
-                await cur.execute(insert_query + SQL(" RETURNING *"), list(insert_data.values()))
-                result = await cur.fetchone()
-                if result:
-                    return OAuthScopeModel(**result)
+                async with self.db_connection.cursor(row_factory=dict_row) as cur:
+                    await cur.execute(insert_query + SQL(" RETURNING *"), list(insert_data.values()))
+                    result = await cur.fetchone()
+                    if result:
+                        return OAuthScopeModel(**result)
 
-            raise OperationError("Failed to create scope - no result returned")
+                raise OperationError("Failed to create scope - no result returned")
 
-        except Exception as e:
-            logger.error(f"Error in create_scope: {e}")
-            raise OperationError(f"Failed to create scope: {str(e)}") from e
+            except Exception as e:
+                logger.error(f"Error in create_scope: {e}")
+                raise OperationError(f"Failed to create scope: {str(e)}") from e
 
     async def update_scope(self, scope_id: UUID, update_data: dict) -> OAuthScopeModel:
         """Update an existing OAuth scope"""
-        try:
-            # Set updated timestamp
-            prepared_data = update_data.copy()
-            prepared_data["updated_at"] = datetime.now(timezone.utc)
+        with DatabaseTimer("scope_update"):
+            try:
+                # Set updated timestamp
+                prepared_data = update_data.copy()
+                prepared_data["updated_at"] = datetime.now(timezone.utc)
 
-            # Build update query
-            update_query = PsycopgHelper.build_update_query(
-                table_name="oauth_scopes", data=prepared_data, where_clause={"id": scope_id}
-            )
+                # Build update query
+                update_query = PsycopgHelper.build_update_query(
+                    table_name="oauth_scopes", data=prepared_data, where_clause={"id": scope_id}
+                )
 
-            values = list(prepared_data.values()) + [scope_id]
+                values = list(prepared_data.values()) + [scope_id]
 
-            async with self.db_connection.cursor(row_factory=dict_row) as cur:
-                await cur.execute(update_query + SQL(" RETURNING *"), values)
-                result = await cur.fetchone()
-                if result:
-                    return OAuthScopeModel(**result)
+                async with self.db_connection.cursor(row_factory=dict_row) as cur:
+                    await cur.execute(update_query + SQL(" RETURNING *"), values)
+                    result = await cur.fetchone()
+                    if result:
+                        return OAuthScopeModel(**result)
 
-            raise RecordNotFoundError(f"Scope with id {scope_id} not found")
+                raise RecordNotFoundError(f"Scope with id {scope_id} not found")
 
-        except RecordNotFoundError:
-            raise
-        except Exception as e:
-            logger.error(f"Error in update_scope: {e}")
-            raise OperationError(f"Failed to update scope: {str(e)}") from e
+            except RecordNotFoundError:
+                raise
+            except Exception as e:
+                logger.error(f"Error in update_scope: {e}")
+                raise OperationError(f"Failed to update scope: {str(e)}") from e
 
     async def delete_scope(self, scope_id: UUID) -> bool:
         """Delete an OAuth scope (soft delete by setting is_active=False)"""
-        try:
-            update_data = {"is_active": False, "updated_at": datetime.now(timezone.utc)}
+        with DatabaseTimer("scope_delete"):
+            try:
+                update_data = {"is_active": False, "updated_at": datetime.now(timezone.utc)}
 
-            query = PsycopgHelper.build_update_query(
-                table_name="oauth_scopes",
-                data={"is_active": "IS_ACTIVE_PLACEHOLDER", "updated_at": "UPDATED_AT_PLACEHOLDER"},
-                where_clause={"id": "ID_PLACEHOLDER"},
-            )
+                query = PsycopgHelper.build_update_query(
+                    table_name="oauth_scopes",
+                    data={"is_active": "IS_ACTIVE_PLACEHOLDER", "updated_at": "UPDATED_AT_PLACEHOLDER"},
+                    where_clause={"id": "ID_PLACEHOLDER"},
+                )
 
-            async with self.db_connection.cursor() as cur:
-                result = await cur.execute(query, [False, update_data["updated_at"], scope_id])
-                # Check if any rows were affected
-                return cur.rowcount > 0
+                async with self.db_connection.cursor() as cur:
+                    result = await cur.execute(query, [False, update_data["updated_at"], scope_id])
+                    # Check if any rows were affected
+                    return cur.rowcount > 0
 
-        except Exception as e:
-            logger.error(f"Error in delete_scope: {e}")
-            raise OperationError(f"Failed to delete scope: {str(e)}") from e
+            except Exception as e:
+                logger.error(f"Error in delete_scope: {e}")
+                raise OperationError(f"Failed to delete scope: {str(e)}") from e
 
     async def get_active_scopes(self, limit: int = 100, offset: int = 0) -> List[OAuthScopeModel]:
         """Get all active OAuth scopes with pagination"""
-        try:
-            query = """
-                SELECT * FROM oauth_scopes 
-                WHERE is_active = true 
-                ORDER BY scope_name 
-                LIMIT %s OFFSET %s
-            """
+        with DatabaseTimer("scope_list_active"):
+            try:
+                query = """
+                    SELECT * FROM oauth_scopes 
+                    WHERE is_active = true 
+                    ORDER BY scope_name 
+                    LIMIT %s OFFSET %s
+                """
 
-            async with self.db_connection.cursor(row_factory=dict_row) as cur:
-                await cur.execute(query, [limit, offset])
-                results = await cur.fetchall()
-                return [OAuthScopeModel(**result) for result in results]
+                async with self.db_connection.cursor(row_factory=dict_row) as cur:
+                    await cur.execute(query, [limit, offset])
+                    results = await cur.fetchall()
+                    return [OAuthScopeModel(**result) for result in results]
 
-        except Exception as e:
-            logger.error(f"Error in get_active_scopes: {e}")
-            raise OperationError(f"Failed to get active scopes: {str(e)}") from e
+            except Exception as e:
+                logger.error(f"Error in get_active_scopes: {e}")
+                raise OperationError(f"Failed to get active scopes: {str(e)}") from e
 
     async def get_default_scopes(self) -> List[OAuthScopeModel]:
         """Get all default scopes (granted automatically)"""
@@ -184,21 +211,22 @@ class ScopeRepository(BaseRepository[OAuthScopeModel, UUID]):
         if not scope_names:
             return set()
 
-        try:
-            placeholders = ", ".join(["%s"] * len(scope_names))
-            query = f"""
-                SELECT scope_name FROM oauth_scopes 
-                WHERE scope_name IN ({placeholders}) AND is_active = true
-            """
+        with DatabaseTimer("scope_validate_names"):
+            try:
+                placeholders = ", ".join(["%s"] * len(scope_names))
+                query = f"""
+                    SELECT scope_name FROM oauth_scopes 
+                    WHERE scope_name IN ({placeholders}) AND is_active = true
+                """
 
-            async with self.db_connection.cursor() as cur:
-                await cur.execute(query, scope_names)
-                results = await cur.fetchall()
-                return {row[0] for row in results}
+                async with self.db_connection.cursor() as cur:
+                    await cur.execute(query, scope_names)
+                    results = await cur.fetchall()
+                    return {row[0] for row in results}
 
-        except Exception as e:
-            logger.error(f"Error in validate_scope_names: {e}")
-            raise OperationError(f"Failed to validate scope names: {str(e)}") from e
+            except Exception as e:
+                logger.error(f"Error in validate_scope_names: {e}")
+                raise OperationError(f"Failed to validate scope names: {str(e)}") from e
 
     async def get_scopes_for_client(self, client_id: UUID) -> List[OAuthScopeModel]:
         """Get all scopes associated with a specific client"""
