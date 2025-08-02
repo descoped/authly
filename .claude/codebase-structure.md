@@ -15,14 +15,13 @@ authly/
 ├── .github/                    # GitHub workflows and templates
 ├── .pytest_cache/             # Pytest cache and configuration
 ├── .venv/                      # Python virtual environment
-├── docs/                       # Current documentation (6 files: API, CLI, Docker, OAuth, OIDC guides)
-├── docs-outdated/              # Outdated documentation (25+ files from previous development)
+├── docs/                       # Current documentation (19 comprehensive guides)
 ├── docker-postgres/            # PostgreSQL initialization scripts
 ├── docker-compose/             # Docker compose services (Grafana, Nginx, Prometheus, etc.)
-├── examples/                   # Usage examples and testing
-├── report/                     # Analysis and audit reports
+├── examples/                   # Usage examples (admin API client, Bruno collections)
+├── scripts/                    # Integration tests and utility scripts
 ├── src/authly/                 # Main application source code
-├── tests/                      # Comprehensive test suite (510 tests across 49 files)
+├── tests/                      # Comprehensive test suite (540+ tests across 45 files)
 ├── .gitignore                  # Git ignore patterns
 ├── .python-version             # Python version specification
 ├── CHANGELOG.md                # Complete implementation changelog
@@ -347,8 +346,7 @@ docker-postgres/
 ### **Examples and Testing**
 ```
 examples/
-├── authly-embedded.py          # Development server with containers
-├── api-test.sh                 # API testing script
+├── admin_api_example.py        # Admin API client usage example
 └── bruno/                      # Bruno API testing collection
     ├── OAuth 2.1/              # OAuth endpoint tests
     ├── OIDC/                   # OIDC endpoint tests
