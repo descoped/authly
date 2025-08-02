@@ -119,7 +119,7 @@ services:
 
   # Log Aggregation (Production)
   fluentd:
-    image: fluent/fluentd:v1.18-debian-1
+    image: fluent/fluentd:v1.19-debian-1
     container_name: authly-fluentd
     volumes:
       - ./docker-compose/fluentd/fluent.conf:/fluentd/etc/fluent.conf:ro
