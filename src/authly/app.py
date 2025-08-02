@@ -14,7 +14,7 @@ from fastapi.openapi.utils import get_openapi
 from fastapi.staticfiles import StaticFiles
 
 from authly._version import __version__
-from authly.api import auth_router, health_router, oauth_router, oidc_router, users_router
+from authly.api import auth_router, health_router, metrics_router, oauth_router, oidc_router, users_router
 from authly.api.admin_middleware import setup_admin_middleware
 from authly.api.admin_router import admin_router
 from authly.api.oauth_discovery_router import oauth_discovery_router
@@ -69,6 +69,9 @@ def create_app(
 
     # Include health router (no prefix)
     app.include_router(health_router)
+
+    # Include metrics router (no prefix - standard /metrics path)
+    app.include_router(metrics_router)
 
     # Get API prefix from config, parameter, or environment
     if api_prefix is None:

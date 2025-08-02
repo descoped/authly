@@ -16,6 +16,16 @@ from .context import LoggingContext, generate_correlation_id, set_request_contex
 
 logger = logging.getLogger(__name__)
 
+# Import metrics collector for HTTP metrics integration
+try:
+    from authly.monitoring.middleware import metrics_collector
+
+    METRICS_ENABLED = True
+except ImportError:
+    logger.debug("Metrics collection not available - continuing without metrics")
+    METRICS_ENABLED = False
+    metrics_collector = None
+
 
 class LoggingMiddleware(BaseHTTPMiddleware):
     """
@@ -76,6 +86,10 @@ class LoggingMiddleware(BaseHTTPMiddleware):
                 logger.warning("Failed to capture request body", extra={"error": str(e)})
 
         with LoggingContext(correlation_id=correlation_id, **request_context):
+            # Start metrics tracking if enabled
+            if METRICS_ENABLED and metrics_collector:
+                metrics_collector.start_request_tracking(request, correlation_id)
+
             # Log request start
             logger.info(
                 "Request started",
@@ -96,6 +110,10 @@ class LoggingMiddleware(BaseHTTPMiddleware):
                 # Add correlation ID to response headers
                 response.headers[self.correlation_header] = correlation_id
 
+                # End metrics tracking if enabled
+                if METRICS_ENABLED and metrics_collector:
+                    metrics_collector.end_request_tracking(request, response, correlation_id)
+
                 # Log request completion
                 logger.info(
                     "Request completed",
@@ -111,6 +129,10 @@ class LoggingMiddleware(BaseHTTPMiddleware):
             except Exception as e:
                 # Calculate request duration even for errors
                 duration = time.time() - start_time
+
+                # End metrics tracking for failed requests if enabled
+                if METRICS_ENABLED and metrics_collector:
+                    metrics_collector.end_request_tracking(request, None, correlation_id, error=e)
 
                 # Log request error
                 logger.error(

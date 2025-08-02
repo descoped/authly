@@ -38,7 +38,18 @@ class TestMainApplicationCreation:
         # Verify it's a FastAPI app
         assert isinstance(app, FastAPI)
         assert app.title == "Authly Authentication Service"
-        assert app.version == "0.1.5"
+
+        # Verify version is loaded from pyproject.toml (should not be hardcoded)
+        from authly._version import __version__
+
+        assert app.version == __version__
+        assert app.version is not None
+        assert len(app.version) > 0
+        # Version should follow semantic versioning pattern (x.y.z)
+        import re
+
+        assert re.match(r"^\d+\.\d+\.\d+", app.version), f"Version {app.version} should follow semantic versioning"
+
         assert "authentication and authorization service" in app.description.lower()
 
     @pytest.mark.asyncio
@@ -88,12 +99,51 @@ class TestMainApplicationCreation:
 
         assert "info" in openapi_schema
         assert openapi_schema["info"]["title"] == "Authly Authentication Service"
-        assert openapi_schema["info"]["version"] == "0.1.5"
+
+        # Verify OpenAPI schema uses same dynamic version as app
+        from authly._version import __version__
+
+        assert openapi_schema["info"]["version"] == __version__
+        assert openapi_schema["info"]["version"] == app.version
 
         # Should have security schemes
         assert "components" in openapi_schema
         assert "securitySchemes" in openapi_schema["components"]
         assert "bearerAuth" in openapi_schema["components"]["securitySchemes"]
+
+    @pytest.mark.asyncio
+    async def test_version_loading_mechanism(self):
+        """Test that version is properly loaded from pyproject.toml dynamically."""
+        import tomllib
+        from pathlib import Path
+
+        from authly._version import __version__, get_version
+
+        # Verify get_version function works
+        version = get_version()
+        assert version == __version__
+
+        # Verify it matches pyproject.toml (when available)
+        try:
+            # Find pyproject.toml relative to this test file
+            current_file = Path(__file__)
+            for parent in current_file.parents:
+                pyproject_path = parent / "pyproject.toml"
+                if pyproject_path.exists():
+                    with open(pyproject_path, "rb") as f:
+                        data = tomllib.load(f)
+                        pyproject_version = data["project"]["version"]
+                        assert version == pyproject_version, f"Version mismatch: {version} != {pyproject_version}"
+                    break
+        except (FileNotFoundError, KeyError):
+            # In environments where pyproject.toml isn't available (e.g., installed package),
+            # the version should still be a valid semantic version
+            import re
+
+            assert re.match(r"^\d+\.\d+\.\d+", version), f"Version {version} should follow semantic versioning"
+
+        # Version should never be the fallback value in tests
+        assert version != "0.0.0-dev", "Version should not be fallback value in tests"
 
 
 class TestMainApplicationIntegration:

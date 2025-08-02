@@ -34,6 +34,7 @@ dependencies = [
     "click>=8.1.7",
     "httpx>=0.28.1",
     "coverage>=7.9.2",
+    "prometheus-client>=0.20.0",
 ]
 
 [dependency-groups]

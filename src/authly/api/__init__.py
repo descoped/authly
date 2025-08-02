@@ -17,6 +17,7 @@ from authly.api.health_router import (
     health_check,
     router as health_router,
 )
+from authly.api.metrics_router import router as metrics_router
 from authly.api.oauth_router import oauth_router
 from authly.api.oidc_router import oidc_router
 from authly.api.users_dependencies import (
@@ -59,6 +60,7 @@ __all__ = [
     "logout",
     "health_router",
     "health_check",
+    "metrics_router",
     "RateLimiter",
     "users_router",
     "oauth_router",
