@@ -22,6 +22,16 @@ from authly.users import UserModel, UserRepository
 
 logger = logging.getLogger(__name__)
 
+# Import authentication metrics tracking
+try:
+    from authly.monitoring.metrics import metrics
+
+    METRICS_ENABLED = True
+except ImportError:
+    logger.debug("Metrics collection not available in auth router")
+    METRICS_ENABLED = False
+    metrics = None
+
 
 class TokenRequest(BaseModel):
     grant_type: str
@@ -132,9 +142,15 @@ async def _handle_password_grant(
     rate_limiter,
 ) -> TokenResponse:
     """Handle password grant type (existing functionality)."""
+    import time
+
+    start_time = time.time()
 
     # Validate required fields for password grant
     if not request.username or not request.password:
+        # Track validation error
+        if METRICS_ENABLED and metrics:
+            metrics.track_oauth_token_request("password", "unknown", "validation_error", 0.0)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Username and password are required for password grant"
         )
@@ -144,6 +160,11 @@ async def _handle_password_grant(
 
     # Check login attempts
     if not login_tracker.check_and_update(request.username):
+        # Track rate limit hit
+        if METRICS_ENABLED and metrics:
+            duration = time.time() - start_time
+            metrics.track_oauth_token_request("password", request.username, "rate_limited", duration)
+            metrics.track_rate_limit_hit(request.username, "password_grant")
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Too many failed attempts. Account temporarily locked.",
@@ -152,6 +173,11 @@ async def _handle_password_grant(
     # Validate user
     user = await user_repo.get_by_username(request.username)
     if not user or not verify_password(request.password, user.password_hash):
+        # Track authentication failure
+        if METRICS_ENABLED and metrics:
+            duration = time.time() - start_time
+            metrics.track_oauth_token_request("password", request.username, "invalid_credentials", duration)
+            metrics.track_login_attempt("failed", "password", request.username)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
@@ -159,9 +185,17 @@ async def _handle_password_grant(
         )
 
     if not user.is_active:
+        # Track inactive user attempt
+        if METRICS_ENABLED and metrics:
+            duration = time.time() - start_time
+            metrics.track_oauth_token_request("password", request.username, "user_inactive", duration)
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is deactivated")
 
     if not user.is_verified:
+        # Track unverified user attempt
+        if METRICS_ENABLED and metrics:
+            duration = time.time() - start_time
+            metrics.track_oauth_token_request("password", request.username, "user_unverified", duration)
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account not verified")
 
     try:
@@ -187,12 +221,22 @@ async def _handle_password_grant(
             logger.info(f"User {user.username} requires password change on login")
             response.requires_password_change = True
 
+        # Track successful authentication
+        if METRICS_ENABLED and metrics:
+            duration = time.time() - start_time
+            metrics.track_oauth_token_request("password", request.username, "success", duration)
+            metrics.track_login_attempt("success", "password", request.username)
+
         return response
 
     except HTTPException:
         # Let HTTPExceptions from TokenService pass through
         raise
-    except Exception:
+    except Exception as e:
+        # Track general authentication error
+        if METRICS_ENABLED and metrics:
+            duration = time.time() - start_time
+            metrics.track_oauth_token_request("password", request.username, "error", duration)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not create authentication tokens"
         )
@@ -205,9 +249,17 @@ async def _handle_authorization_code_grant(
     authorization_service: AuthorizationService,
 ) -> TokenResponse:
     """Handle authorization_code grant type with PKCE verification."""
+    import time
+
+    start_time = time.time()
 
     # Validate required fields for authorization code grant
     if not request.code or not request.redirect_uri or not request.client_id or not request.code_verifier:
+        # Track validation error
+        if METRICS_ENABLED and metrics:
+            metrics.track_oauth_token_request(
+                "authorization_code", request.client_id or "unknown", "validation_error", 0.0
+            )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="code, redirect_uri, client_id, and code_verifier are required for authorization_code grant",
@@ -223,6 +275,12 @@ async def _handle_authorization_code_grant(
         )
 
         if not success:
+            # Track authorization code exchange failure
+            if METRICS_ENABLED and metrics:
+                duration = time.time() - start_time
+                metrics.track_oauth_token_request(
+                    "authorization_code", request.client_id, "invalid_authorization_code", duration
+                )
             logger.warning(f"Authorization code exchange failed: {error_msg}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST, detail=error_msg or "Invalid authorization code"
@@ -231,13 +289,25 @@ async def _handle_authorization_code_grant(
         # Get user for token generation
         user = await user_repo.get_by_id(code_data["user_id"])
         if not user:
+            # Track user not found error
+            if METRICS_ENABLED and metrics:
+                duration = time.time() - start_time
+                metrics.track_oauth_token_request("authorization_code", request.client_id, "user_not_found", duration)
             logger.error(f"User not found for authorization code: {code_data['user_id']}")
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid authorization code")
 
         if not user.is_active:
+            # Track inactive user attempt
+            if METRICS_ENABLED and metrics:
+                duration = time.time() - start_time
+                metrics.track_oauth_token_request("authorization_code", request.client_id, "user_inactive", duration)
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is deactivated")
 
         if not user.is_verified:
+            # Track unverified user attempt
+            if METRICS_ENABLED and metrics:
+                duration = time.time() - start_time
+                metrics.track_oauth_token_request("authorization_code", request.client_id, "user_unverified", duration)
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account not verified")
 
         # Extract OIDC parameters from authorization code data for ID token generation
@@ -257,6 +327,12 @@ async def _handle_authorization_code_grant(
         # Update last login
         await user_repo.update_last_login(user.id)
 
+        # Track successful authorization code grant
+        if METRICS_ENABLED and metrics:
+            duration = time.time() - start_time
+            metrics.track_oauth_token_request("authorization_code", request.client_id, "success", duration)
+            metrics.track_login_attempt("success", "authorization_code", str(user.id))
+
         logger.info(f"Authorization code exchanged successfully for user {user.id}")
 
         return TokenResponse(
@@ -271,6 +347,10 @@ async def _handle_authorization_code_grant(
         # Re-raise HTTP exceptions
         raise
     except Exception as e:
+        # Track general authorization code grant error
+        if METRICS_ENABLED and metrics:
+            duration = time.time() - start_time
+            metrics.track_oauth_token_request("authorization_code", request.client_id or "unknown", "error", duration)
         logger.error(f"Error handling authorization code grant: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not process authorization code"
@@ -283,9 +363,15 @@ async def _handle_refresh_token_grant(
     token_service: TokenService,
 ) -> TokenResponse:
     """Handle refresh_token grant type."""
+    import time
+
+    start_time = time.time()
 
     # Validate required fields for refresh token grant
     if not request.refresh_token:
+        # Track validation error
+        if METRICS_ENABLED and metrics:
+            metrics.track_oauth_token_request("refresh_token", request.client_id or "unknown", "validation_error", 0.0)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="refresh_token is required for refresh_token grant"
         )
@@ -294,6 +380,11 @@ async def _handle_refresh_token_grant(
         # Refresh token pair - client_id lookup will be handled by token service
         client_id = request.client_id if request.client_id else None
         token_response = await token_service.refresh_token_pair(request.refresh_token, user_repo, client_id=client_id)
+
+        # Track successful refresh token grant
+        if METRICS_ENABLED and metrics:
+            duration = time.time() - start_time
+            metrics.track_oauth_token_request("refresh_token", request.client_id or "unknown", "success", duration)
 
         logger.info(f"Refresh token exchanged successfully")
 
@@ -309,6 +400,10 @@ async def _handle_refresh_token_grant(
         # Re-raise HTTPExceptions (like invalid refresh token) as-is
         raise
     except Exception as e:
+        # Track general refresh token grant error
+        if METRICS_ENABLED and metrics:
+            duration = time.time() - start_time
+            metrics.track_oauth_token_request("refresh_token", request.client_id or "unknown", "error", duration)
         logger.error(f"Error handling refresh token grant: {e}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not process refresh token")
 
@@ -320,13 +415,24 @@ async def refresh_access_token(
     token_service: TokenService = Depends(get_token_service_with_client),
 ):
     """Create new token pair while invalidating old refresh token"""
+    import time
+
+    start_time = time.time()
 
     if request.grant_type != "refresh_token":
+        # Track invalid grant type
+        if METRICS_ENABLED and metrics:
+            metrics.track_oauth_token_request("refresh_token", "unknown", "invalid_grant_type", 0.0)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid grant type")
 
     try:
         # Refresh token pair using TokenService
         token_response = await token_service.refresh_token_pair(request.refresh_token, user_repo)
+
+        # Track successful token refresh
+        if METRICS_ENABLED and metrics:
+            duration = time.time() - start_time
+            metrics.track_oauth_token_request("refresh_token", "unknown", "success", duration)
 
         return TokenResponse(
             access_token=token_response.access_token,
@@ -340,6 +446,10 @@ async def refresh_access_token(
         # Let HTTPExceptions from TokenService pass through
         raise
     except Exception:
+        # Track token refresh error
+        if METRICS_ENABLED and metrics:
+            duration = time.time() - start_time
+            metrics.track_oauth_token_request("refresh_token", "unknown", "error", duration)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not refresh tokens")
 
 
@@ -350,10 +460,19 @@ async def logout(
     token_service: TokenService = Depends(get_token_service),
 ):
     """Invalidate all active tokens for the current user"""
+    import time
+
+    start_time = time.time()
 
     try:
         # Logout user session using TokenService
         invalidated_count = await token_service.logout_user_session(token, current_user.id)
+
+        # Track logout operation
+        if METRICS_ENABLED and metrics:
+            duration = time.time() - start_time
+            status_result = "success" if invalidated_count > 0 else "no_active_tokens"
+            metrics.track_logout_event(str(current_user.id), status_result, invalidated_count)
 
         if invalidated_count > 0:
             logger.info(f"Invalidated {invalidated_count} tokens for user {current_user.id}")
@@ -366,6 +485,10 @@ async def logout(
         # Let HTTPExceptions from TokenService pass through
         raise
     except Exception as e:
+        # Track logout error
+        if METRICS_ENABLED and metrics:
+            duration = time.time() - start_time
+            metrics.track_logout_event(str(current_user.id), "error", 0)
         logger.error(f"Logout failed: {str(e)}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Logout operation failed")
 
@@ -390,9 +513,19 @@ async def revoke_token(
     Always returns HTTP 200 OK per RFC 7009, even for invalid tokens.
     This prevents token enumeration attacks.
     """
+    import time
+
+    start_time = time.time()
     try:
         # Attempt to revoke the token using the token service
         revoked = await token_service.revoke_token(request.token, request.token_type_hint)
+
+        # Track token revocation
+        if METRICS_ENABLED and metrics:
+            duration = time.time() - start_time
+            status_result = "success" if revoked else "invalid_token"
+            token_type = request.token_type_hint or "unknown"
+            metrics.track_token_revocation(token_type, status_result)
 
         if revoked:
             logger.info("Token revoked successfully")
@@ -406,6 +539,11 @@ async def revoke_token(
         return {"message": "Token revocation processed successfully"}
 
     except Exception as e:
+        # Track token revocation error
+        if METRICS_ENABLED and metrics:
+            duration = time.time() - start_time
+            token_type = request.token_type_hint or "unknown"
+            metrics.track_token_revocation(token_type, "error")
         # Even on errors, return 200 OK per RFC 7009 to prevent information disclosure
         logger.error(f"Error during token revocation: {str(e)}")
         return {"message": "Token revocation processed successfully"}

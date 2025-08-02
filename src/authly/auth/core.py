@@ -10,13 +10,42 @@ from authly.config import AuthlyConfig
 
 logger = logging.getLogger(__name__)
 
+# Import authentication metrics tracking
+try:
+    from authly.monitoring.metrics import metrics
+
+    METRICS_ENABLED = True
+except ImportError:
+    logger.debug("Metrics collection not available in auth core")
+    METRICS_ENABLED = False
+    metrics = None
+
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a password against its hash."""
-    return bcrypt.checkpw(
-        plain_password.encode("utf-8"),
-        hashed_password.encode("utf-8") if isinstance(hashed_password, str) else hashed_password,
-    )
+    import time
+
+    start_time = time.time()
+
+    try:
+        result = bcrypt.checkpw(
+            plain_password.encode("utf-8"),
+            hashed_password.encode("utf-8") if isinstance(hashed_password, str) else hashed_password,
+        )
+
+        # Track password verification metrics
+        if METRICS_ENABLED and metrics:
+            duration = time.time() - start_time
+            status = "success" if result else "failed"
+            metrics.track_login_attempt(status, "password")
+
+        return result
+    except Exception as e:
+        # Track password verification errors
+        if METRICS_ENABLED and metrics:
+            duration = time.time() - start_time
+            metrics.track_login_attempt("error", "password")
+        raise
 
 
 def get_password_hash(password: str) -> str:
@@ -39,14 +68,31 @@ def create_access_token(
     Returns:
         JWT access token string
     """
-    if expires_delta:
-        expire = datetime.now(timezone.utc) + timedelta(minutes=expires_delta)
-    else:
-        expire = datetime.now(timezone.utc) + timedelta(minutes=config.access_token_expire_minutes)
+    import time
 
-    to_encode = data.copy()
-    to_encode.update({"exp": int(expire.timestamp())})
-    return jwt.encode(to_encode, secret_key, algorithm=algorithm)
+    start_time = time.time()
+
+    try:
+        if expires_delta:
+            expire = datetime.now(timezone.utc) + timedelta(minutes=expires_delta)
+        else:
+            expire = datetime.now(timezone.utc) + timedelta(minutes=config.access_token_expire_minutes)
+
+        to_encode = data.copy()
+        to_encode.update({"exp": int(expire.timestamp())})
+        token = jwt.encode(to_encode, secret_key, algorithm=algorithm)
+
+        # Track token generation metrics
+        if METRICS_ENABLED and metrics:
+            duration = time.time() - start_time
+            metrics.oauth_token_generation_duration_seconds.labels(token_type="access_token").observe(duration)
+
+        return token
+    except Exception as e:
+        # Track token generation errors
+        if METRICS_ENABLED and metrics:
+            metrics.track_security_event("token_generation_error", "error")
+        raise
 
 
 def create_refresh_token(user_id: str, secret_key: str, config: AuthlyConfig, jti: Optional[str] = None) -> str:
@@ -62,16 +108,33 @@ def create_refresh_token(user_id: str, secret_key: str, config: AuthlyConfig, jt
     Returns:
         JWT refresh token string
     """
-    # Generate a new JTI if one is not provided
-    if jti is None:
-        token_jti = secrets.token_hex(config.token_hex_length)
-    else:
-        token_jti = jti
+    import time
 
-    expire = datetime.now(timezone.utc) + timedelta(days=config.refresh_token_expire_days)
-    payload = {"sub": user_id, "type": "refresh", "jti": token_jti, "exp": int(expire.timestamp())}
+    start_time = time.time()
 
-    return jwt.encode(payload, secret_key, algorithm=config.algorithm)
+    try:
+        # Generate a new JTI if one is not provided
+        if jti is None:
+            token_jti = secrets.token_hex(config.token_hex_length)
+        else:
+            token_jti = jti
+
+        expire = datetime.now(timezone.utc) + timedelta(days=config.refresh_token_expire_days)
+        payload = {"sub": user_id, "type": "refresh", "jti": token_jti, "exp": int(expire.timestamp())}
+
+        token = jwt.encode(payload, secret_key, algorithm=config.algorithm)
+
+        # Track token generation metrics
+        if METRICS_ENABLED and metrics:
+            duration = time.time() - start_time
+            metrics.oauth_token_generation_duration_seconds.labels(token_type="refresh_token").observe(duration)
+
+        return token
+    except Exception as e:
+        # Track token generation errors
+        if METRICS_ENABLED and metrics:
+            metrics.track_security_event("token_generation_error", "error")
+        raise
 
 
 def decode_token(token: str, secret_key: str, algorithm: str = "HS256") -> dict:
@@ -89,9 +152,27 @@ def decode_token(token: str, secret_key: str, algorithm: str = "HS256") -> dict:
     Raises:
         ValueError: If token validation fails
     """
+    import time
+
+    start_time = time.time()
+
     try:
         payload = jwt.decode(token, secret_key, algorithms=[algorithm])
+
+        # Track successful token validation
+        if METRICS_ENABLED and metrics:
+            duration = time.time() - start_time
+            token_type = payload.get("type", "access_token")
+            metrics.oauth_token_generation_duration_seconds.labels(token_type=f"{token_type}_validation").observe(
+                duration
+            )
+
         return payload
     except JWTError as e:
+        # Track token validation failures
+        if METRICS_ENABLED and metrics:
+            duration = time.time() - start_time
+            metrics.track_security_event("token_validation_failed", "warning")
+
         logger.error(f"JWT decode error: {str(e)}")
         raise ValueError("Could not validate credentials")

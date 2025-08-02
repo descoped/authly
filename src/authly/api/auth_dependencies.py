@@ -12,6 +12,16 @@ from authly.core.dependencies import get_config, get_database_connection
 
 logger = logging.getLogger(__name__)
 
+# Import authentication metrics tracking
+try:
+    from authly.monitoring.metrics import metrics
+
+    METRICS_ENABLED = True
+except ImportError:
+    logger.debug("Metrics collection not available in auth dependencies")
+    METRICS_ENABLED = False
+    metrics = None
+
 
 @dataclass(frozen=True)
 class OAuth2State:
@@ -260,6 +270,9 @@ async def get_current_client(
     Raises:
         HTTPException: If client authentication fails
     """
+    import time
+
+    start_time = time.time()
     from authly.oauth.models import TokenEndpointAuthMethod
 
     client_id = None
@@ -309,6 +322,12 @@ async def get_current_client(
 
     # Check if we have at least a client_id
     if not client_id:
+        # Track missing client credentials
+        if METRICS_ENABLED and metrics:
+            duration = time.time() - start_time
+            metrics.track_client_authentication(
+                "unknown", "missing_credentials", auth_method.value if auth_method else "unknown"
+            )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Client authentication required",
@@ -326,6 +345,10 @@ async def get_current_client(
         )
 
         if not authenticated_client:
+            # Track client authentication failure
+            if METRICS_ENABLED and metrics:
+                duration = time.time() - start_time
+                metrics.track_client_authentication(client_id, "authentication_failed", auth_method.value)
             logger.warning(f"Client authentication failed for client_id: {client_id}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -333,12 +356,23 @@ async def get_current_client(
                 headers={"WWW-Authenticate": "Basic"},
             )
 
+        # Track successful client authentication
+        if METRICS_ENABLED and metrics:
+            duration = time.time() - start_time
+            metrics.track_client_authentication(client_id, "success", auth_method.value)
+
         return authenticated_client
 
     except HTTPException:
         # Re-raise HTTPExceptions (like authentication failures) as-is
         raise
     except Exception as e:
+        # Track client authentication error
+        if METRICS_ENABLED and metrics:
+            duration = time.time() - start_time
+            metrics.track_client_authentication(
+                client_id or "unknown", "error", auth_method.value if auth_method else "unknown"
+            )
         logger.error(f"Error during client authentication: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Client authentication service error"

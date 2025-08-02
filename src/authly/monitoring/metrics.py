@@ -347,6 +347,56 @@ class AuthlyMetrics:
         if status in ["invalid_secret", "client_not_found", "auth_method_mismatch"]:
             self.track_security_event(f"client_{status}", "warning")
 
+    def track_token_revocation(self, token_type: str, status: str):
+        """
+        Track token revocation operations.
+
+        Args:
+            token_type: Type of token being revoked (access_token, refresh_token, etc.)
+            status: Revocation status (success, invalid_token, error)
+        """
+        # Track as a security event
+        self.track_security_event(f"token_revocation_{status}", "info")
+
+        # Also track via OAuth token request metric with revocation grant type
+        self.track_oauth_token_request("revocation", "unknown", status, 0.0)
+
+    def track_logout_event(self, user_id: str, status: str, tokens_invalidated: int = 0):
+        """
+        Track user logout operations.
+
+        Args:
+            user_id: User identifier (partially masked for privacy)
+            status: Logout status (success, no_active_tokens, error)
+            tokens_invalidated: Number of tokens invalidated during logout
+        """
+        # Track as a security event
+        self.track_security_event(f"user_logout_{status}", "info")
+
+        # Track as authentication event
+        self.track_login_attempt("logout", "session_end", user_id[:10] + "***" if len(user_id) > 10 else user_id)
+
+        # Update active tokens if tokens were invalidated
+        if tokens_invalidated > 0:
+            # This is an approximation - in real implementation you'd get actual counts
+            pass
+
+    def track_client_authentication(self, client_id: str, status: str, auth_method: str):
+        """
+        Track OAuth client authentication attempts.
+
+        Args:
+            client_id: OAuth client identifier
+            status: Authentication status (success, authentication_failed, missing_credentials, error)
+            auth_method: Authentication method used (client_secret_basic, client_secret_post, none)
+        """
+        # Track client authentication via client operation tracking
+        self.track_client_operation("authenticate_client", status, client_id, "unknown", auth_method, 0.0)
+
+        # Track security events for failed authentication
+        if status in ["authentication_failed", "missing_credentials"]:
+            self.track_security_event(f"client_auth_{status}", "warning")
+
 
 # Global metrics instance
 metrics = AuthlyMetrics()
