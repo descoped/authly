@@ -53,6 +53,8 @@ pytest
 pytest tests/test_auth.py -v          # Run specific test file
 pytest tests/test_users.py -v         # Run user tests
 
+> It is important to note that you have to call `source .venv/bin/activate` if you want to run `pytest` directly. Otherwise use `uv run pytest`.
+
 # Linting and formatting
 uv run ruff check .                   # Lint code (replaces flake8)
 uv run ruff format .                  # Format code (replaces black)
