@@ -63,7 +63,7 @@ This is the recommended long-term solution. It involves removing the `username` 
 
 **Plan:**
 
-1.  **Database Schema Change**: Modify `docker/init-db-and-user.sql` to remove the `username` column from the `users` table.
+1.  **Database Schema Change**: Modify `docker-postgres/init-db-and-user.sql` to remove the `username` column from the `users` table.
 2.  **Pydantic Models**: Remove `username` from all user-related models in `src/authly/users/models.py`.
 3.  **Repository Layer**: Update `src/authly/users/repository.py` to replace username-based lookups (e.g., `get_by_username`) with email-based lookups (`get_by_email`).
 4.  **Service Layer**: Update `src/authly/users/service.py` to remove any logic that references `username`.

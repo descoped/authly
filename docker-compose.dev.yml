@@ -8,9 +8,9 @@ services:
       - "5432:5432"
     volumes:
       - postgres_dev_data:/var/lib/postgresql/data
-      - ./docker/init-db-and-user.sql:/docker-entrypoint-initdb.d/01-init-db.sql:ro
+      - ./docker-postgres/init-db-and-user.sql:/docker-entrypoint-initdb.d/01-init-db.sql:ro
       # Mount development SQL scripts
-      - ./docker/dev-data:/docker-entrypoint-initdb.d/dev:ro
+      - ./docker-postgres/dev-data:/docker-entrypoint-initdb.d/dev:ro
 
   # Redis Cache (Development)
   redis:

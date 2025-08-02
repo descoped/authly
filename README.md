@@ -10,14 +10,14 @@
 [![Docker Hub](https://img.shields.io/docker/v/descoped/authly?label=Docker%20Hub&color=blue)](https://hub.docker.com/r/descoped/authly/tags)
 
 
-A **production-ready OAuth 2.1 + OpenID Connect 1.0 authorization server** built with FastAPI and PostgreSQL. Authly provides enterprise-grade security, comprehensive testing (510 tests passing), and professional administration tools.
+A **production-ready OAuth 2.1 + OpenID Connect 1.0 authorization server** built with FastAPI and PostgreSQL. Authly provides enterprise-grade security, comprehensive testing with 100% pass rate, and professional administration tools.
 
 ---
 
 ## 🚀 **Production Ready Features**
 
 ✅ **Complete OAuth 2.1 + OIDC 1.0 Compliance** - Full RFC implementation with PKCE  
-✅ **510 Tests Passing** - 100% success rate with real integration testing  
+✅ **Comprehensive Testing** - 540+ tests with 100% success rate and real integration testing  
 ✅ **Enterprise Security** - Two-layer admin system, rate limiting, audit logging  
 ✅ **Production Architecture** - Docker, monitoring, health checks, deployment guides  
 ✅ **Professional CLI** - Complete admin interface with API-first architecture  
@@ -78,7 +78,7 @@ A **production-ready OAuth 2.1 + OpenID Connect 1.0 authorization server** built
 ### **Admin Security Model**
 - **Two-Layer Security** - Intrinsic authority (is_admin flag) + OAuth scopes
 - **Bootstrap System** - Solves IAM chicken-and-egg paradox
-- **Granular Permissions** - 8 admin scopes for fine-grained access control
+- **Granular Permissions** - Multiple admin scopes for fine-grained access control
 - **API Restrictions** - Admin API localhost-only with configurable access
 
 ### **System Security**
@@ -252,18 +252,18 @@ See the [Redis Integration Guide](docs/redis-integration.md) for complete config
 ## 🧪 **Testing Excellence**
 
 ### **Test Coverage**
-- **510 Tests Total** - 100% passing (verified production quality)
+- **Comprehensive Test Suite** - 540+ tests with 100% pass rate (verified production quality)
 - **Real Integration Testing** - PostgreSQL testcontainers (no mocking)
 - **Complete Flow Testing** - End-to-end OAuth and OIDC flows
 - **Security Testing** - Authentication, authorization, and validation
 - **API Testing** - All endpoints with comprehensive scenarios
 
 ### **Testing Categories**
-- **OAuth 2.1 Tests** (156 tests) - Authorization flows, PKCE, client management
-- **OIDC 1.0 Tests** (98 tests) - ID tokens, UserInfo, JWKS, discovery
-- **Admin System Tests** (85 tests) - CLI, API, security, authentication
-- **Core Authentication Tests** (67 tests) - JWT, passwords, tokens
-- **User Management Tests** (33 tests) - User lifecycle and management
+- **OAuth 2.1 Tests** - Authorization flows, PKCE, client management
+- **OIDC 1.0 Tests** - ID tokens, UserInfo, JWKS, discovery
+- **Admin System Tests** - CLI, API, security, authentication
+- **Core Authentication Tests** - JWT, passwords, tokens
+- **User Management Tests** - User lifecycle and management
 
 ### **Quality Standards**
 - **No Mocking** - Real database and HTTP server integration testing
@@ -303,7 +303,7 @@ See the [Redis Integration Guide](docs/redis-integration.md) for complete config
 - ✅ **OIDC 1.0 Complete** - ID tokens, UserInfo, JWKS, discovery
 - ✅ **Admin System Complete** - CLI, API, security, user management
 - ✅ **Production Ready** - Docker, monitoring, deployment, documentation
-- ✅ **Test Excellence** - 510 tests passing with comprehensive coverage
+- ✅ **Test Excellence** - Comprehensive test suite with 100% pass rate
 
 ### **Standards Compliance**
 - ✅ **6 RFC Specifications** implemented and validated

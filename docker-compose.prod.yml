@@ -6,7 +6,7 @@ services:
       POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
     volumes:
       - postgres_prod_data:/var/lib/postgresql/data
-      - ./docker/init-db-and-user.sql:/docker-entrypoint-initdb.d/01-init-db.sql:ro
+      - ./docker-postgres/init-db-and-user.sql:/docker-entrypoint-initdb.d/01-init-db.sql:ro
     secrets:
       - postgres_password
     # Remove port exposure for security

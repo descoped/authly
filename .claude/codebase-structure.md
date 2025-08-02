@@ -17,7 +17,7 @@ authly/
 ├── .venv/                      # Python virtual environment
 ├── docs/                       # Current documentation (6 files: API, CLI, Docker, OAuth, OIDC guides)
 ├── docs-outdated/              # Outdated documentation (25+ files from previous development)
-├── docker/                     # Database initialization scripts
+├── docker-postgres/            # PostgreSQL initialization scripts
 ├── docker-compose/             # Docker compose services (Grafana, Nginx, Prometheus, etc.)
 ├── examples/                   # Usage examples and testing
 ├── report/                     # Analysis and audit reports
@@ -340,7 +340,7 @@ docs/
 ### **Docker Support**
 ```
 Dockerfile                      # Multi-stage production build
-docker/
+docker-postgres/
 └── init-db-and-user.sql        # PostgreSQL schema initialization
 ```
 

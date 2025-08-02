@@ -130,7 +130,7 @@ Core patterns:
 
 ### Database Schema (Modern PostgreSQL)
 
-**See `docker/init-db-and-user.sql` for complete production schema with domain annotations.**
+**See `docker-postgres/init-db-and-user.sql` for complete production schema with domain annotations.**
 
 **Advanced PostgreSQL Features:**
 - **UUID Primary Keys**: `gen_random_uuid()` for security and distribution

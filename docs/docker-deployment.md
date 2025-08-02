@@ -13,7 +13,7 @@ Complete lifecycle management guide for Authly's Docker infrastructure.
   - Monitoring configs (`docker-compose/prometheus/`, `docker-compose/grafana/`)
   - Log aggregation (`docker-compose/fluentd/`)
   - Development tools (`docker-compose/pgadmin/`)
-- Database initialization scripts (`docker/init-db-and-user.sql`)
+- Database initialization scripts (`docker-postgres/init-db-and-user.sql`)
 - Environment templates (`.env.example`)
 - SSL directory structure (`docker-compose/nginx/ssl/README.md`)
 
@@ -341,9 +341,9 @@ openssl rand -hex 32     # For tokens
 #### **4. SSL/TLS Configuration**
 ```bash
 # Generate SSL certificates (production)
-# Place in docker/nginx/ssl/
-cp your-cert.pem docker/nginx/ssl/cert.pem
-cp your-key.pem docker/nginx/ssl/key.pem
+# Place in docker-postgres/nginx/ssl/
+cp your-cert.pem docker-postgres/nginx/ssl/cert.pem
+cp your-key.pem docker-postgres/nginx/ssl/key.pem
 
 # Or use Let's Encrypt with certbot
 docker run -it --rm \
@@ -514,7 +514,7 @@ asyncio.run(test())
 openssl s_client -connect auth.yourdomain.com:443 -servername auth.yourdomain.com
 
 # Check certificate validity
-openssl x509 -in docker/nginx/ssl/cert.pem -text -noout
+openssl x509 -in docker-postgres/nginx/ssl/cert.pem -text -noout
 ```
 
 ### **Performance Tuning**

@@ -94,11 +94,11 @@ yarn.lock
 .circleci/
 
 # Monitoring and config (exclude from build)
-docker/prometheus/
-docker/grafana/
-docker/nginx/
-docker/fluentd/
-# Keep docker/init-db-and-user.sql for database initialization
+docker-postgres/prometheus/
+docker-postgres/grafana/
+docker-postgres/nginx/
+docker-postgres/fluentd/
+# Keep docker-postgres/init-db-and-user.sql for database initialization
 
 # Sensitive files
 *.pem

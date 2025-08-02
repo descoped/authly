@@ -38,7 +38,7 @@ def postgres_container() -> Generator[PostgresContainer, None, None]:
     )
 
     postgres.with_volume_mapping(
-        str(find_root_folder() / "docker"),
+        str(find_root_folder() / "docker-postgres"),
         "/docker-entrypoint-initdb.d",  # all sql scripts put in this directory, will be executed on startup
     )
 

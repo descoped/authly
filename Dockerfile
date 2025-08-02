@@ -131,7 +131,7 @@ ENV PATH="/usr/local/bin:$PATH"
 ENV PYTHONPATH=""
 
 # Copy database initialization script if it exists
-COPY docker/init-db-and-user.sql /app/docker/init-db-and-user.sql
+COPY docker-postgres/init-db-and-user.sql /app/docker-postgres/init-db-and-user.sql
 
 # Create logs directory for application logging
 RUN mkdir -p /app/logs
