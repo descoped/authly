@@ -12,44 +12,43 @@
 - **WebFetch/WebSearch**: Research and documentation access
 
 ## Memory Management
-**See `.claude/README.md` for complete memory system guide and usage patterns.**
+**See `.claude/CLAUDE.md` for complete memory system organization and usage patterns.**
 
 **Primary References:**
-- **`.claude/CLAUDE.md`** - Primary project memory and development guide
-- **`.claude/memory.md`** - Implementation status and detailed file references
-- **`.claude/architecture.md`** - System architecture and design principles
-- **`.claude/external-libraries.md`** - Local repository integration patterns
+- **`.claude/CLAUDE.md`** - **PRIMARY ENTRY POINT** - Complete project memory and development guide
+- **`.claude/implementation-status.md`** - Current implementation status and detailed progress tracking
+- **`.claude/architecture.md`** - System architecture and design principles  
+- **`.claude/codebase-structure.md`** - Complete project structure with metrics
+- **`docs/README.md`** - Complete documentation index with 18 guides
 
-**Strategic Planning:**
-- **`.claude/project-consolidation-plan.md`** - Consolidation strategy
-- **`.claude/task-management.md`** - TodoWrite workflow patterns
-- **`.claude/commit-consolidation-plan.md`** - Git history management
+**Development Workflows:**
+- **`.claude/task-management.md`** - TodoWrite workflow patterns and enterprise project management
 
-**Technical References:**
-- **`.claude/codebase-structure-current.md`** - Complete code organization
-- **`.claude/psycopg3-transaction-patterns.md`** - Database best practices
-- **`.claude/session-consolidation-summary.md`** - Session continuity patterns
+**Historical Knowledge:**
+- **`.claude/evolution/`** - Complete implementation history (for learning purposes only)
+- **`.claude/roadmap/`** - Future features and strategic roadmaps
 
-**Project Context**: Complete OAuth 2.1 + OIDC 1.0 authorization server (feature complete + consolidated)
+**Project Context**: Production-ready OAuth 2.1 + OIDC 1.0 authorization server with comprehensive documentation
 
 ## Development Focus
-- **Quality Excellence**: Maintain 439/439 test success rate (100% pass rate achieved)
+- **Quality Excellence**: Maintain 510/510 test success rate (100% pass rate achieved)
 - **Real Integration Testing**: PostgreSQL testcontainers, no mocking, authentic patterns
 - **Security First**: OAuth 2.1 + OIDC 1.0 compliance with defensive practices only
 - **Production Architecture**: Scalable deployment with Docker and lifecycle management
 - **Comprehensive Documentation**: Living documentation across `.claude/` memory system
 - **Modern Python Patterns**: Async-first, type-safe, package-by-feature architecture
 
-## Current Project Status (Feature Complete)
-**See `.claude/memory.md` for detailed implementation status and next steps.**
+## Current Project Status (Production Ready)
+**See `ai_docs/TODO.md` for current tasks and implementation priorities.**
 
 **Core Completed Features:**
 - **✅ OAuth 2.1 + OIDC 1.0**: Complete authorization server implementation
-- **✅ Test Excellence**: 439/439 tests passing with real integration patterns
+- **✅ Test Excellence**: 510/510 tests passing with real integration patterns
 - **✅ Production Ready**: Docker, monitoring, security hardening
-- **✅ Project Consolidation**: Complete documentation organization
+- **✅ Documentation**: 18 comprehensive guides covering all aspects
+- **✅ GDPR Foundation**: Privacy compliance analysis and implementation guide
 
-**🎯 Status**: All planned phases completed - project is feature complete + professionally consolidated
+**🎯 Status**: Enterprise production ready - remaining tasks focus on advanced GDPR features
 
 ## Development Standards
 - **Code Quality**: Type annotations, Pydantic validation, async patterns

@@ -86,20 +86,20 @@ Authly is a production-ready OAuth 2.1 authentication and authorization service 
 
 ## 📝 CONSOLIDATION SESSION NOTES
 
-**See `.claude/session-consolidation-summary.md` for detailed session documentation.**
+**Note**: Documentation consolidation phase has been completed. All valuable content from outdated documentation has been migrated to the current `docs/` folder with comprehensive guides.
 
-### **Key Consolidation Achievements (July 10, 2025)**
-- ✅ **Documentation Archival**: Historical docs moved to `docs/historical/`
-- ✅ **Project Root Cleanup**: Updated TODO.md, README.md, consolidated CLI_USAGE.md
-- ✅ **Memory System Enhancement**: Created strategic .claude/ documents
-- ✅ **Commit Consolidation Planning**: Strategy for enormous history management
+### **Key Consolidation Achievements (August 2025)**
+- ✅ **Documentation Consolidation**: All valuable content migrated to comprehensive `docs/` guides (18 total files)
+- ✅ **Project Structure Cleanup**: Removed redundant files and outdated references
+- ✅ **Memory System Enhancement**: Updated .claude/ system with current project state
+- ✅ **Knowledge Evolution**: Implementation history preserved in `.claude/evolution/`
 
 ### **🎯 PROJECT STATUS: FEATURE COMPLETE + CONSOLIDATED**
 All originally planned features have been implemented and tested. The project is now a complete OAuth 2.1 + OIDC 1.0 authorization server with production-ready deployment capabilities **and** a clean, organized project structure suitable for professional release management.
 
 ## Next Steps
 
-**See `ai_docs/TODO.md` for detailed task priorities.**
+**See `ai_docs/TODO.md` for detailed task priorities and current project status.**
 
 ### High Priority
 1. **Phase 3: Argon2 Password Hashing** - Enhance security with modern password hashing
@@ -154,13 +154,13 @@ All originally planned features have been implemented and tested. The project is
 ## 🔗 MEMORY FILE REFERENCES
 
 ### Claude Memory System (`.claude/`)
-- **`.claude/CLAUDE.md`** - Primary comprehensive project memory and architecture documentation
-- **`.claude/memory.md`** - This file - implementation status, next steps, and historical context
-- **`.claude/external-libraries.md`** - Detailed psycopg-toolkit and fastapi-testing usage patterns with local repository references
-- **`.claude/psycopg3-transaction-patterns.md`** - Transaction patterns, architecture best practices, and anti-patterns
+- **`.claude/CLAUDE.md`** - **PRIMARY ENTRY POINT** - Complete project memory and architecture documentation
+- **`.claude/implementation-status.md`** - This file - current implementation status, next steps, and progress tracking
+- **`.claude/architecture.md`** - Comprehensive system architecture and design patterns
 - **`.claude/capabilities.md`** - Tool configuration and development focus
-- **`.claude/settings.json`** - Team-shared Claude configuration (committed to git)
-- **`.claude/settings.local.json`** - Personal Claude preferences (gitignored)
+- **`.claude/codebase-structure.md`** - Current project structure documentation
+- **`.claude/evolution/`** - **HISTORICAL ONLY** - Complete implementation history for learning purposes
+- **`.claude/roadmap/`** - **FUTURE FEATURES** - Strategic roadmaps for upcoming implementation
 
 ### Core Architecture (src/)
 
@@ -252,5 +252,12 @@ All originally planned features have been implemented and tested. The project is
 - **`../psycopg-toolkit/`** - Enhanced PostgreSQL operations with modern async patterns
 - **`../fastapi-testing/`** - Async-first testing utilities with real server lifecycle management
 
-### Documentation & Planning
-- **`refactoring/FIX_CLI_AND_APP_LIFECYCLE_TODO_FINAL.md`** - Validated implementation status and phase planning
+### Live Documentation (`docs/`)
+- **`docs/README.md`** - Complete documentation index with 18 comprehensive guides
+- **`docs/architecture.md`** - System architecture and component design
+- **`docs/oauth-guide.md`** - OAuth 2.1 implementation guide
+- **`docs/oidc-implementation.md`** - OpenID Connect implementation details
+- **`docs/security-guide.md`** - Comprehensive security implementation
+- **`docs/deployment-guide.md`** - Production deployment procedures
+- **`docs/performance-guide.md`** - Performance benchmarks and optimization
+- **`docs/troubleshooting-guide.md`** - Troubleshooting and maintenance guide

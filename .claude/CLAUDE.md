@@ -77,7 +77,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 - Run API tests with: `./examples/api-test.sh`
 - `examples/embeded.py`: Powerful script to run entire service with database container
 - Comprehensive test suite with realistic database integration testing
-- **See `.claude/external-libraries.md` for detailed testing patterns and library usage**
+- **See `docs/testing-guide.md` for comprehensive testing patterns and current methodology**
 - **Current Status**: 510 tests passing (100% success rate) with comprehensive OAuth 2.1 + OIDC 1.0 coverage
 
 ## Architecture Overview
@@ -86,7 +86,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 ### Project Structure (Package-by-Feature with OAuth 2.1)
 
-**See `.claude/codebase-structure-current.md` for complete project structure with metrics.**
+**See `.claude/codebase-structure.md` for complete project structure with metrics.**
 
 **Current Project Status**: Version 0.5.1 with complete OAuth 2.1 + OIDC Core 1.0 implementation and 510 tests passing.
 
@@ -99,7 +99,7 @@ Key architectural components:
 
 ### Core Components
 
-**See `.claude/memory.md` for detailed file descriptions and architectural context.**
+**See `.claude/implementation-status.md` for detailed file descriptions and current implementation progress.**
 
 Key components:
 - **Authly Singleton**: Central resource manager with thread-safe initialization
@@ -148,7 +148,7 @@ Core patterns:
 
 ### Security Features
 
-**See `docs-outdated/security-features.md` for comprehensive security implementation details.**
+**See `docs/security-guide.md` for comprehensive security implementation details.**
 
 - JWT tokens with configurable expiration and JTI tracking
 - Secure password hashing with bcrypt
@@ -161,7 +161,7 @@ Core patterns:
 
 ## Testing Architecture (Modern Async Testing)
 
-**See `docs-outdated/testing-architecture.md` for comprehensive testing methodology and patterns.**
+**See `docs/testing-guide.md` for comprehensive testing methodology and patterns.**
 
 **Core Testing Principle**: Every new feature must have comprehensive test coverage before completion.
 
@@ -175,10 +175,8 @@ Core patterns:
 
 **Test Excellence Achievement**: 510 tests passing (100% success rate)
 
-**External Testing Libraries:**
-See `.claude/external-libraries.md` for detailed documentation on:
-- **psycopg-toolkit**: Database operations, transaction management, repository patterns
-- **fastapi-testing**: API testing, async server lifecycle, real-world integration patterns
+**Testing Excellence**: Real integration testing with PostgreSQL testcontainers and authentic HTTP testing patterns
+- **Comprehensive Coverage**: 510 tests across 49 test files ensuring complete specification compliance
 
 ## OAuth 2.1 + OIDC 1.0 Implementation - COMPLETED ✅
 
@@ -242,7 +240,7 @@ See `.claude/external-libraries.md` for detailed documentation on:
 - ✅ Security and error handling testing
 - ✅ Performance and scalability testing
 
-**See `.claude/memory.md` for detailed testing achievements and debugging journey.**
+**See `.claude/implementation-status.md` for detailed testing achievements and debugging journey.**
 
 ### 🎯 MAJOR MILESTONE ACHIEVED
 
@@ -305,7 +303,7 @@ This session established a comprehensive memory system and cleaned up the enormo
 - **Testing Commands**: `pytest`, `pytest tests/test_*.py -v`
 
 ### Test Excellence Achievement
-**See `.claude/memory.md` for detailed testing achievements and debugging journey.**
+**See `.claude/implementation-status.md` for detailed testing achievements and debugging journey.**
 
 - **Root Cause Analysis**: Fixed environment variable caching in admin_middleware.py
 - **Test Isolation**: Resolved database state conflicts between bootstrap and admin fixtures
@@ -347,47 +345,56 @@ This session established a comprehensive memory system and cleaned up the enormo
 - **`docs/`** = Professional user documentation only
 - **Separation of concerns** = Development process vs. user-facing content
 
-## Memory File References
+## Memory System Organization
 
-### Claude Memory System (`.claude/`)
-- **`.claude/CLAUDE.md`** - Primary project memory (this file)
-- **`.claude/memory.md`** - Implementation status, next steps, and detailed file descriptions
-- **`.claude/architecture.md`** - System architecture and design patterns
-- **`.claude/external-libraries.md`** - psycopg-toolkit and fastapi-testing usage patterns
-- **`.claude/codebase-structure-current.md`** - Complete project structure with metrics
-- **`.claude/psycopg3-transaction-patterns.md`** - Database transaction patterns
-- **`.claude/task-management.md`** - TodoWrite/TodoRead workflow patterns
-- **`.claude/project-consolidation-plan.md`** - Consolidation strategy
-- **`.claude/commit-consolidation-plan.md`** - Git history management
-- **`.claude/session-consolidation-summary.md`** - Historical session documentation
-- **`.claude/settings.json`** - Team-shared Claude configuration
+### **Primary Memory Files (`.claude/`)**
+
+The `.claude/` directory contains the comprehensive project memory system. Each file serves a distinct purpose:
+
+**Core Project Memory:**
+- **`.claude/CLAUDE.md`** - **PRIMARY ENTRY POINT** (this file) - Complete project memory, architecture, and development guidance
+- **`.claude/implementation-status.md`** - Current implementation status, next steps, and detailed progress tracking
+- **`.claude/architecture.md`** - Comprehensive system architecture, design patterns, and technical decisions
+
+**Technical References:**
+- **`.claude/codebase-structure.md`** - Complete project structure with metrics and organization
+- **`.claude/external-libraries.md`** - Local library integration patterns (psycopg-toolkit, fastapi-testing)
+- **`.claude/psycopg3-transaction-patterns.md`** - Database transaction patterns and best practices
+- **`.claude/capabilities.md`** - Development focus, tool configuration, and quality standards
+
+**Development Workflows:**
+- **`.claude/task-management.md`** - TodoWrite/TodoRead enterprise patterns and project management
+
+**Historical Knowledge:**
+- **`.claude/evolution/`** - **HISTORICAL PURPOSES ONLY** - Complete implementation history, learning, and development journey preservation. Used for understanding how the project evolved and for learning from past decisions.
+
+**Future Planning:**
+- **`.claude/roadmap/`** - **FUTURE FEATURES** - Strategic roadmaps and specifications for features to be implemented in future phases.
+
+**Configuration:**
+- **`.claude/settings.json`** - Team-shared Claude configuration (committed to git)
 - **`.claude/settings.local.json`** - Personal Claude preferences (gitignored)
 
-### Evolution Documentation (`.claude/evolution/`)
-- **`.claude/evolution/README.md`** - Complete evolution timeline and navigation
-- **`.claude/evolution/architectural-genesis/`** - Phase 1: Original vision and AI collaboration
-- **`.claude/evolution/implementation-reality/`** - Phase 2: How vision became production
-- **`.claude/evolution/quality-excellence/`** - Quality achievement and debugging methodology
-- **`.claude/evolution/security-evolution/`** - Security audit and comprehensive validation
-- **`.claude/evolution/production-excellence/`** - Enterprise-grade deployment readiness
-- **`.claude/evolution/cross-references/`** - Architectural consistency analysis
-
-### Roadmap Documentation (`.claude/roadmap/`)
-- **Restriction** - Leave all documents in this directory untouched! Never remove them.
+### **Memory System Philosophy**
+- **Comprehensive Context** - All project knowledge captured and organized in functionally-named files
+- **Session Continuity** - Enable seamless continuation across development sessions using CLAUDE.md as entry point
+- **Clear Purpose** - Each `.claude/*.md` file has a distinct, obvious role with no redundancy
+- **Historical Preservation** - Complete development journey preserved in `evolution/` for learning purposes only
+- **Future Planning** - Strategic roadmaps maintained in `roadmap/` for upcoming feature implementation
 
 ### AI Assistant Documentation (`ai_docs/`)
 - **`ai_docs/TODO.md`** - Current tasks and implementation priorities
-- **`ai_docs/OIDC_BACKLOG.md`** - OIDC enhancement backlog and implementation plans
-- **`ai_docs/SIGNED_URLS_WITH_POLICY_BASED_ACL.md`** - Future enhancement technical design
-- **`ai_docs/ADMIN_FRONTEND_*.md`** - Admin frontend planning and specifications
 
 ### Core Documentation (`docs/`)
-- **`docs-outdated/oauth-2.1-implementation.md`** - Complete OAuth 2.1 feature documentation
+- **`docs/oauth-guide.md`** - Complete OAuth 2.1 implementation guide
 - **`docs/api-reference.md`** - Complete API endpoint documentation
-- **`docs-outdated/cli-administration.md`** - Admin CLI usage and OAuth management
-- **`docs-outdated/security-features.md`** - Security implementation details
-- **`docs-outdated/testing-architecture.md`** - Testing methodology and patterns
-- **`docs-outdated/deployment-guide.md`** - Production deployment instructions
+- **`docs/cli-guide.md`** - Admin CLI usage and OAuth management
+- **`docs/security-guide.md`** - Comprehensive security implementation details
+- **`docs/testing-guide.md`** - Testing methodology and patterns
+- **`docs/deployment-guide.md`** - Production deployment instructions
+- **`docs/oidc-implementation.md`** - OpenID Connect implementation guide
+- **`docs/performance-guide.md`** - Performance benchmarks and optimization
+- **`docs/troubleshooting-guide.md`** - Comprehensive troubleshooting guide
 
 ### Local Library References
 - **`../psycopg-toolkit/`** - Enhanced PostgreSQL operations with modern async patterns
