@@ -1,0 +1,51 @@
+{
+  "client_id": "oidc-conformance-test",
+  "client_name": "OIDC Conformance Test Client",
+  "client_secret": "conformance-test-secret-change-in-production",
+  "client_type": "confidential",
+  "redirect_uris": [
+    "https://localhost:8443/test/a/authly/callback",
+    "https://localhost:8443/test/a/authly/callback/implicit",
+    "https://localhost:8443/test/a/authly/callback/hybrid"
+  ],
+  "post_logout_redirect_uris": [
+    "https://localhost:8443/test/a/authly/post_logout_callback",
+    "https://localhost:8443/logout"
+  ],
+  "response_types": [
+    "code",
+    "code id_token",
+    "code token",
+    "code id_token token",
+    "id_token",
+    "id_token token",
+    "token"
+  ],
+  "grant_types": [
+    "authorization_code",
+    "refresh_token",
+    "implicit"
+  ],
+  "scopes": [
+    "openid",
+    "profile",
+    "email",
+    "phone",
+    "address",
+    "offline_access"
+  ],
+  "token_endpoint_auth_method": "client_secret_basic",
+  "id_token_signed_response_alg": "RS256",
+  "subject_type": "public",
+  "require_pkce": true,
+  "frontchannel_logout_uri": "https://localhost:8443/test/a/authly/frontchannel_logout",
+  "frontchannel_logout_session_required": true,
+  "application_type": "web",
+  "contacts": [
+    "admin@authly.local"
+  ],
+  "logo_uri": "https://localhost:8443/static/logo.png",
+  "client_uri": "https://localhost:8443",
+  "policy_uri": "https://localhost:8443/policy",
+  "tos_uri": "https://localhost:8443/terms"
+}

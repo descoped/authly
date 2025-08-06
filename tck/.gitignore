@@ -1,0 +1,28 @@
+# Conformance Suite - External dependency
+# Clone this from: https://gitlab.com/openid/conformance-suite.git
+conformance-suite/
+
+# Test results
+results/
+*.log
+
+# Temporary files
+*.tmp
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Docker volumes
+*_data/

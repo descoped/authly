@@ -9,25 +9,31 @@
 [![PyPI - Version](https://img.shields.io/pypi/v/authly?color=blue)](https://pypi.org/project/authly/)
 [![Docker Hub](https://img.shields.io/docker/v/descoped/authly?label=Docker%20Hub&color=blue)](https://hub.docker.com/r/descoped/authly/tags)
 
-
-A **production-ready OAuth 2.1 + OpenID Connect 1.0 authorization server** built with FastAPI and PostgreSQL. Authly provides enterprise-grade security, comprehensive testing with 100% pass rate, and professional administration tools.
-
----
-
-## 🚀 **Production Ready Features**
-
-✅ **Complete OAuth 2.1 + OIDC 1.0 Compliance** - Full RFC implementation with PKCE  
-✅ **Comprehensive Testing** - 708 tests with 100% success rate organized in 7 feature domains  
-✅ **Enterprise Security** - Two-layer admin system, rate limiting, audit logging  
-✅ **Production Architecture** - Docker, monitoring, health checks, deployment guides  
-✅ **Professional CLI** - Complete admin interface with API-first architecture  
-✅ **Developer Experience** - Comprehensive docs, easy setup, embedded development mode
+An **OAuth 2.1 and OpenID Connect authorization server** in active development. Built with FastAPI and PostgreSQL, Authly aims to provide standards-compliant authentication and authorization services.
 
 ---
 
-## 🔐 **OAuth 2.1 Authorization Server**
+## ⚠️ Development Status
 
-### **Core Authorization Features**
+**This project is a work in progress:**
+- Core OAuth 2.1 features are implemented and functional
+- Basic OpenID Connect support is available
+- ~90% OIDC specification compliance (not certified)
+- Suitable for development and testing environments
+- NOT recommended for production use without extensive testing and security audit
+
+**Known Limitations:**
+- Token endpoint error response format needs fixes
+- UserInfo endpoint doesn't support POST method
+- Authorization endpoint error handling needs improvement
+- Some OIDC test scenarios not fully implemented
+- Edge cases in OAuth flows need more testing
+
+---
+
+## 🔐 OAuth 2.1 Implementation
+
+### **Core Features (Working)**
 - **Authorization Code Flow** with mandatory PKCE (Proof Key for Code Exchange)
 - **Client Management** for confidential and public OAuth clients
 - **Token Revocation** (RFC 7009) for immediate token invalidation
@@ -36,342 +42,200 @@ A **production-ready OAuth 2.1 + OpenID Connect 1.0 authorization server** built
 
 ### **Supported Grant Types**
 - **Authorization Code Grant** with PKCE for third-party applications
-- **Password Grant** for trusted first-party applications
+- **Password Grant** for trusted first-party applications (legacy support)
 - **Refresh Token Grant** for token renewal
 - **Client Credentials Grant** for service-to-service authentication
 
-### **Security Standards Compliance**
-- **RFC 6749** - OAuth 2.0 Authorization Framework ✅
-- **RFC 7636** - Proof Key for Code Exchange (PKCE) ✅
-- **RFC 7009** - OAuth 2.0 Token Revocation ✅
-- **RFC 8414** - OAuth 2.0 Authorization Server Metadata ✅
+### **Standards Compliance (Partial)**
+- **RFC 6749** - OAuth 2.0 Authorization Framework ✅ Implemented
+- **RFC 7636** - Proof Key for Code Exchange (PKCE) ✅ Implemented
+- **RFC 7009** - OAuth 2.0 Token Revocation ✅ Implemented
+- **RFC 8414** - OAuth 2.0 Authorization Server Metadata ✅ Implemented
+- **Official Certification**: ❌ Not certified
 
 ---
 
-## 🆔 **OpenID Connect 1.0**
+## 🆔 OpenID Connect Support
 
-### **OIDC Core Features**
+### **Basic OIDC Features (Working)**
 - **ID Token Generation** with RS256/HS256 signing algorithms
-- **UserInfo Endpoint** with scope-based claims filtering
+- **UserInfo Endpoint** (GET method only)
 - **JWKS Endpoint** for token signature verification
 - **OIDC Discovery** with provider configuration metadata
 
-### **ID Token Claims**
-- **Standard Claims** - sub, aud, iss, exp, iat, auth_time, nonce
-- **Profile Claims** - name, given_name, family_name, email, email_verified
-- **Custom Claims** - Extensible claims processing based on requested scopes
+### **OIDC Compliance Status**
+- **Discovery**: 100% compliant ✅
+- **JWKS**: 100% compliant ✅
+- **Core Endpoints**: 50% compliant ⚠️
+- **Overall**: ~90% specification compliance
+- **Official Certification**: ❌ Not certified
 
-### **OIDC Standards Compliance**
-- **OpenID Connect Core 1.0** - Complete implementation ✅
-- **OpenID Connect Discovery 1.0** - Provider metadata ✅
+### **What Needs Work**
+- UserInfo POST method support
+- Complete error response formatting
+- Full authorization flow testing
+- Edge case handling
 
 ---
 
-## 🛡️ **Enterprise Security**
+## 🛡️ Security Features
 
-### **Authentication & Authorization**
-- **JWT Security** - RS256/HS256 signing with proper validation and rotation
-- **Password Security** - bcrypt hashing with configurable work factors
-- **Token Management** - JTI tracking, rotation, and blacklisting
-- **Session Security** - Concurrent session control and timeout management
+### **Implemented Security**
+- **JWT Security** - RS256/HS256 signing with validation
+- **Password Security** - bcrypt hashing (Argon2 planned)
+- **Token Management** - JTI tracking and blacklisting
+- **Rate Limiting** - Basic protection on auth endpoints
+- **CORS Protection** - Configurable CORS policies
 
 ### **Admin Security Model**
-- **Two-Layer Security** - Intrinsic authority (is_admin flag) + OAuth scopes
+- **Two-Layer Security** - Intrinsic authority + OAuth scopes
 - **Bootstrap System** - Solves IAM chicken-and-egg paradox
-- **Granular Permissions** - Multiple admin scopes for fine-grained access control
-- **API Restrictions** - Admin API localhost-only with configurable access
+- **API Restrictions** - Admin API localhost-only by default
 
-### **System Security**
-- **Rate Limiting** - Configurable protection with multiple backends
-- **CORS Protection** - Comprehensive CORS policies and security headers
-- **Secret Management** - Encrypted storage with automatic memory cleanup
-- **Audit Logging** - Complete administrative action tracking
-
----
-
-## 👥 **User Management**
-
-### **User Lifecycle**
-- **Registration & Verification** - Complete user onboarding with email verification
-- **Role-Based Access Control** - Admin and user roles with privilege management
-- **Profile Management** - Comprehensive user profile CRUD operations
-- **Account Security** - Password reset, account lockout, and security monitoring
-
-### **Admin Capabilities**
-- **User Administration** - Create, update, delete, and manage user accounts
-- **Permission Management** - Assign and revoke admin privileges
-- **Security Monitoring** - Track user authentication and security events
+### **Security Limitations**
+- Not penetration tested
+- No security audit performed
+- Some edge cases not fully handled
+- Performance under attack not tested
 
 ---
 
-## ⚙️ **Professional CLI Administration**
+## 👥 User Management
 
-### **Unified CLI Interface**
-```bash
-# Start Authly server
-python -m authly serve
+### **Basic Features (Working)**
+- User registration and authentication
+- Role-based access control (admin/user)
+- Profile management CRUD operations
+- Password reset functionality
 
-# Admin operations
-python -m authly admin login
-python -m authly admin client create --name "My App" --client-type public --redirect-uri "http://localhost:3000/callback"
-python -m authly admin scope create --name "read" --description "Read access"
-python -m authly admin status
-```
-
-### **Admin Commands**
-- **Authentication** - `login`, `logout`, `whoami` with secure token storage
-- **Client Management** - Create, list, update, delete OAuth clients
-- **Scope Management** - Create, list, update, delete OAuth scopes
-- **User Management** - Admin user operations and privilege management
-- **System Status** - Health checks, configuration, and system information
-
-### **API-First Architecture**
-- **HTTP API Backend** - CLI uses REST API exclusively (no direct DB access)
-- **Secure Authentication** - JWT-based admin authentication with refresh tokens
-- **Consistent Interface** - All admin operations available via both CLI and API
+### **Admin Tools**
+- CLI for OAuth client management
+- Admin API for user management
+- Scope management interface
+- Basic monitoring endpoints
 
 ---
 
-## 🚀 **Quick Start**
+## 🚀 Quick Start
 
 ### **Development Setup**
+
 ```bash
-# Clone and install
-git clone <repository-url>
+# Clone repository
+git clone https://github.com/descoped/authly.git
 cd authly
+
+# Install dependencies with uv
 uv sync --all-groups
 
-# Start with embedded development server (includes PostgreSQL container)
-uv run python -m authly serve --embedded
+# Run with Docker Compose (recommended for development)
+docker compose up
 
-# Access Authly at http://localhost:8000
-# Admin CLI: uv run python -m authly admin --help
+# Or run tests
+uv run pytest
 ```
 
-### **Production Deployment**
-```bash
-# Using Docker
-docker build -t authly .
-docker run -p 8000:8000 \
-  -e DATABASE_URL="postgresql://user:pass@host:5432/authly" \
-  -e JWT_SECRET_KEY="your-secret-key" \
-  authly
-
-# Using UV
-export DATABASE_URL="postgresql://user:pass@localhost:5432/authly"
-export JWT_SECRET_KEY="your-secret-key"
-uv run python -m authly serve
-```
-
-### **OAuth Client Setup**
-```bash
-# Create OAuth client
-uv run python -m authly admin login
-uv run python -m authly admin client create \
-  --name "My Application" \
-  --client-type confidential \
-  --redirect-uri "https://myapp.com/callback"
-
-# Create scope
-uv run python -m authly admin scope create \
-  --name "read" \
-  --description "Read access to user data"
-```
-
-### **Optional Redis Integration**
-For distributed deployments and enhanced performance:
+### **Docker Installation**
 
 ```bash
-# Install Redis support
-uv add --group redis authly
+# Using Docker Hub
+docker pull descoped/authly:latest
+docker run -p 8000:8000 descoped/authly:latest
 
-# Configure Redis features
-export AUTHLY_REDIS_URL="redis://localhost:6379/0"
-export AUTHLY_REDIS_RATE_LIMIT="true"  # Distributed rate limiting
-export AUTHLY_REDIS_CACHE="true"       # High-performance caching
-
-# Start with Redis integration
-python -m authly serve
+# Using Docker Compose
+docker compose up
 ```
 
-**Redis Features:**
-- **Distributed Rate Limiting** - Shared across multiple server instances  
-- **High-Performance Caching** - JWKS keys, discovery metadata, sessions
-- **Automatic Fallback** - Works without Redis, falls back to memory backends
-- **Configuration-Driven** - Enable specific features as needed
-
-See the [Redis Integration Guide](docs/redis-integration.md) for complete configuration options.
+The service will be available at `http://localhost:8000`
 
 ---
 
-## 📚 **Documentation**
+## 🧪 Testing
 
-**[Complete Documentation Index](docs/README.md)** - All 20 comprehensive guides with navigation
+The project includes a comprehensive test suite:
+- Integration tests with real PostgreSQL
+- OAuth flow testing
+- Basic OIDC compliance tests
+- ~90% specification compliance achieved
 
-### **API Documentation**
-- **[API Reference](docs/api-reference.md)** - Complete REST API documentation
-- **[OAuth 2.1 Guide](docs/oauth-guide.md)** - OAuth implementation and usage
-- **[OIDC Guide](docs/oidc-guide.md)** - OpenID Connect implementation and usage
-
-### **Administration**
-- **[CLI Guide](docs/cli-guide.md)** - Complete CLI administration guide
-- **[Docker Deployment](docs/docker-deployment.md)** - Docker infrastructure and deployment
-- **[Security Audit](docs/security-audit.md)** - Security analysis and validation
-
----
-
-## 🔍 **API Endpoints**
-
-### **OAuth 2.1 Endpoints**
-- `GET/POST /oauth/authorize` - Authorization endpoint with consent UI
-- `POST /oauth/token` - Token exchange endpoint with all grant types
-- `POST /oauth/revoke` - Token revocation endpoint
-- `GET /.well-known/oauth-authorization-server` - OAuth discovery metadata
-
-### **OpenID Connect Endpoints**
-- `GET /oidc/userinfo` - UserInfo endpoint with claims filtering
-- `GET /.well-known/jwks.json` - JWKS endpoint for token verification
-- `GET /.well-known/openid_configuration` - OIDC discovery metadata
-
-### **Authentication Endpoints**
-- `POST /auth/token` - User authentication and token generation
-- `POST /auth/refresh` - Token refresh and rotation
-- `POST /auth/logout` - Token invalidation and logout
-
-### **Admin API Endpoints**
-- `GET/POST /admin/clients` - OAuth client management
-- `GET/POST /admin/scopes` - OAuth scope management
-- `GET/POST /admin/users` - User management (admin only)
-- `GET /admin/status` - System health and configuration
-
-### **Health & Monitoring**
-- `GET /health` - Application health check
-- `GET /health/ready` - Readiness probe for Kubernetes
-- `GET /health/live` - Liveness probe for Kubernetes
-
----
-
-## 🧪 **Testing Excellence**
-
-### **Test Coverage**
-- **Comprehensive Test Suite** - 708 tests with 100% pass rate (verified production quality)
-- **Real Integration Testing** - PostgreSQL testcontainers (no mocking)
-- **Complete Flow Testing** - End-to-end OAuth and OIDC flows
-- **Security Testing** - Authentication, authorization, and validation
-- **API Testing** - All endpoints with comprehensive scenarios
-
-### **Test Organization**
-Tests are organized by feature domains for better clarity and parallel execution:
-- **`auth_user_journey/`** - Core authentication lifecycle (8 test files)
-- **`oauth_flows/`** - OAuth 2.1 implementation (7 test files)
-- **`oidc_features/`** - OIDC-specific functionality (7 test files)
-- **`oidc_scenarios/`** - End-to-end OIDC flows (8 test files)
-- **`admin_portal/`** - Admin interface (10 test files)
-- **`admin_user_management/`** - Admin user operations (7 test files)
-- **`infrastructure/`** - Core framework (9 test files)
-
-See [Test Suite Documentation](tests/README.md) for running specific test categories.
-
-### **Quality Standards**
-- **No Mocking** - Real database and HTTP server integration testing
-- **Comprehensive Coverage** - All features, security scenarios, and error cases
-- **Continuous Validation** - 100% success rate maintained throughout development
-
----
-
-## 🏗️ **Architecture**
-
-### **Technology Stack**
-- **Python 3.11+** - Modern async/await with comprehensive type annotations
-- **FastAPI** - High-performance async web framework with automatic OpenAPI
-- **PostgreSQL** - Advanced database with UUID primary keys and proper indexing
-- **Pydantic v2** - Modern data validation with constraints and serialization
-- **UV** - Modern, fast Python package manager and dependency resolver
-
-### **Design Patterns**
-- **Package-by-Feature** - Clean module organization with clear boundaries
-- **Repository Pattern** - Clean data access layer with async operations
-- **Service Layer Pattern** - Business logic separation with dependency injection
-- **Factory Pattern** - FastAPI app factory for different deployment modes
-- **Strategy Pattern** - Pluggable components (storage, rate limiting, secrets)
-
-### **Security Architecture**
-- **Layered Security** - Multiple security layers with defense in depth
-- **Async-First Design** - Scalable performance with modern Python patterns
-- **Type Safety** - Comprehensive type annotations and validation
-- **Configuration Management** - Flexible config with multiple providers
-
----
-
-## 📊 **Project Status**
-
-### **Implementation Status**
-- ✅ **OAuth 2.1 Complete** - All endpoints, flows, and security features
-- ✅ **OIDC 1.0 Complete** - ID tokens, UserInfo, JWKS, discovery, Session Management 1.0
-- ✅ **Admin System Complete** - CLI, API, security, user management, session management
-- ✅ **Production Ready** - Docker, monitoring, deployment, documentation
-- ✅ **Test Excellence** - 708 tests with 100% pass rate in 7 feature domains
-- ✅ **Enterprise Features** - Redis integration, structured logging, Prometheus metrics, query optimization
-
-### **Standards Compliance**
-- ✅ **6 RFC Specifications** implemented and validated
-- ✅ **Security Best Practices** - OWASP guidelines and threat modeling
-- ✅ **Enterprise Features** - Audit logging, rate limiting, monitoring
-- ✅ **Developer Experience** - Comprehensive docs, easy setup, great tooling
-
-### **Next Phase Opportunities**
-- **GDPR Compliance** - Data retention, consent tracking, audit logging, right to erasure
-- **Advanced Security** - Argon2 password hashing, FIDO2, WebAuthn, biometric authentication
-- **Admin Frontend** - React/MUI dashboard for visual administration
-- **Enterprise Integrations** - HashiCorp Vault, cloud secret managers, SAML, LDAP
-- **Cloud Native** - Kubernetes operators, service mesh integration
-- **Advanced Features** - See `.claude/roadmap/` for detailed specifications
-
----
-
-## 📝 **License**
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
----
-
-## 🤝 **Contributing**
-
-We welcome contributions! Please see our contributing guidelines and code of conduct.
-
-### **Development Setup**
-1. Clone the repository
-2. Install dependencies: `uv sync --all-groups`
-3. Install git hooks (recommended): `.githooks/install-hooks.sh`
-4. Run tests: `pytest`
-5. Start development server: `uv run python -m authly serve --embedded`
-
-### **Git Hooks (Auto-Fix)**
 ```bash
-# Install git hooks with auto-fixing capabilities
-.githooks/install-hooks.sh
+# Run all tests
+uv run pytest
 
-# Features:
-# ✅ Auto-fix ruff linting issues
-# ✅ Auto-format code with ruff
-# ✅ Re-stage fixed files automatically
+# Run specific test category
+uv run pytest tests/test_oauth.py -v
 
-# Disable auto-fixing (if needed)
-export AUTHLY_NO_AUTO_FIX=true
+# Check conformance (90% compliance)
+cd tck && make validate
 ```
-
-### **Development Commands**
-- **Linting**: `uv run ruff check .`
-- **Formatting**: `uv run ruff format .`
-- **Auto-fix linting**: `uv run ruff check --fix .`
-- **Validate Renovate config**: `npx --yes --package renovate -- renovate-config-validator .github/renovate.json`
-
-### **Quality Standards**
-- All code must include comprehensive tests
-- 100% test success rate required
-- Type annotations and documentation required
-- Security-first development practices
 
 ---
 
-**Authly** - Production-ready OAuth 2.1 + OpenID Connect 1.0 authorization server with enterprise-grade security and comprehensive testing.
+## 📚 Documentation
+
+- **[OAuth Implementation Guide](docs/oauth-guide.md)** - OAuth 2.1 features and usage
+- **[OIDC Implementation Guide](docs/oidc-guide.md)** - OpenID Connect features
+- **[API Reference](docs/api-reference.md)** - Complete API documentation
+- **[Security Guide](docs/security-guide.md)** - Security features and best practices
+- **[Deployment Guide](docs/deployment-guide.md)** - Deployment instructions
+
+---
+
+## 🛠️ Technology Stack
+
+- **Python 3.11+** - Modern async/await with type annotations
+- **FastAPI** - High-performance async web framework
+- **PostgreSQL** - Primary data store with UUID support
+- **Redis** - Optional caching and session storage
+- **JWT** - Token-based authentication
+- **Docker** - Containerized deployment
+
+---
+
+## 📋 Roadmap
+
+### **Current Focus**
+- [ ] Fix token endpoint error response format
+- [ ] Add UserInfo POST method support
+- [ ] Improve authorization endpoint error handling
+- [ ] Complete OIDC test scenario coverage
+
+### **Future Plans**
+- [ ] Achieve 100% OIDC specification compliance
+- [ ] Official OIDC certification
+- [ ] Argon2 password hashing
+- [ ] Advanced OIDC features (prompt, max_age, ACR)
+- [ ] GDPR compliance features
+- [ ] Performance optimization
+- [ ] Security audit
+
+---
+
+## 🤝 Contributing
+
+This project is in active development and welcomes contributions. However, please note:
+
+1. The codebase is evolving rapidly
+2. Breaking changes may occur
+3. Not all features are fully tested
+4. Documentation may lag behind implementation
+
+Please read the [Contributing Guidelines](.github/CONTRIBUTING.md) before submitting PRs.
+
+---
+
+## ⚖️ License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+## ⚠️ Disclaimer
+
+**This software is provided as-is, without warranty of any kind.** It is a work in progress and should not be used in production environments without thorough testing and security review. The developers are not responsible for any security breaches or data loss that may occur from using this software.
+
+**Current Status:**
+- ✅ Suitable for: Development, testing, learning, prototypes
+- ❌ NOT suitable for: Production systems, high-security environments, certified compliance requirements
+
+For production OAuth/OIDC needs, consider established solutions like Keycloak, Auth0, or Okta until this project reaches maturity.

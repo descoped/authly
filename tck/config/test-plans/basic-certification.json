@@ -1,0 +1,114 @@
+{
+  "name": "OIDC Basic Certification",
+  "description": "Basic OpenID Connect certification test plan for authorization code flow",
+  "version": "1.0",
+  "server": {
+    "discoveryUrl": "http://localhost:8000/.well-known/openid-configuration",
+    "issuer": "http://localhost:8000"
+  },
+  "client": {
+    "client_id": "oidc-conformance-test",
+    "client_secret": "conformance-test-secret",
+    "redirect_uris": [
+      "https://localhost:8443/test/a/authly/callback"
+    ],
+    "scope": "openid profile email",
+    "grant_types": ["authorization_code"],
+    "response_types": ["code"],
+    "token_endpoint_auth_method": "client_secret_basic"
+  },
+  "test_configuration": {
+    "response_type": "code",
+    "response_mode": "query",
+    "client_auth_type": "client_secret_basic",
+    "request_object_method": "none",
+    "jwks_uri": "no"
+  },
+  "test_modules": [
+    {
+      "name": "oidcc-server",
+      "description": "Server configuration validation",
+      "required": true
+    },
+    {
+      "name": "oidcc-discovery-issuer-not-matching-config",
+      "description": "Discovery endpoint issuer validation",
+      "required": true
+    },
+    {
+      "name": "oidcc-ensure-request-without-nonce-succeeds-for-code-flow",
+      "description": "Code flow without nonce parameter",
+      "required": true
+    },
+    {
+      "name": "oidcc-ensure-registered-redirect-uri",
+      "description": "Redirect URI exact match validation",
+      "required": true
+    },
+    {
+      "name": "oidcc-userinfo-get",
+      "description": "UserInfo endpoint GET method",
+      "required": true
+    },
+    {
+      "name": "oidcc-userinfo-post-header",
+      "description": "UserInfo endpoint POST with Bearer token",
+      "required": true
+    },
+    {
+      "name": "oidcc-userinfo-post-body",
+      "description": "UserInfo endpoint POST with body token",
+      "required": false
+    },
+    {
+      "name": "oidcc-id-token-kid-absent-single-jwks",
+      "description": "ID token without kid when single key",
+      "required": false
+    },
+    {
+      "name": "oidcc-id-token-aud-single-value",
+      "description": "ID token aud as single value",
+      "required": true
+    },
+    {
+      "name": "oidcc-id-token-iat",
+      "description": "ID token iat claim validation",
+      "required": true
+    },
+    {
+      "name": "oidcc-id-token-sub",
+      "description": "ID token sub claim validation",
+      "required": true
+    },
+    {
+      "name": "oidcc-scope-profile",
+      "description": "Profile scope claims in UserInfo",
+      "required": true
+    },
+    {
+      "name": "oidcc-scope-email",
+      "description": "Email scope claims in UserInfo",
+      "required": true
+    },
+    {
+      "name": "oidcc-scope-address",
+      "description": "Address scope claims in UserInfo",
+      "required": false
+    },
+    {
+      "name": "oidcc-scope-phone",
+      "description": "Phone scope claims in UserInfo",
+      "required": false
+    },
+    {
+      "name": "oidcc-nonce-invalid",
+      "description": "Invalid nonce rejection",
+      "required": true
+    },
+    {
+      "name": "oidcc-claims-essential",
+      "description": "Essential claims handling",
+      "required": false
+    }
+  ]
+}

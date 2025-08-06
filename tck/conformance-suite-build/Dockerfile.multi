@@ -1,0 +1,50 @@
+# Multi-stage Dockerfile for OpenID Conformance Suite
+# Stage 1: Build the JAR file
+FROM maven:3-eclipse-temurin-17 AS builder
+
+WORKDIR /usr/src/conformance-suite
+
+# Copy pom.xml first to leverage Docker cache for dependencies
+COPY pom.xml .
+RUN mvn dependency:go-offline -B
+
+# Copy source code and build
+COPY src ./src
+COPY scripts ./scripts
+RUN mvn clean package -B -DskipTests=true
+
+# Stage 2: Final runtime image
+FROM eclipse-temurin:17-jre
+
+# Create non-root user for security
+RUN groupadd -r conformance && useradd -r -g conformance conformance
+
+# Copy JAR from builder stage
+COPY --from=builder /usr/src/conformance-suite/target/fapi-test-suite.jar /server/
+
+# Set environment variables
+ENV BASE_URL=https://localhost:8443
+ENV BASE_MTLS_URL=https://localhost:8444
+ENV MONGODB_HOST=mongodb
+ENV JAVA_EXTRA_ARGS=
+
+# Expose port
+EXPOSE 8080
+
+# Switch to non-root user
+USER conformance
+
+# Entry point
+ENTRYPOINT java \
+  -D"fintechlabs.base_url=${BASE_URL}" \
+  -D"fintechlabs.base_mtls_url=${BASE_MTLS_URL}" \
+  -D"spring.data.mongodb.uri=mongodb://${MONGODB_HOST}:27017/test_suite" \
+  ${JWKS:+-D"fintechlabs.jwks=${JWKS}"} \
+  ${SIGNING_KEY:+-D"fintechlabs.signingKey=${SIGNING_KEY}"} \
+  ${OIDC_GOOGLE_CLIENTID:+-D"oidc.google.clientid=${OIDC_GOOGLE_CLIENTID}"} \
+  ${OIDC_GOOGLE_SECRET:+-D"oidc.google.secret=${OIDC_GOOGLE_SECRET}"} \
+  ${OIDC_GITLAB_CLIENTID:+-D"oidc.gitlab.clientid=${OIDC_GITLAB_CLIENTID}"} \
+  ${OIDC_GITLAB_SECRET:+-D"oidc.gitlab.secret=${OIDC_GITLAB_SECRET}"} \
+  $JAVA_EXTRA_ARGS \
+  -jar /server/fapi-test-suite.jar \
+  -Djdk.tls.maxHandshakeMessageSize=65536

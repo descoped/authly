@@ -1,10 +1,12 @@
 # OpenID Connect 1.0 Implementation Guide
 
-Comprehensive guide to using Authly's OpenID Connect 1.0 implementation built on the OAuth 2.1 foundation for secure identity authentication.
+Guide to using Authly's OpenID Connect 1.0 implementation (work in progress, ~90% specification compliance).
 
 **Standards**: OpenID Connect Core 1.0, OpenID Connect Discovery 1.0  
+**Compliance**: ~90% specification compliance (not certified)  
 **Foundation**: OAuth 2.1 with mandatory PKCE  
-**Signing**: RS256 (RSA) and HS256 (HMAC) ID token signing
+**Signing**: RS256 (RSA) and HS256 (HMAC) ID token signing  
+**Status**: Development/testing use only
 
 ---
 

@@ -1,0 +1,101 @@
+# TCK/Conformance Testing Docker Compose Override
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml -f docker-compose.tck.yml up -d
+#
+# This file adds the OpenID conformance suite to the Authly development stack
+
+services:
+  # =================================================================
+  # CONFORMANCE SUITE SERVICES
+  # =================================================================
+  
+  # MongoDB for conformance suite storage
+  tck-mongodb:
+    image: mongo:6.0.13
+    container_name: tck-mongodb
+    volumes:
+      - tck_mongo_data:/data/db
+    networks:
+      - authly_network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Conformance suite server (option 1: use pre-built JAR if available)
+  # For fresh checkout, use: cd tck && make init
+  tck-server:
+    image: eclipse-temurin:17-jre
+    container_name: tck-server
+    ports:
+      - "8443:8443"
+      - "9999:9999"
+    volumes:
+      - ./tck/conformance-suite/target/:/server/:ro
+      - ./tck/conformance-suite/src/main/resources/static:/static:ro
+    environment:
+      - JAVA_OPTS=-Xmx2g -XX:MaxMetaspaceSize=512m
+    command: >
+      sh -c "
+      if [ ! -f /server/fapi-test-suite.jar ]; then
+        echo 'ERROR: JAR not found. Run: cd tck && make init';
+        exit 1;
+      fi;
+      java -jar /server/fapi-test-suite.jar
+      -Djdk.tls.maxHandshakeMessageSize=65536
+      --fintechlabs.base_url=https://localhost:8443
+      --server.port=8443
+      --fintechlabs.devmode=true
+      "
+    networks:
+      - authly_network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - tck-mongodb
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "500k"
+        max-file: "5"
+
+  # =================================================================
+  # AUTHLY SERVICE OVERRIDES FOR TCK
+  # =================================================================
+  
+  # Extend Authly configuration for conformance testing
+  authly:
+    environment:
+      # Add conformance suite to CORS origins
+      AUTHLY_CORS_ORIGINS: '["http://localhost:8000","http://localhost:3000","https://localhost:8443","https://localhost.emobix.co.uk:8443"]'
+      
+      # Ensure OIDC is enabled with proper settings
+      AUTHLY_OIDC_ENABLED: "true"
+      AUTHLY_JWT_ALGORITHM: "RS256"
+      
+      # Enable all OIDC features for testing
+      AUTHLY_OIDC_SESSION_MANAGEMENT: "true"
+      AUTHLY_OIDC_FRONT_CHANNEL_LOGOUT: "true"
+      AUTHLY_OIDC_BACK_CHANNEL_LOGOUT: "false"  # Not yet implemented
+      
+      # Development mode for detailed error messages
+      AUTHLY_DEBUG: "true"
+    depends_on:
+      - postgres
+      - redis
+      - tck-mongodb  # Ensure conformance suite is ready
+
+  # PostgreSQL - add initialization for test client
+  postgres:
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      - ./docker-postgres/init-db-and-user.sql:/docker-entrypoint-initdb.d/01-init-db.sql:ro
+      - ./tck/scripts/init-test-client.sql:/docker-entrypoint-initdb.d/02-test-client.sql:ro
+
+volumes:
+  tck_mongo_data:
+    driver: local
+
+networks:
+  authly_network:
+    driver: bridge

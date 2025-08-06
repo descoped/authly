@@ -53,7 +53,7 @@ class TestOAuth21EndToEndFlow:
         # Test with invalid/non-existent code
         token_response = await oauth_server.client.post(
             "/api/v1/oauth/token",
-            json={
+            data={
                 "grant_type": "authorization_code",
                 "code": "invalid_authorization_code",
                 "redirect_uri": "https://client.example.com/callback",
@@ -73,7 +73,7 @@ class TestOAuth21EndToEndFlow:
         # Test existing password grant flow
         token_response = await oauth_server.client.post(
             "/api/v1/oauth/token",
-            json={"grant_type": "password", "username": test_user.username, "password": "Test123!"},
+            data={"grant_type": "password", "username": test_user.username, "password": "Test123!"},
         )
 
         # Should succeed with valid credentials
@@ -87,7 +87,7 @@ class TestOAuth21EndToEndFlow:
     async def test_invalid_grant_type(self, oauth_server: AsyncTestServer):
         """Test error handling for invalid grant types."""
         token_response = await oauth_server.client.post(
-            "/api/v1/oauth/token", json={"grant_type": "invalid_grant_type", "some_param": "some_value"}
+            "/api/v1/oauth/token", data={"grant_type": "invalid_grant_type", "some_param": "some_value"}
         )
 
         # Should fail with 400 Bad Request
@@ -100,7 +100,7 @@ class TestOAuth21EndToEndFlow:
         """Test that authorization_code grant is recognized and processed."""
         token_response = await oauth_server.client.post(
             "/api/v1/oauth/token",
-            json={
+            data={
                 "grant_type": "authorization_code",
                 "code": "test_invalid_code",
                 "redirect_uri": "https://example.com/callback",
@@ -121,7 +121,7 @@ class TestOAuth21EndToEndFlow:
         # Missing required parameters
         token_response = await oauth_server.client.post(
             "/api/v1/oauth/token",
-            json={
+            data={
                 "grant_type": "authorization_code",
                 "code": "test_code",
                 # Missing: redirect_uri, client_id, code_verifier

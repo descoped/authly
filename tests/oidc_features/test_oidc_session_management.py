@@ -179,7 +179,7 @@ class TestOIDCSessionManagementDiscovery:
     @pytest.mark.asyncio
     async def test_session_management_in_discovery(self, oidc_server: AsyncTestServer):
         """Test that session management endpoints are advertised in OIDC discovery."""
-        response = await oidc_server.client.get("/.well-known/openid_configuration")
+        response = await oidc_server.client.get("/.well-known/openid-configuration")
         await response.expect_status(200)
 
         metadata = await response.json()
@@ -198,7 +198,7 @@ class TestOIDCSessionManagementDiscovery:
     @pytest.mark.asyncio
     async def test_end_session_endpoint_in_discovery(self, oidc_server: AsyncTestServer):
         """Test that end session endpoint is properly advertised."""
-        response = await oidc_server.client.get("/.well-known/openid_configuration")
+        response = await oidc_server.client.get("/.well-known/openid-configuration")
         await response.expect_status(200)
 
         metadata = await response.json()
@@ -224,7 +224,7 @@ class TestOIDCSessionManagementIntegration:
     async def test_session_management_workflow(self, oidc_server: AsyncTestServer):
         """Test complete session management workflow."""
         # 1. Get discovery metadata with session management endpoints
-        discovery_response = await oidc_server.client.get("/.well-known/openid_configuration")
+        discovery_response = await oidc_server.client.get("/.well-known/openid-configuration")
         await discovery_response.expect_status(200)
 
         metadata = await discovery_response.json()

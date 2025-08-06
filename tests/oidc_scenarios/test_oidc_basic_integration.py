@@ -23,7 +23,7 @@ class TestOIDCBasicIntegration:
         """Test that OIDC discovery endpoint shows only supported flows."""
 
         # Get OIDC discovery metadata
-        discovery_response = await oidc_server.client.get("/.well-known/openid_configuration")
+        discovery_response = await oidc_server.client.get("/.well-known/openid-configuration")
         await discovery_response.expect_status(200)
 
         discovery_data = await discovery_response.json()
@@ -101,7 +101,7 @@ class TestOIDCBasicIntegration:
         oauth_data = await oauth_discovery_response.json()
 
         # Get OIDC discovery metadata
-        oidc_discovery_response = await oidc_server.client.get("/.well-known/openid_configuration")
+        oidc_discovery_response = await oidc_server.client.get("/.well-known/openid-configuration")
         await oidc_discovery_response.expect_status(200)
 
         oidc_data = await oidc_discovery_response.json()
@@ -212,7 +212,7 @@ class TestOIDCBasicIntegration:
 
         # Test that all well-known endpoints are accessible
         endpoints_to_test = [
-            "/.well-known/openid_configuration",
+            "/.well-known/openid-configuration",
             "/.well-known/oauth-authorization-server",
             "/.well-known/jwks.json",
         ]

@@ -1,0 +1,68 @@
+{
+  "name": "OAuth 2.1 PKCE Certification",
+  "description": "OAuth 2.1 PKCE enforcement test plan",
+  "version": "1.0",
+  "server": {
+    "discoveryUrl": "http://localhost:8000/.well-known/openid-configuration",
+    "issuer": "http://localhost:8000"
+  },
+  "client": {
+    "client_id": "oidc-conformance-test",
+    "client_secret": "conformance-test-secret",
+    "redirect_uris": [
+      "https://localhost:8443/test/a/authly/callback"
+    ],
+    "scope": "openid profile email",
+    "grant_types": ["authorization_code"],
+    "response_types": ["code"],
+    "token_endpoint_auth_method": "client_secret_basic"
+  },
+  "test_configuration": {
+    "response_type": "code",
+    "response_mode": "query",
+    "client_auth_type": "client_secret_basic",
+    "pkce": "required"
+  },
+  "test_modules": [
+    {
+      "name": "oidcc-codereuse-30seconds",
+      "description": "Authorization code cannot be reused",
+      "required": true
+    },
+    {
+      "name": "oidcc-codereuse",
+      "description": "Immediate authorization code reuse rejection",
+      "required": true
+    },
+    {
+      "name": "oidcc-ensure-pkce-required",
+      "description": "PKCE is required for authorization code flow",
+      "required": true
+    },
+    {
+      "name": "oidcc-ensure-pkce-code-verifier-required",
+      "description": "Code verifier required at token endpoint",
+      "required": true
+    },
+    {
+      "name": "oidcc-ensure-pkce-code-challenge-method-s256",
+      "description": "S256 code challenge method support",
+      "required": true
+    },
+    {
+      "name": "oidcc-ensure-pkce-plain-not-supported",
+      "description": "Plain code challenge method rejected",
+      "required": false
+    },
+    {
+      "name": "oidcc-ensure-pkce-invalid-code-verifier",
+      "description": "Invalid code verifier rejection",
+      "required": true
+    },
+    {
+      "name": "oidcc-ensure-pkce-missing-code-verifier",
+      "description": "Missing code verifier rejection",
+      "required": true
+    }
+  ]
+}

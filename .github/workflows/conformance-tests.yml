@@ -1,0 +1,133 @@
+name: OIDC Conformance Tests
+
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - 'src/**'
+      - 'tck/**'
+      - '.github/workflows/conformance-tests.yml'
+  pull_request:
+    branches: [master, main]
+    paths:
+      - 'src/**'
+      - 'tck/**'
+  schedule:
+    # Run nightly at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+jobs:
+  conformance-validation:
+    name: OIDC Spec Conformance (90% Target)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Start Authly Stack
+        run: |
+          docker compose up -d
+          
+          # Wait for Authly to be healthy
+          timeout 60 bash -c 'until curl -f http://localhost:8000/health; do sleep 2; done'
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install Dependencies
+        run: |
+          pip install requests urllib3 pyjwt
+      
+      - name: Run Conformance Validator
+        id: validate
+        run: |
+          cd tck
+          python scripts/conformance-validator.py
+        continue-on-error: true
+      
+      - name: Check Compliance Level
+        run: |
+          cd tck
+          # Extract compliance percentage from report
+          COMPLIANCE=$(grep "checks passed" reports/latest/SPECIFICATION_CONFORMANCE.md | grep -oE "[0-9]+%" | head -1 | tr -d '%')
+          
+          echo "## 📊 OIDC Conformance Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Compliance Level: ${COMPLIANCE}%**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "$COMPLIANCE" -ge 90 ]; then
+            echo "✅ Target compliance (90%) achieved!" >> $GITHUB_STEP_SUMMARY
+            echo "COMPLIANCE_MET=true" >> $GITHUB_ENV
+          else
+            echo "❌ Below target compliance (90%)" >> $GITHUB_STEP_SUMMARY
+            echo "COMPLIANCE_MET=false" >> $GITHUB_ENV
+          fi
+          
+          # Add summary details
+          echo "### Category Scores" >> $GITHUB_STEP_SUMMARY
+          grep "Category Score:" conformance-reports/SPECIFICATION_CONFORMANCE.md >> $GITHUB_STEP_SUMMARY || true
+      
+      - name: Upload Conformance Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: conformance-report
+          path: |
+            tck/conformance-reports/SPECIFICATION_CONFORMANCE.md
+            tck/conformance-reports/conformance_results.json
+      
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('tck/conformance-reports/SPECIFICATION_CONFORMANCE.md', 'utf8');
+            
+            // Extract key metrics
+            const complianceMatch = report.match(/(\d+)\/(\d+) checks passed \((\d+)%\)/);
+            const passed = complianceMatch ? complianceMatch[1] : '?';
+            const total = complianceMatch ? complianceMatch[2] : '?';
+            const percentage = complianceMatch ? complianceMatch[3] : '?';
+            
+            const comment = `## 🧪 OIDC Conformance Test Results
+            
+            **Overall Compliance: ${percentage}% (${passed}/${total} checks)**
+            
+            ${percentage >= 90 ? '✅ Meets 90% target' : '❌ Below 90% target'}
+            
+            <details>
+            <summary>View Detailed Report</summary>
+            
+            \`\`\`
+            ${report.substring(0, 2000)}...
+            \`\`\`
+            
+            [Download full report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            </details>`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+      
+      - name: Stop Services
+        if: always()
+        run: |
+          docker compose down
+      
+      - name: Exit Status
+        run: |
+          if [ "${{ env.COMPLIANCE_MET }}" != "true" ]; then
+            echo "❌ Conformance validation failed to meet 90% target"
+            exit 1
+          fi
+          echo "✅ Conformance validation passed (90%+ compliance)"

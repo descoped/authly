@@ -107,7 +107,7 @@ class TestOIDCIntegrationFlows:
         """Test that OIDC discovery endpoint advertises only supported flows."""
 
         # Get OIDC discovery metadata
-        discovery_response = await oidc_server.client.get("/.well-known/openid_configuration")
+        discovery_response = await oidc_server.client.get("/.well-known/openid-configuration")
         await discovery_response.expect_status(200)
 
         discovery_data = await discovery_response.json()
@@ -238,7 +238,7 @@ class TestOIDCIntegrationFlows:
             "code_verifier": "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",
         }
 
-        token_response = await oidc_server.client.post("/api/v1/oauth/token", json=token_data)
+        token_response = await oidc_server.client.post("/api/v1/oauth/token", data=token_data)
         await token_response.expect_status(200)
 
         token_result = await token_response.json()
@@ -329,7 +329,7 @@ class TestOIDCIntegrationFlows:
             "code_verifier": "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",
         }
 
-        token_response = await oidc_server.client.post("/api/v1/oauth/token", json=token_data)
+        token_response = await oidc_server.client.post("/api/v1/oauth/token", data=token_data)
         await token_response.expect_status(200)
 
         token_result = await token_response.json()
@@ -395,7 +395,7 @@ class TestOIDCIntegrationFlows:
             "code_verifier": "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",
         }
 
-        token_response = await oidc_server.client.post("/api/v1/oauth/token", json=token_data)
+        token_response = await oidc_server.client.post("/api/v1/oauth/token", data=token_data)
         await token_response.expect_status(200)
 
         token_result = await token_response.json()
@@ -409,7 +409,7 @@ class TestOIDCIntegrationFlows:
             "client_secret": "test_client_secret",
         }
 
-        refresh_response = await oidc_server.client.post("/api/v1/oauth/token", json=refresh_data)
+        refresh_response = await oidc_server.client.post("/api/v1/oauth/token", data=refresh_data)
         await refresh_response.expect_status(200)
 
         refresh_result = await refresh_response.json()

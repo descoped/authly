@@ -1,6 +1,6 @@
 # Testing Guide for Authly
 
-This document provides comprehensive coverage of Authly's testing architecture that maintains 100% test success rates, demonstrating real-world integration testing philosophy for production-ready OAuth 2.1 and OpenID Connect implementation.
+This document covers Authly's testing architecture, which uses real-world integration testing. Note: While tests cover main functionality, edge cases and error scenarios need more coverage. The system is not production-certified.
 
 ## Table of Contents
 
@@ -18,7 +18,7 @@ This document provides comprehensive coverage of Authly's testing architecture t
 
 ### Core Principles
 
-Authly's testing architecture is built on **real-world integration testing** over mocking, ensuring that every component works correctly in production-like conditions. This approach has consistently delivered 100% test success rates across all implementation phases.
+Authly's testing architecture is built on **real-world integration testing** over mocking, aiming to test components in realistic conditions. Tests cover main paths but may not handle all edge cases or error scenarios.
 
 #### Real-World Integration Principles
 
@@ -27,7 +27,7 @@ Authly's testing architecture is built on **real-world integration testing** ove
 3. **Real Connections**: Use actual async database connections with proper pooling
 4. **Transaction Isolation**: Each test gets its own database transaction that rolls back automatically
 5. **No Critical Mocking**: Avoid mocking authentication, database operations, or HTTP requests
-6. **Production Parity**: Test configuration and deployment scenarios match production
+6. **Development Parity**: Test configuration aims to match realistic scenarios
 
 ### Why Real Integration Testing?
 

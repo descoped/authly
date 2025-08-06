@@ -69,7 +69,7 @@ class TestOIDCIntegrationFlowsSimple:
         """Test that discovery endpoints are available."""
 
         # OIDC discovery should be available
-        oidc_response = await oidc_server.client.get("/.well-known/openid_configuration")
+        oidc_response = await oidc_server.client.get("/.well-known/openid-configuration")
         await oidc_response.expect_status(200)
 
         # OAuth discovery should be available

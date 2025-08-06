@@ -108,7 +108,7 @@ async def test_login_unverified(auth_server: AsyncTestServer, create_unverified_
 @pytest.mark.asyncio
 async def test_login_success(test_config: AuthlyConfig, auth_server: AsyncTestServer, test_user: UserModel):
     response = await auth_server.client.post(
-        "/api/v1/oauth/token", json={"username": test_user.username, "password": "Test123!", "grant_type": "password"}
+        "/api/v1/oauth/token", data={"username": test_user.username, "password": "Test123!", "grant_type": "password"}
     )
 
     auth_response = await response.json()
@@ -139,7 +139,7 @@ async def test_login_invalid_credentials(auth_server: AsyncTestServer):
 async def test_refresh_token_flow(auth_server: AsyncTestServer, test_user: UserModel):
     # First login
     login_response = await auth_server.client.post(
-        "/api/v1/oauth/token", json={"username": test_user.username, "password": "Test123!", "grant_type": "password"}
+        "/api/v1/oauth/token", data={"username": test_user.username, "password": "Test123!", "grant_type": "password"}
     )
 
     tokens = await login_response.json()
@@ -166,7 +166,7 @@ async def test_refresh_token_flow(auth_server: AsyncTestServer, test_user: UserM
 async def test_logout(auth_server: AsyncTestServer, test_user: UserModel):
     # First login
     login_response = await auth_server.client.post(
-        "/api/v1/oauth/token", json={"username": test_user.username, "password": "Test123!", "grant_type": "password"}
+        "/api/v1/oauth/token", data={"username": test_user.username, "password": "Test123!", "grant_type": "password"}
     )
 
     tokens = await login_response.json()
@@ -188,7 +188,7 @@ async def test_login_stores_tokens(
 ):
     """Test that login creates and stores both access and refresh tokens."""
     response = await auth_server.client.post(
-        "/api/v1/oauth/token", json={"username": test_user.username, "password": "Test123!", "grant_type": "password"}
+        "/api/v1/oauth/token", data={"username": test_user.username, "password": "Test123!", "grant_type": "password"}
     )
 
     auth_response = await response.json()
@@ -219,7 +219,7 @@ async def test_refresh_invalidates_old_token(
     """Test that refresh invalidates old token and stores new ones."""
     # First login
     login_response = await auth_server.client.post(
-        "/api/v1/oauth/token", json={"username": test_user.username, "password": "Test123!", "grant_type": "password"}
+        "/api/v1/oauth/token", data={"username": test_user.username, "password": "Test123!", "grant_type": "password"}
     )
 
     tokens = await login_response.json()
@@ -256,7 +256,7 @@ async def test_logout_invalidates_all_tokens(
     """Test that logout invalidates all user tokens."""
     # First login
     login_response = await auth_server.client.post(
-        "/api/v1/oauth/token", json={"username": test_user.username, "password": "Test123!", "grant_type": "password"}
+        "/api/v1/oauth/token", data={"username": test_user.username, "password": "Test123!", "grant_type": "password"}
     )
 
     tokens = await login_response.json()
@@ -286,7 +286,7 @@ async def test_refresh_token_reuse(auth_server: AsyncTestServer, test_user: User
     """Test that reusing a refresh token after refresh fails."""
     # Initial login
     login_response = await auth_server.client.post(
-        "/api/v1/oauth/token", json={"username": test_user.username, "password": "Test123!", "grant_type": "password"}
+        "/api/v1/oauth/token", data={"username": test_user.username, "password": "Test123!", "grant_type": "password"}
     )
 
     tokens = await login_response.json()
