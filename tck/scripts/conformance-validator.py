@@ -387,14 +387,30 @@ def main():
     # Generate report
     report = generate_conformance_report(results)
 
-    # Save report
-    report_path = Path(__file__).parent.parent / "conformance-reports" / "SPECIFICATION_CONFORMANCE.md"
+    # Create reports directory
+    reports_dir = Path(__file__).parent.parent / "reports" / "latest"
+    reports_dir.mkdir(parents=True, exist_ok=True)
+
+    # Also save to conformance-reports for backward compatibility
+    legacy_dir = Path(__file__).parent.parent / "conformance-reports"
+    legacy_dir.mkdir(parents=True, exist_ok=True)
+
+    # Save report to both locations
+    report_path = reports_dir / "SPECIFICATION_CONFORMANCE.md"
     with open(report_path, "w") as f:
         f.write(report)
 
-    # Save raw results
-    results_path = Path(__file__).parent.parent / "conformance-reports" / "conformance_results.json"
+    legacy_report_path = legacy_dir / "SPECIFICATION_CONFORMANCE.md"
+    with open(legacy_report_path, "w") as f:
+        f.write(report)
+
+    # Save raw results to both locations
+    results_path = reports_dir / "conformance_results.json"
     with open(results_path, "w") as f:
+        json.dump(results, f, indent=2)
+
+    legacy_results_path = legacy_dir / "conformance_results.json"
+    with open(legacy_results_path, "w") as f:
         json.dump(results, f, indent=2)
 
     print("\n" + "=" * 60)

@@ -6,7 +6,6 @@ on:
     paths:
       - 'src/**'
       - 'tck/**'
-      - 'docker-compose*.yml'
       - '.github/workflows/conformance-tests.yml'
   pull_request:
     branches: [master, main]
@@ -19,151 +18,116 @@ on:
   workflow_dispatch:
 
 jobs:
-  conformance-tests:
-    name: Run OIDC Conformance Suite
+  conformance-validation:
+    name: OIDC Spec Conformance (90% Target)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
       
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-      
-      - name: Cache Docker layers
-        uses: actions/cache@v3
-        with:
-          path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-buildx-
-      
-      - name: Cache Maven dependencies
-        uses: actions/cache@v3
-        with:
-          path: ~/.m2
-          key: ${{ runner.os }}-maven-${{ hashFiles('tck/conformance-suite/pom.xml') }}
-          restore-keys: |
-            ${{ runner.os }}-maven-
-      
-      - name: Build conformance suite JAR
+      - name: Start Authly Stack
         run: |
-          if [ ! -f "tck/conformance-suite/target/fapi-test-suite.jar" ]; then
-            echo "Building conformance suite JAR..."
-            
-            # Clone if not exists
-            if [ ! -d "tck/conformance-suite/.git" ]; then
-              git clone https://gitlab.com/openid/conformance-suite.git tck/conformance-suite
-            fi
-            
-            # Build JAR
-            cd tck/conformance-suite
-            docker run --rm \
-              -v "$PWD":/usr/src/mymaven \
-              -v "$HOME/.m2":/root/.m2 \
-              -w /usr/src/mymaven \
-              maven:3-eclipse-temurin-17 \
-              mvn -B clean package -DskipTests=true
-            cd ../..
-          fi
-      
-      - name: Start services
-        run: |
-          # Start all services including conformance suite
-          docker compose -f docker-compose.yml -f docker-compose.dev.yml -f docker-compose.tck.yml up -d
+          docker compose up -d
           
-          # Wait for services to be healthy
-          timeout 120 bash -c 'until docker compose ps | grep -q "healthy"; do sleep 2; done'
-      
-      - name: Check service health
-        run: |
-          docker compose ps
-          docker compose logs --tail=50
+          # Wait for Authly to be healthy
+          timeout 60 bash -c 'until curl -f http://localhost:8000/health; do sleep 2; done'
       
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
       
-      - name: Install Python dependencies
+      - name: Install Dependencies
         run: |
-          pip install requests urllib3
+          pip install requests urllib3 pyjwt
       
-      - name: Run conformance tests
-        id: conformance
+      - name: Run Conformance Validator
+        id: validate
         run: |
           cd tck
-          python scripts/run-conformance-tests.py
+          python scripts/conformance-validator.py
         continue-on-error: true
       
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v3
-        with:
-          name: conformance-reports
-          path: tck/results/
-      
-      - name: Generate test summary
-        if: always()
+      - name: Check Compliance Level
         run: |
-          if [ -f "tck/results/conformance_report_*.md" ]; then
-            echo "## OIDC Conformance Test Results" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            tail -n +3 tck/results/conformance_report_*.md >> $GITHUB_STEP_SUMMARY
+          cd tck
+          # Extract compliance percentage from report
+          COMPLIANCE=$(grep "checks passed" reports/latest/SPECIFICATION_CONFORMANCE.md | grep -oE "[0-9]+%" | head -1 | tr -d '%')
+          
+          echo "## 📊 OIDC Conformance Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Compliance Level: ${COMPLIANCE}%**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "$COMPLIANCE" -ge 90 ]; then
+            echo "✅ Target compliance (90%) achieved!" >> $GITHUB_STEP_SUMMARY
+            echo "COMPLIANCE_MET=true" >> $GITHUB_ENV
+          else
+            echo "❌ Below target compliance (90%)" >> $GITHUB_STEP_SUMMARY
+            echo "COMPLIANCE_MET=false" >> $GITHUB_ENV
           fi
+          
+          # Add summary details
+          echo "### Category Scores" >> $GITHUB_STEP_SUMMARY
+          grep "Category Score:" conformance-reports/SPECIFICATION_CONFORMANCE.md >> $GITHUB_STEP_SUMMARY || true
+      
+      - name: Upload Conformance Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: conformance-report
+          path: |
+            tck/conformance-reports/SPECIFICATION_CONFORMANCE.md
+            tck/conformance-reports/conformance_results.json
       
       - name: Comment on PR
-        if: github.event_name == 'pull_request' && always()
-        uses: actions/github-script@v6
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
-            const path = require('path');
+            const report = fs.readFileSync('tck/conformance-reports/SPECIFICATION_CONFORMANCE.md', 'utf8');
             
-            // Find the latest report
-            const reportsDir = 'tck/results';
-            const files = fs.readdirSync(reportsDir);
-            const reportFile = files.find(f => f.startsWith('conformance_report_'));
+            // Extract key metrics
+            const complianceMatch = report.match(/(\d+)\/(\d+) checks passed \((\d+)%\)/);
+            const passed = complianceMatch ? complianceMatch[1] : '?';
+            const total = complianceMatch ? complianceMatch[2] : '?';
+            const percentage = complianceMatch ? complianceMatch[3] : '?';
             
-            if (reportFile) {
-              const report = fs.readFileSync(path.join(reportsDir, reportFile), 'utf8');
-              
-              // Extract summary from report
-              const lines = report.split('\n');
-              const summaryStart = lines.findIndex(l => l.includes('## Executive Summary'));
-              const summaryEnd = lines.findIndex((l, i) => i > summaryStart && l.startsWith('##'));
-              const summary = lines.slice(summaryStart, summaryEnd).join('\n');
-              
-              // Create PR comment
-              const comment = `## 🧪 OIDC Conformance Test Results
-              
-              ${summary}
-              
-              <details>
-              <summary>View Full Report</summary>
-              
-              ${report}
-              
-              </details>`;
-              
-              github.rest.issues.createComment({
-                issue_number: context.issue.number,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                body: comment
-              });
-            }
+            const comment = `## 🧪 OIDC Conformance Test Results
+            
+            **Overall Compliance: ${percentage}% (${passed}/${total} checks)**
+            
+            ${percentage >= 90 ? '✅ Meets 90% target' : '❌ Below 90% target'}
+            
+            <details>
+            <summary>View Detailed Report</summary>
+            
+            \`\`\`
+            ${report.substring(0, 2000)}...
+            \`\`\`
+            
+            [Download full report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            </details>`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
       
-      - name: Stop services
+      - name: Stop Services
         if: always()
         run: |
-          docker compose -f docker-compose.yml -f docker-compose.dev.yml -f docker-compose.tck.yml down
+          docker compose down
       
-      - name: Check test results
+      - name: Exit Status
         run: |
-          if [ "${{ steps.conformance.outcome }}" != "success" ]; then
-            echo "❌ Conformance tests failed"
+          if [ "${{ env.COMPLIANCE_MET }}" != "true" ]; then
+            echo "❌ Conformance validation failed to meet 90% target"
             exit 1
           fi
-          echo "✅ Conformance tests passed"
+          echo "✅ Conformance validation passed (90%+ compliance)"

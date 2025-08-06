@@ -397,16 +397,32 @@ def main():
     """Generate comprehensive conformance report"""
     report, matrix = generate_conformance_matrix()
 
-    # Save report
-    report_path = Path(__file__).parent.parent / "conformance-reports" / "COMPREHENSIVE_API_MATRIX.md"
+    # Create reports directory
+    reports_dir = Path(__file__).parent.parent / "reports" / "latest"
+    reports_dir.mkdir(parents=True, exist_ok=True)
+
+    # Also save to conformance-reports for backward compatibility
+    legacy_dir = Path(__file__).parent.parent / "conformance-reports"
+    legacy_dir.mkdir(parents=True, exist_ok=True)
+
+    # Save report to both locations
+    report_path = reports_dir / "COMPREHENSIVE_API_MATRIX.md"
     with open(report_path, "w") as f:
+        f.write(report)
+
+    legacy_report_path = legacy_dir / "COMPREHENSIVE_API_MATRIX.md"
+    with open(legacy_report_path, "w") as f:
         f.write(report)
 
     print(f"\n✅ Comprehensive matrix saved to: {report_path}")
 
-    # Save raw data
-    data_path = Path(__file__).parent.parent / "conformance-reports" / "api_matrix.json"
+    # Save raw data to both locations
+    data_path = reports_dir / "api_matrix.json"
     with open(data_path, "w") as f:
+        json.dump(matrix, f, indent=2)
+
+    legacy_data_path = legacy_dir / "api_matrix.json"
+    with open(legacy_data_path, "w") as f:
         json.dump(matrix, f, indent=2)
 
     print(f"📊 Raw data saved to: {data_path}")
