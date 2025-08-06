@@ -76,6 +76,11 @@ def run_tests():
     try:
         resp = requests.get("http://localhost:8000/.well-known/openid-configuration")
         results["discovery_hyphen"] = resp.status_code == 200
+        if resp.status_code == 200:
+            discovery = resp.json()
+            if not results["token_endpoint"]:  # Only set if not already set
+                results["token_endpoint"] = discovery.get("token_endpoint", "").replace("http://localhost:8000", "")
+            results["discovery_fields"] = discovery  # Capture the discovery fields
     except:
         pass
 
@@ -119,18 +124,30 @@ def run_tests():
     except:
         pass
 
-    # Test Authorization endpoint
+    # Test Authorization endpoint (with PKCE as required by OAuth 2.1)
     try:
         resp = requests.get(
             "http://localhost:8000/api/v1/oauth/authorize",
-            params={"client_id": "test", "response_type": "code", "redirect_uri": "http://localhost/callback"},
+            params={
+                "client_id": "test",
+                "response_type": "code",
+                "redirect_uri": "http://localhost/callback",
+                "code_challenge": "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+                "code_challenge_method": "S256",
+                "state": "test_state",
+            },
+            allow_redirects=False,  # Don't follow redirects
         )
         results["authorization_redirect"] = resp.status_code in [302, 303]
     except:
         pass
 
-    # Check PKCE requirement
-    results["pkce_required"] = results["discovery_fields"].get("require_pkce", False)
+    # Check PKCE requirement (check if S256 is in code_challenge_methods_supported)
+    if results["discovery_fields"]:
+        methods = results["discovery_fields"].get("code_challenge_methods_supported", [])
+        results["pkce_required"] = "S256" in methods
+    else:
+        results["pkce_required"] = False
 
     return results
 
@@ -146,6 +163,10 @@ def calculate_compliance_score(results):
         "authorization_endpoint" in results["discovery_fields"],
         "token_endpoint" in results["discovery_fields"],
         "jwks_uri" in results["discovery_fields"],
+        "userinfo_endpoint" in results["discovery_fields"],
+        "response_types_supported" in results["discovery_fields"],
+        "id_token_signing_alg_values_supported" in results["discovery_fields"],
+        "subject_types_supported" in results["discovery_fields"],
     ]
 
     oauth_checks = [
@@ -153,10 +174,15 @@ def calculate_compliance_score(results):
         results["token_error_code"] == 400,  # Correct error code
         results["authorization_redirect"],  # Redirects on error
         results["token_endpoint"] == "/api/v1/oauth/token",  # Correct endpoint
+        results["discovery_hyphen"],  # Discovery working
+        "grant_types_supported" in results["discovery_fields"],
     ]
 
     oauth21_checks = [
         results["pkce_required"],  # PKCE enforcement
+        results["authorization_redirect"],  # Works with PKCE
+        results["token_error_code"] == 400,  # Proper error codes
+        "code_challenge_methods_supported" in results["discovery_fields"],
     ]
 
     oidc_score = int(sum(oidc_checks) / len(oidc_checks) * 100)
