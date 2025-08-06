@@ -1,0 +1,73 @@
+version: '3.8'
+
+# This compose file builds the conformance suite from source
+# without modifying the cloned repository
+
+services:
+  # MongoDB for conformance suite storage
+  tck-mongodb:
+    image: mongo:6.0.13
+    container_name: tck-mongodb
+    volumes:
+      - tck_mongo_data:/data/db
+    networks:
+      - authly_network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Build and run conformance suite server
+  tck-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: tck-server
+    environment:
+      - JAVA_OPTS=-Xmx2g -XX:MaxMetaspaceSize=512m
+    command: >
+      java
+      -jar /server/fapi-test-suite.jar
+      -Djdk.tls.maxHandshakeMessageSize=65536
+      --fintechlabs.base_url=https://localhost.emobix.co.uk:9443
+      --fintechlabs.devmode=true
+      --fintechlabs.startredir=true
+      --fintechlabs.mongodb.host=tck-mongodb
+    networks:
+      - authly_network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      - "localhost.emobix.co.uk:127.0.0.1"
+    links:
+      - tck-mongodb:mongodb
+    depends_on:
+      - tck-mongodb
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "500k"
+        max-file: "5"
+
+  # HTTPS frontend using nginx
+  tck-nginx:
+    image: nginx:alpine
+    container_name: tck-nginx
+    ports:
+      - "9443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+    networks:
+      - authly_network
+    depends_on:
+      - tck-server
+
+volumes:
+  tck_mongo_data:
+    driver: local
+
+networks:
+  authly_network:
+    external: true
+    name: authly_authly_network

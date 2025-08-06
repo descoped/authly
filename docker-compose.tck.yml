@@ -22,42 +22,35 @@ services:
       timeout: 5s
       retries: 5
 
-  # Conformance suite HTTPS server
-  tck-httpd:
-    build:
-      context: ./tck/conformance-suite/httpd
-      dockerfile: Dockerfile
-    container_name: tck-httpd
+  # Conformance suite server (option 1: use pre-built JAR if available)
+  # For fresh checkout, use: cd tck && make init
+  tck-server:
+    image: eclipse-temurin:17-jre
+    container_name: tck-server
     ports:
       - "8443:8443"
-    volumes:
-      - ./tck/conformance-suite/src/main/resources/:/usr/local/apache2/htdocs/:ro
-    networks:
-      - authly_network
-    depends_on:
-      - tck-server
-
-  # Conformance suite server (requires built JAR)
-  tck-server:
-    build:
-      context: ./tck/conformance-suite/server-dev
-    container_name: tck-server
+      - "9999:9999"
     volumes:
       - ./tck/conformance-suite/target/:/server/:ro
+      - ./tck/conformance-suite/src/main/resources/static:/static:ro
     environment:
       - JAVA_OPTS=-Xmx2g -XX:MaxMetaspaceSize=512m
     command: >
-      java
-      -jar /server/fapi-test-suite.jar
+      sh -c "
+      if [ ! -f /server/fapi-test-suite.jar ]; then
+        echo 'ERROR: JAR not found. Run: cd tck && make init';
+        exit 1;
+      fi;
+      java -jar /server/fapi-test-suite.jar
       -Djdk.tls.maxHandshakeMessageSize=65536
-      --fintechlabs.base_url=https://localhost.emobix.co.uk:8443
+      --fintechlabs.base_url=https://localhost:8443
+      --server.port=8443
       --fintechlabs.devmode=true
-      --fintechlabs.startredir=true
+      "
     networks:
       - authly_network
     extra_hosts:
       - "host.docker.internal:host-gateway"
-      - "localhost.emobix.co.uk:127.0.0.1"
     depends_on:
       - tck-mongodb
     logging:

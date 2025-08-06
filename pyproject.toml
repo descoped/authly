@@ -97,6 +97,7 @@ exclude = [
     "*.png",
     "dist/*",
     "build/*",
+    "tck/*",
     ".pytest_cache",
     ".ruff_cache",
     "__pycache__",
@@ -168,6 +169,8 @@ ignore = [
 #"tests/*" = ["F401"]
 # Examples can be more relaxed
 #"examples/*" = ["F401", "F841"]
+# Tck
+"tck/*" = ["C416", "F401", "F541", "I001", "E722", "W291", "W292", "W293"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["authly"]

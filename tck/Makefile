@@ -1,117 +1,136 @@
 # OIDC Conformance Testing Makefile
-# Provides convenient commands for running conformance tests
+# Properly handles external dependencies without modifying them
 
-.PHONY: help build start stop test report clean all
+.PHONY: help init clone build start stop test clean status
 
-# Default target
+# Configuration
+CONFORMANCE_REPO := https://gitlab.com/openid/conformance-suite.git
+CONFORMANCE_DIR := conformance-suite
+CONFORMANCE_VERSION := master  # Pin to specific version in production
+BUILD_DIR := conformance-suite-build
+
 help:
 	@echo "OIDC Conformance Testing Commands"
 	@echo "================================="
 	@echo ""
 	@echo "Setup:"
-	@echo "  make build    - Build conformance suite JAR"
-	@echo "  make start    - Start all services (Authly + conformance suite)"
+	@echo "  make init     - Initialize conformance suite (clone + build)"
+	@echo "  make clone    - Clone conformance suite repository"
+	@echo "  make build    - Build conformance suite from source"
+	@echo "  make start    - Start all services"
 	@echo "  make stop     - Stop all services"
 	@echo ""
 	@echo "Testing:"
 	@echo "  make test     - Run automated conformance tests"
-	@echo "  make basic    - Run basic certification tests"
-	@echo "  make pkce     - Run PKCE enforcement tests"
-	@echo "  make report   - Generate test report from latest results"
+	@echo "  make quick    - Run quick validation tests"
 	@echo ""
 	@echo "Management:"
-	@echo "  make logs     - View service logs"
 	@echo "  make status   - Check service status"
-	@echo "  make clean    - Clean up test results and containers"
-	@echo ""
-	@echo "Shortcuts:"
-	@echo "  make all      - Build, start, and run all tests"
+	@echo "  make logs     - View service logs"
+	@echo "  make clean    - Clean up everything"
+	@echo "  make reset    - Reset conformance suite to upstream"
 
-# Build conformance suite JAR
+# Initialize everything
+init: build
+	@echo "✅ Conformance suite initialized"
+
+# Clone conformance suite if not exists (optional for local reference)
+clone:
+	@if [ ! -d "$(CONFORMANCE_DIR)/.git" ]; then \
+		echo "📦 Cloning conformance suite for reference..."; \
+		git clone $(CONFORMANCE_REPO) $(CONFORMANCE_DIR); \
+		cd $(CONFORMANCE_DIR) && git checkout $(CONFORMANCE_VERSION); \
+	else \
+		echo "✅ Conformance suite already cloned"; \
+	fi
+
+# Build conformance suite using Docker (no local dependencies)
 build:
-	@echo "🔨 Building conformance suite JAR..."
-	@if [ ! -f "conformance-suite/target/fapi-test-suite.jar" ]; then \
-		if [ ! -d "conformance-suite/.git" ]; then \
-			git clone https://gitlab.com/openid/conformance-suite.git conformance-suite; \
-		fi; \
-		cd conformance-suite && \
-		docker run --rm \
-			-v "$$PWD":/usr/src/mymaven \
-			-v "$$HOME/.m2":/root/.m2 \
-			-w /usr/src/mymaven \
-			maven:3-eclipse-temurin-17 \
-			mvn -B clean package -DskipTests=true; \
-	else \
-		echo "✅ JAR already built"; \
-	fi
+	@echo "🔨 Building conformance suite with Docker..."
+	@cd $(BUILD_DIR) && docker compose build tck-server
+	@echo "✅ Conformance suite built"
 
-# Start all services
+# Start services using our build configuration
 start: build
-	@echo "🚀 Starting all services..."
-	@cd .. && ./scripts/start-with-tck.sh
+	@echo "🚀 Starting services..."
+	@cd $(BUILD_DIR) && docker compose up -d
+	@echo "✅ Services started"
+	@echo "   Conformance Suite: https://localhost:9443"
 
-# Stop all services
+# Stop services
 stop:
-	@echo "🛑 Stopping all services..."
-	@cd .. && docker compose -f docker-compose.yml -f docker-compose.dev.yml -f docker-compose.tck.yml down
+	@echo "🛑 Stopping services..."
+	@cd $(BUILD_DIR) && docker compose down
+	@echo "✅ Services stopped"
 
-# Run automated tests
+# Run conformance tests
 test:
-	@echo "🧪 Running automated conformance tests..."
-	@./scripts/run-automated-tests.sh
+	@echo "🧪 Running conformance tests..."
+	@python3 scripts/run-conformance-tests.py
 
-# Run basic certification tests
-basic:
-	@echo "📋 Running basic certification tests..."
-	@python3 scripts/conformance_client.py --plan basic-certification.json
-
-# Run PKCE tests
-pkce:
-	@echo "🔐 Running PKCE enforcement tests..."
-	@python3 scripts/conformance_client.py --plan pkce-certification.json
-
-# Generate report from latest results
-report:
-	@echo "📄 Generating report..."
-	@if [ -f "results/conformance_report_*.md" ]; then \
-		latest=$$(ls -t results/conformance_report_*.md | head -1); \
-		echo "Latest report: $$latest"; \
-		cat "$$latest"; \
-	else \
-		echo "No reports found. Run 'make test' first."; \
-	fi
-
-# View logs
-logs:
-	@echo "📜 Viewing service logs..."
-	@cd .. && docker compose -f docker-compose.yml -f docker-compose.dev.yml -f docker-compose.tck.yml logs -f
+# Quick validation
+quick:
+	@echo "⚡ Running quick tests..."
+	@python3 scripts/quick-test.py
 
 # Check status
 status:
 	@echo "📊 Service Status:"
-	@echo "=================="
-	@docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" | grep -E "(authly|tck-)" || echo "No services running"
+	@docker ps --format "table {{.Names}}\t{{.Status}}" | grep -E "tck-" || echo "No TCK services running"
 
-# Clean up
-clean:
+# View logs
+logs:
+	@cd $(BUILD_DIR) && docker compose logs -f
+
+# Clean everything
+clean: stop
 	@echo "🧹 Cleaning up..."
+	@rm -rf $(CONFORMANCE_DIR)/target
+	@cd $(BUILD_DIR) && docker compose down -v
 	@rm -rf results/*
-	@cd .. && docker compose -f docker-compose.yml -f docker-compose.dev.yml -f docker-compose.tck.yml down -v
+	@echo "✅ Cleaned"
 
-# Run everything
-all: build start test report
+# Reset conformance suite to upstream (removes local changes)
+reset:
+	@echo "🔄 Resetting conformance suite to upstream..."
+	@if [ -d "$(CONFORMANCE_DIR)/.git" ]; then \
+		cd $(CONFORMANCE_DIR) && \
+		git stash && \
+		git checkout $(CONFORMANCE_VERSION) && \
+		git reset --hard origin/$(CONFORMANCE_VERSION) && \
+		git clean -fd; \
+		echo "✅ Reset complete"; \
+	else \
+		echo "❌ Conformance suite not cloned"; \
+	fi
 
-# Install Python dependencies
-deps:
-	@echo "📦 Installing Python dependencies..."
-	@pip3 install requests urllib3
+# Update to latest upstream
+update:
+	@echo "📥 Updating conformance suite..."
+	@if [ -d "$(CONFORMANCE_DIR)/.git" ]; then \
+		cd $(CONFORMANCE_DIR) && \
+		git fetch origin && \
+		git checkout $(CONFORMANCE_VERSION) && \
+		git pull origin $(CONFORMANCE_VERSION); \
+		echo "✅ Updated to latest"; \
+	else \
+		make clone; \
+	fi
 
-# Open conformance suite in browser
+# Check for local modifications
+check-modifications:
+	@echo "🔍 Checking for local modifications..."
+	@if [ -d "$(CONFORMANCE_DIR)/.git" ]; then \
+		cd $(CONFORMANCE_DIR) && \
+		if git diff --quiet && git diff --cached --quiet; then \
+			echo "✅ No local modifications"; \
+		else \
+			echo "⚠️  Local modifications detected:"; \
+			git status --short; \
+		fi \
+	fi
+
+# Development: Open conformance suite in browser
 browse:
 	@echo "🌐 Opening conformance suite..."
-	@open https://localhost:8443 || xdg-open https://localhost:8443 || echo "Please open https://localhost:8443 in your browser"
-
-# Quick test (minimal tests for CI)
-quick-test:
-	@echo "⚡ Running quick conformance tests..."
-	@python3 scripts/run-conformance-tests.py --quick
+	@open https://localhost:8443 || xdg-open https://localhost:8443

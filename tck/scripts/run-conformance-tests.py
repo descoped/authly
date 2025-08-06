@@ -20,7 +20,7 @@ class ConformanceTestRunner:
 
     def __init__(
         self,
-        conformance_url: str = "https://localhost:8443",
+        conformance_url: str = "https://localhost:9443",
         authly_url: str = "http://localhost:8000",
         client_id: str = "oidc-conformance-test",
         client_secret: str = "conformance-test-secret",
