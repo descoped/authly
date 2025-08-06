@@ -174,14 +174,42 @@ jobs:
           cd tck
           # Run the OIDC spec compliance validator
           # This checks discovery, JWKS, token formats, and security requirements
-          python scripts/conformance-validator.py
-        continue-on-error: true
+          python scripts/conformance-validator.py || true
+          
+          # Check if the report was created
+          if [ -f reports/latest/SPECIFICATION_CONFORMANCE.md ]; then
+            echo "✅ Conformance report generated successfully"
+          else
+            echo "❌ Failed to generate conformance report"
+            exit 1
+          fi
+        continue-on-error: false
       
       - name: Check Compliance Level
         run: |
           cd tck
+          
+          # Display report location and contents for debugging
+          echo "📁 Checking for reports in: $(pwd)/reports/latest/"
+          ls -la reports/latest/ || echo "Reports directory not found"
+          
           # Extract compliance percentage from the report
-          COMPLIANCE=$(grep "checks passed" reports/latest/SPECIFICATION_CONFORMANCE.md | grep -oE "[0-9]+%" | head -1 | tr -d '%')
+          if [ -f reports/latest/SPECIFICATION_CONFORMANCE.md ]; then
+            echo "✅ Found conformance report"
+            COMPLIANCE=$(grep "checks passed" reports/latest/SPECIFICATION_CONFORMANCE.md | grep -oE "[0-9]+%" | head -1 | tr -d '%' || echo "0")
+            
+            # Display the first part of the report for debugging
+            echo "📄 Report preview:"
+            head -20 reports/latest/SPECIFICATION_CONFORMANCE.md
+          else
+            echo "❌ Conformance report not found at reports/latest/SPECIFICATION_CONFORMANCE.md"
+            COMPLIANCE="0"
+          fi
+          
+          # If COMPLIANCE is empty, set it to 0
+          if [ -z "$COMPLIANCE" ]; then
+            COMPLIANCE="0"
+          fi
           
           echo "## 📊 OIDC Conformance Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -196,8 +224,19 @@ jobs:
             echo "COMPLIANCE_MET=false" >> $GITHUB_ENV
           fi
           
-          echo "### Category Scores" >> $GITHUB_STEP_SUMMARY
-          grep "Category Score:" conformance-reports/SPECIFICATION_CONFORMANCE.md >> $GITHUB_STEP_SUMMARY || true
+          # Add detailed report section to summary
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "<details>" >> $GITHUB_STEP_SUMMARY
+          echo "<summary>📋 View Detailed Report</summary>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`markdown" >> $GITHUB_STEP_SUMMARY
+          if [ -f reports/latest/SPECIFICATION_CONFORMANCE.md ]; then
+            cat reports/latest/SPECIFICATION_CONFORMANCE.md | head -100 >> $GITHUB_STEP_SUMMARY
+          else
+            echo "Report not found" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "</details>" >> $GITHUB_STEP_SUMMARY
       
       - name: Upload Conformance Report
         if: always()
@@ -205,8 +244,8 @@ jobs:
         with:
           name: conformance-report
           path: |
-            tck/conformance-reports/SPECIFICATION_CONFORMANCE.md
-            tck/conformance-reports/conformance_results.json
+            tck/reports/latest/SPECIFICATION_CONFORMANCE.md
+            tck/reports/latest/conformance_results.json
       
       - name: Stop Services
         if: always()
@@ -219,6 +258,23 @@ jobs:
           # Stop Authly stack
           docker compose down
       
+      - name: Display Final Status
+        if: always()
+        run: |
+          echo "=" | tee -a $GITHUB_STEP_SUMMARY
+          echo "" | tee -a $GITHUB_STEP_SUMMARY
+          echo "### 📊 Final Status" | tee -a $GITHUB_STEP_SUMMARY
+          echo "" | tee -a $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ env.COMPLIANCE_MET }}" == "true" ]; then
+            echo "✅ **PASSED**: Conformance validation met 90% target" | tee -a $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **FAILED**: Conformance validation below 90% target" | tee -a $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" | tee -a $GITHUB_STEP_SUMMARY
+          echo "📥 **Artifacts**: Download the full conformance report from the workflow artifacts" | tee -a $GITHUB_STEP_SUMMARY
+          
       - name: Exit Status
         run: |
           if [ "${{ env.COMPLIANCE_MET }}" != "true" ]; then
