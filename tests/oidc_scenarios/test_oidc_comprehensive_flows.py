@@ -196,7 +196,7 @@ class TestComprehensiveOIDCFlows:
             "code_verifier": "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",
         }
 
-        token_response = await oidc_server.client.post("/api/v1/oauth/token", json=token_data)
+        token_response = await oidc_server.client.post("/api/v1/oauth/token", data=token_data)
         await token_response.expect_status(200)
 
         token_json = await token_response.json()
@@ -238,7 +238,7 @@ class TestComprehensiveOIDCFlows:
             "code_verifier": "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",
         }
 
-        token_response = await oidc_server.client.post("/api/v1/oauth/token", json=token_data)
+        token_response = await oidc_server.client.post("/api/v1/oauth/token", data=token_data)
         await token_response.expect_status(200)
 
         token_json = await token_response.json()
@@ -287,7 +287,7 @@ class TestComprehensiveOIDCFlows:
                 "code_verifier": "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",
             }
 
-            token_response = await oidc_server.client.post("/api/v1/oauth/token", json=token_data)
+            token_response = await oidc_server.client.post("/api/v1/oauth/token", data=token_data)
             await token_response.expect_status(200)
 
             token_json = await token_response.json()
@@ -345,7 +345,7 @@ class TestComprehensiveOIDCFlows:
             "code_verifier": "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",
         }
 
-        token_response = await oidc_server.client.post("/api/v1/oauth/token", json=token_data)
+        token_response = await oidc_server.client.post("/api/v1/oauth/token", data=token_data)
         await token_response.expect_status(200)
 
         token_json = await token_response.json()
@@ -395,7 +395,7 @@ class TestComprehensiveOIDCFlows:
                 "code_verifier": "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",
             }
 
-            token_response = await oidc_server.client.post("/api/v1/oauth/token", json=token_data)
+            token_response = await oidc_server.client.post("/api/v1/oauth/token", data=token_data)
             await token_response.expect_status(200)
 
             token_json = await token_response.json()
@@ -441,7 +441,7 @@ class TestComprehensiveOIDCFlows:
                 "code_verifier": "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",
             }
 
-            token_response = await oidc_server.client.post("/api/v1/oauth/token", json=token_data)
+            token_response = await oidc_server.client.post("/api/v1/oauth/token", data=token_data)
             await token_response.expect_status(200)
 
             token_json = await token_response.json()
@@ -479,7 +479,7 @@ class TestComprehensiveOIDCFlows:
             "code_verifier": "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",
         }
 
-        token_response = await oidc_server.client.post("/api/v1/oauth/token", json=token_data)
+        token_response = await oidc_server.client.post("/api/v1/oauth/token", data=token_data)
         await token_response.expect_status(200)
 
         token_json = await token_response.json()
@@ -614,7 +614,7 @@ class TestOIDCErrorHandling:
         """Test OIDC discovery endpoint error handling."""
 
         # Discovery endpoint should always be available
-        discovery_response = await oidc_server.client.get("/.well-known/openid_configuration")
+        discovery_response = await oidc_server.client.get("/.well-known/openid-configuration")
         await discovery_response.expect_status(200)
 
         discovery_json = await discovery_response.json()
@@ -749,7 +749,7 @@ class TestOIDCJWKSKeyRotation:
             "code_verifier": "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",
         }
 
-        token_response = await oidc_server.client.post("/api/v1/oauth/token", json=token_data)
+        token_response = await oidc_server.client.post("/api/v1/oauth/token", data=token_data)
         await token_response.expect_status(200)
 
         token_json = await token_response.json()

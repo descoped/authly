@@ -197,6 +197,13 @@ Required Authly settings for conformance testing:
 
 ## Results Analysis
 
+### Conformance Reports
+Versioned conformance reports are stored in `conformance-reports/`:
+- Naming: `CONFORMANCE_STATUS_v{XXX}_{date}_{tag}.md`
+- Fix summaries: `FIX_SUMMARY_v{XXX}_{date}.md`
+- See [conformance-reports/README.md](./conformance-reports/README.md) for version history
+
+### Test Results
 Test results are stored in `results/` with timestamps:
 - `results/YYYY-MM-DD/conformance-report.json`
 - `results/YYYY-MM-DD/test-logs.txt`
@@ -220,6 +227,25 @@ Test results are stored in `results/` with timestamps:
 - Dynamic Client Registration
 
 ## Development Workflow
+
+### Conformance Testing Workflow
+
+**IMPORTANT**: Follow the standardized workflow for fixing conformance issues:
+
+📋 **See [CONFORMANCE_WORKFLOW.md](./CONFORMANCE_WORKFLOW.md)** for the complete workflow including:
+- Issue identification process
+- Test-first development approach
+- Unit test validation before TCK
+- Documentation and versioning standards
+- Fix patterns and best practices
+
+**Key Workflow Steps**:
+1. Generate conformance report to identify issues
+2. Write tests for expected behavior FIRST
+3. Implement fixes in code
+4. Validate with unit tests (must be 100% passing)
+5. Run TCK conformance verification
+6. Document fixes with proper versioning
 
 ### Integrated Stack Management
 

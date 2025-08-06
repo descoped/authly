@@ -161,7 +161,7 @@ class TestAdvancedOIDCClaims:
             "code_verifier": "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",
         }
 
-        token_response = await oidc_server.client.post("/api/v1/oauth/token", json=token_data)
+        token_response = await oidc_server.client.post("/api/v1/oauth/token", data=token_data)
         await token_response.expect_status(200)
 
         token_json = await token_response.json()
@@ -211,7 +211,7 @@ class TestAdvancedOIDCClaims:
             "code_verifier": "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",
         }
 
-        token_response = await oidc_server.client.post("/api/v1/oauth/token", json=token_data)
+        token_response = await oidc_server.client.post("/api/v1/oauth/token", data=token_data)
         await token_response.expect_status(200)
 
         token_json = await token_response.json()
@@ -260,7 +260,7 @@ class TestAdvancedOIDCClaims:
             "code_verifier": "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",
         }
 
-        token_response = await oidc_server.client.post("/api/v1/oauth/token", json=token_data)
+        token_response = await oidc_server.client.post("/api/v1/oauth/token", data=token_data)
         await token_response.expect_status(200)
 
         token_json = await token_response.json()
@@ -459,7 +459,7 @@ class TestOIDCTokenValidation:
         # and validate that the OIDC service properly validates the aud claim
 
         # For now, we test that the discovery endpoint advertises correct audience requirements
-        discovery_response = await oidc_server.client.get("/.well-known/openid_configuration")
+        discovery_response = await oidc_server.client.get("/.well-known/openid-configuration")
         await discovery_response.expect_status(200)
 
         discovery_json = await discovery_response.json()
@@ -471,7 +471,7 @@ class TestOIDCTokenValidation:
     async def test_id_token_iss_claim_validation(self, oidc_server: AsyncTestServer):
         """Test ID token issuer claim validation."""
 
-        discovery_response = await oidc_server.client.get("/.well-known/openid_configuration")
+        discovery_response = await oidc_server.client.get("/.well-known/openid-configuration")
         await discovery_response.expect_status(200)
 
         discovery_json = await discovery_response.json()
@@ -488,7 +488,7 @@ class TestOIDCTokenValidation:
     async def test_id_token_exp_claim_validation(self, oidc_server: AsyncTestServer):
         """Test ID token expiration claim validation."""
 
-        discovery_response = await oidc_server.client.get("/.well-known/openid_configuration")
+        discovery_response = await oidc_server.client.get("/.well-known/openid-configuration")
         await discovery_response.expect_status(200)
 
         discovery_json = await discovery_response.json()
@@ -501,7 +501,7 @@ class TestOIDCTokenValidation:
     async def test_id_token_signature_algorithms(self, oidc_server: AsyncTestServer):
         """Test supported ID token signature algorithms."""
 
-        discovery_response = await oidc_server.client.get("/.well-known/openid_configuration")
+        discovery_response = await oidc_server.client.get("/.well-known/openid-configuration")
         await discovery_response.expect_status(200)
 
         discovery_json = await discovery_response.json()
@@ -530,7 +530,7 @@ class TestOIDCSpecCompliance:
         """Test that all required OIDC endpoints are available."""
 
         # Test OIDC Discovery (required)
-        discovery_response = await oidc_server.client.get("/.well-known/openid_configuration")
+        discovery_response = await oidc_server.client.get("/.well-known/openid-configuration")
         await discovery_response.expect_status(200)
 
         # Test JWKS endpoint (required)
@@ -544,7 +544,7 @@ class TestOIDCSpecCompliance:
     async def test_oidc_discovery_required_fields(self, oidc_server: AsyncTestServer):
         """Test OIDC discovery contains all required fields per spec."""
 
-        discovery_response = await oidc_server.client.get("/.well-known/openid_configuration")
+        discovery_response = await oidc_server.client.get("/.well-known/openid-configuration")
         await discovery_response.expect_status(200)
 
         discovery_json = await discovery_response.json()
@@ -576,7 +576,7 @@ class TestOIDCSpecCompliance:
     async def test_oidc_scopes_advertised_correctly(self, oidc_server: AsyncTestServer):
         """Test that OIDC scopes are advertised correctly in discovery."""
 
-        discovery_response = await oidc_server.client.get("/.well-known/openid_configuration")
+        discovery_response = await oidc_server.client.get("/.well-known/openid-configuration")
         await discovery_response.expect_status(200)
 
         discovery_json = await discovery_response.json()
@@ -599,7 +599,7 @@ class TestOIDCSpecCompliance:
     async def test_oidc_claims_advertised_correctly(self, oidc_server: AsyncTestServer):
         """Test that OIDC claims are advertised correctly in discovery."""
 
-        discovery_response = await oidc_server.client.get("/.well-known/openid_configuration")
+        discovery_response = await oidc_server.client.get("/.well-known/openid-configuration")
         await discovery_response.expect_status(200)
 
         discovery_json = await discovery_response.json()

@@ -250,7 +250,7 @@ class TestOIDCAuthorizationCodeFlow:
 
         await asyncio.sleep(0.2)
 
-        token_response = await oidc_server.client.post("/api/v1/oauth/token", json=token_data)
+        token_response = await oidc_server.client.post("/api/v1/oauth/token", data=token_data)
 
         # Get response details before asserting
         if token_response._response.status_code != 200:
@@ -346,7 +346,7 @@ class TestOIDCAuthorizationCodeFlow:
             "code_verifier": "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",
         }
 
-        token_response = await oidc_server.client.post("/api/v1/oauth/token", json=token_data)
+        token_response = await oidc_server.client.post("/api/v1/oauth/token", data=token_data)
         await token_response.expect_status(200)
 
         token_json = await token_response.json()
@@ -429,7 +429,7 @@ class TestOIDCAuthorizationCodeFlow:
             "code_verifier": "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",
         }
 
-        token_response = await oidc_server.client.post("/api/v1/oauth/token", json=token_data)
+        token_response = await oidc_server.client.post("/api/v1/oauth/token", data=token_data)
         await token_response.expect_status(200)
 
         token_json = await token_response.json()
@@ -495,7 +495,7 @@ class TestOIDCAuthorizationCodeFlow:
             "code_verifier": "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",
         }
 
-        token_response = await oidc_server.client.post("/api/v1/oauth/token", json=token_data)
+        token_response = await oidc_server.client.post("/api/v1/oauth/token", data=token_data)
         await token_response.expect_status(200)
 
         token_json = await token_response.json()
@@ -560,7 +560,7 @@ class TestOIDCAuthorizationCodeFlow:
             "code_verifier": "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",
         }
 
-        token_response = await oidc_server.client.post("/api/v1/oauth/token", json=token_data)
+        token_response = await oidc_server.client.post("/api/v1/oauth/token", data=token_data)
         await token_response.expect_status(200)
 
         token_json = await token_response.json()
@@ -575,7 +575,7 @@ class TestOIDCAuthorizationCodeFlow:
             "client_secret": "test_client_secret_confidential",
         }
 
-        refresh_response = await oidc_server.client.post("/api/v1/oauth/token", json=refresh_data)
+        refresh_response = await oidc_server.client.post("/api/v1/oauth/token", data=refresh_data)
         await refresh_response.expect_status(200)
 
         refresh_json = await refresh_response.json()
@@ -769,7 +769,7 @@ class TestOIDCFlowIntegration:
             "code_verifier": "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",
         }
 
-        token_response = await oidc_server.client.post("/api/v1/oauth/token", json=token_data)
+        token_response = await oidc_server.client.post("/api/v1/oauth/token", data=token_data)
         await token_response.expect_status(200)
 
         token_json = await token_response.json()
@@ -799,7 +799,7 @@ class TestOIDCFlowIntegration:
         """Test that OIDC discovery endpoint is consistent with actual implementation."""
 
         # Get OIDC discovery metadata
-        discovery_response = await oidc_server.client.get("/.well-known/openid_configuration")
+        discovery_response = await oidc_server.client.get("/.well-known/openid-configuration")
         await discovery_response.expect_status(200)
 
         discovery_json = await discovery_response.json()

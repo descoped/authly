@@ -173,7 +173,7 @@ class TestOIDCLogoutDiscovery:
     @pytest.mark.asyncio
     async def test_oidc_logout_in_discovery_metadata(self, oidc_server: AsyncTestServer):
         """Test that logout endpoint is advertised in OIDC discovery with real service integration."""
-        response = await oidc_server.client.get("/.well-known/openid_configuration")
+        response = await oidc_server.client.get("/.well-known/openid-configuration")
         await response.expect_status(200)
 
         metadata = await response.json()

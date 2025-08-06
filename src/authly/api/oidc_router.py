@@ -52,7 +52,7 @@ def get_base_url(request: Request) -> str:
 
 
 @oidc_router.get(
-    "/.well-known/openid_configuration",
+    "/.well-known/openid-configuration",
     response_model=OIDCServerMetadata,
     summary="OpenID Connect Discovery",
     description="""

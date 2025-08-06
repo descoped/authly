@@ -268,14 +268,52 @@ async def authorize_get(
     id_token_hint: str | None = Query(None, description="ID token hint"),
     login_hint: str | None = Query(None, description="Login hint"),
     acr_values: str | None = Query(None, description="ACR values"),
-    current_user: UserModel = Depends(get_current_user),
+    current_user: UserModel | None = None,
     authorization_service: AuthorizationService = Depends(get_authorization_service),
 ):
     """
     OAuth 2.1 Authorization endpoint (GET).
 
     Validates the authorization request and displays a consent form.
+    If user is not authenticated, redirects back to client with login_required error.
     """
+
+    # Check if user is authenticated
+    try:
+        from authly.api.users_dependencies import get_current_user
+
+        # Try to get current user - this will fail if not authenticated
+        if not current_user:
+            # Import dependencies here to avoid circular imports
+            from fastapi.security import OAuth2PasswordBearer
+
+            oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/oauth/token", auto_error=False)
+            token = await oauth2_scheme(request)
+
+            if token:
+                from authly.api.users_dependencies import get_token_service, get_user_repository
+                from authly.core.dependencies import get_config
+
+                user_repo = get_user_repository()
+                token_service = get_token_service()
+                config = get_config()
+                current_user = await get_current_user(token, user_repo, token_service, config)
+    except Exception:
+        # User is not authenticated - redirect back with error
+        error_params = {"error": "login_required", "error_description": "User authentication required"}
+        if state:
+            error_params["state"] = state
+        error_url = f"{redirect_uri}?{urlencode(error_params)}"
+        return RedirectResponse(url=error_url, status_code=302)
+
+    if not current_user:
+        # User is not authenticated - redirect back with error
+        error_params = {"error": "login_required", "error_description": "User authentication required"}
+        if state:
+            error_params["state"] = state
+        error_url = f"{redirect_uri}?{urlencode(error_params)}"
+        return RedirectResponse(url=error_url, status_code=302)
+
     try:
         # Create authorization request model with OpenID Connect parameters
         auth_request = OAuthAuthorizationRequest(
@@ -481,7 +519,16 @@ async def authorize_post(
 
 @oauth_router.post("/token", response_model=TokenResponse)
 async def get_access_token(
-    request: TokenRequest,
+    grant_type: str = Form(..., description="The grant type"),
+    username: str | None = Form(None, description="Username for password grant"),
+    password: str | None = Form(None, description="Password for password grant"),
+    scope: str | None = Form(None, description="Requested scope"),
+    code: str | None = Form(None, description="Authorization code"),
+    redirect_uri: str | None = Form(None, description="Redirect URI"),
+    code_verifier: str | None = Form(None, description="PKCE code verifier"),
+    client_id: str | None = Form(None, description="OAuth client ID"),
+    client_secret: str | None = Form(None, description="OAuth client secret"),
+    refresh_token: str | None = Form(None, description="Refresh token"),
     user_repo: UserRepository = Depends(get_user_repository),
     token_service: TokenService = Depends(get_token_service_with_client),
     authorization_service: AuthorizationService = Depends(get_authorization_service),
@@ -491,10 +538,27 @@ async def get_access_token(
     """
     OAuth 2.1 Token Endpoint - supports multiple grant types.
 
+    Accepts application/x-www-form-urlencoded as per OAuth 2.0 specification.
+
     Supported grant types:
     - password: Username/password authentication (existing)
     - authorization_code: OAuth 2.1 authorization code flow with PKCE
+    - refresh_token: Refresh an access token
     """
+
+    # Create a TokenRequest object from form data for backward compatibility
+    request = TokenRequest(
+        grant_type=grant_type,
+        username=username,
+        password=password,
+        scope=scope,
+        code=code,
+        redirect_uri=redirect_uri,
+        code_verifier=code_verifier,
+        client_id=client_id,
+        client_secret=client_secret,
+        refresh_token=refresh_token,
+    )
 
     if request.grant_type == "password":
         return await _handle_password_grant(request, user_repo, token_service, rate_limiter, login_tracker)

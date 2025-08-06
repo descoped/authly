@@ -1,6 +1,7 @@
 # OIDC TCK Task List
 
 **Created**: 2025-08-06  
+**Updated**: 2025-08-06 (v002)  
 **Purpose**: Track OIDC conformance testing tasks and implementation requirements  
 **Status**: 🚧 In Progress
 
@@ -8,11 +9,16 @@
 
 ## 📊 Overall Progress
 
-- [ ] **Phase 1**: Infrastructure Setup ✅ COMPLETED
-- [ ] **Phase 2**: Basic Conformance Testing (IN PROGRESS)
-- [ ] **Phase 3**: Full Conformance Suite
+- [x] **Phase 1**: Infrastructure Setup ✅ COMPLETED
+- [x] **Phase 2**: Basic Conformance Testing ✅ COMPLETED
+- [ ] **Phase 3**: Full Conformance Suite (IN PROGRESS)
 - [ ] **Phase 4**: Fix Identified Issues
 - [ ] **Phase 5**: Official Certification
+
+## 🎯 Compliance Scores (v002)
+- **OIDC Core**: 87% compliant ↑
+- **OAuth 2.0**: 25% compliant ↓
+- **OAuth 2.1**: 100% compliant ✅
 
 ---
 
@@ -26,6 +32,9 @@
 - [x] Create Python integration tests
 - [x] Document setup procedures
 - [x] Create quick-setup automation script
+- [x] Implement external dependency management strategy
+- [x] Build conformance suite from source with Docker
+- [x] Configure networking between Authly and conformance suite
 
 ### Initial Testing
 - [x] Start Authly with Docker Compose
@@ -33,6 +42,9 @@
 - [x] Run Python integration tests
 - [x] Identify endpoint path issues (/api/v1/ prefix)
 - [x] Document troubleshooting steps
+- [x] Rebuild with latest codebase (fixed token endpoint URL)
+- [x] Create versioned conformance reporting system
+- [x] Generate automated compliance reports with scoring
 
 ---
 
@@ -79,23 +91,29 @@
   - [ ] Run conformance tests
   - [ ] Document results
 
-### Known Issues to Fix
+### Known Issues to Fix (4 Critical for Certification)
 
-#### Endpoint Issues
-- [ ] Missing user registration endpoint
-  - Looked for: `/api/v1/auth/register`
-  - Status: 404 Not Found
-  - Solution: Create users via admin API or direct database
+#### 🚨 Critical Endpoint Issues
+- [ ] **Discovery endpoint URL violation**
+  - Current: `/.well-known/openid_configuration` (underscore)
+  - Required: `/.well-known/openid-configuration` (hyphen)
+  - File: `/src/authly/api/oidc_router.py` line 55
+  - Impact: BLOCKS CERTIFICATION
   
-- [ ] Authorization endpoint authentication
-  - Current: Returns 401 Unauthorized for unauthenticated requests
-  - Expected: Redirect to login page (302/303) or show consent
-  - Note: This is API-first behavior, may be correct
+- [ ] **Token endpoint content-type**
+  - Current: Only accepts `application/json`
+  - Required: Must accept `application/x-www-form-urlencoded`
+  - Impact: BLOCKS CERTIFICATION
   
-- [ ] Token endpoint error codes
+- [ ] **Token endpoint error codes**
   - Current: Returns 422 for malformed requests
   - Expected: Return 400 Bad Request per OAuth spec
   - Solution: Adjust validation error response codes
+  
+- [ ] **Authorization endpoint authentication**
+  - Current: Returns 401 Unauthorized for unauthenticated requests
+  - Expected: Redirect to login page (302/303) with error parameters
+  - Note: This is API-first behavior, needs adjustment for OAuth flows
 
 #### Working Features ✅
 - [x] PKCE is properly enforced (returns 401 without PKCE)
@@ -127,19 +145,32 @@
 
 ## 🎯 Next Immediate Actions
 
-1. ✅ **Build Conformance Suite from Source** (COMPLETED)
-   - Cloned repository to `conformance-suite/`
-   - Built JAR using Maven in Docker container
-   - JAR file created: `target/fapi-test-suite.jar` (123MB)
-   - Started conformance suite containers successfully
-   - Web UI accessible at https://localhost:8443
+1. **Fix Critical OIDC Spec Violations** (BLOCKS CERTIFICATION)
+   ```bash
+   # Fix discovery endpoint URL in /src/authly/api/oidc_router.py
+   # Change: /.well-known/openid_configuration
+   # To:     /.well-known/openid-configuration
+   ```
 
-2. **Access Conformance Suite Web UI**
+2. **Fix Token Endpoint Content-Type**
+   ```bash
+   # Update token endpoint to accept form-encoded data
+   # Currently only accepts application/json
+   # Must accept: application/x-www-form-urlencoded
+   ```
+
+3. **Generate New Conformance Report After Fixes**
+   ```bash
+   cd tck
+   python scripts/generate-conformance-report.py post_fixes
+   ```
+
+4. **Access Conformance Suite Web UI**
    ```bash
    # Open in browser
-   open https://localhost:8443
+   open https://localhost:9443
    # Or use curl to test
-   curl -k https://localhost:8443
+   curl -k https://localhost:9443
    ```
 
 3. **Create Test User via Database**
@@ -181,9 +212,10 @@
 
 ### Important URLs
 - **Authly**: http://localhost:8000
-- **Discovery**: http://localhost:8000/.well-known/openid_configuration
+- **Conformance Suite**: https://localhost:9443 (was 8443)
+- **Discovery**: http://localhost:8000/.well-known/openid_configuration (⚠️ should be hyphen)
 - **Authorization**: http://localhost:8000/api/v1/oauth/authorize
-- **Token**: http://localhost:8000/api/v1/auth/token
+- **Token**: http://localhost:8000/api/v1/oauth/token ✅ (fixed in latest build)
 - **UserInfo**: http://localhost:8000/oidc/userinfo
 - **JWKS**: http://localhost:8000/.well-known/jwks.json
 

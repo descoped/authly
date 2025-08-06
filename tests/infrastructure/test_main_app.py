@@ -183,7 +183,7 @@ class TestMainApplicationIntegration:
         assert response._response.status_code in [401, 422]  # Needs auth, but endpoint exists
 
         # Test OAuth endpoints exist
-        response = await test_server.client.get("/api/v1/oauth/.well-known/openid_configuration")
+        response = await test_server.client.get("/api/v1/oauth/.well-known/openid-configuration")
         assert response._response.status_code in [200, 404]  # May or may not be implemented
 
     @pytest.mark.asyncio
