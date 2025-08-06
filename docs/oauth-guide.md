@@ -1,15 +1,16 @@
 # OAuth 2.1 Implementation Guide
 
-Comprehensive guide to using Authly's OAuth 2.1 authorization server for secure application authentication and authorization.
+Guide to using Authly's OAuth 2.1 authorization server implementation (work in progress).
 
 **Standards**: OAuth 2.1, RFC 6749, RFC 7636 (PKCE), RFC 7009 (Revocation), RFC 8414 (Discovery)  
-**Security**: Mandatory PKCE, comprehensive validation, enterprise-grade protection
+**Security**: Mandatory PKCE, basic validation (not security audited)  
+**Status**: Development/testing use only - not certified for production
 
 ---
 
 ## 🎯 **OAuth 2.1 Overview**
 
-Authly implements a complete OAuth 2.1 authorization server that provides secure, standards-compliant authentication and authorization for modern applications. OAuth 2.1 consolidates security best practices and makes PKCE mandatory for all flows.
+Authly implements an OAuth 2.1 authorization server aiming for standards compliance. OAuth 2.1 consolidates security best practices and makes PKCE mandatory for all flows. **Note**: Implementation is functional but not fully tested for all edge cases.
 
 ### **Key Features**
 - ✅ **Mandatory PKCE** - Proof Key for Code Exchange required for all authorization flows

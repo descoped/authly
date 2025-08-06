@@ -1,7 +1,7 @@
 # OIDC/OAuth Test Conformance Kit (TCK) Makefile
 # Achieves 90% OIDC/OAuth compliance
 
-.PHONY: help validate analyze report all clean setup
+.PHONY: help validate analyze report all clean setup test-quick test-plans
 
 # Colors for output
 GREEN := \033[0;32m
@@ -56,6 +56,17 @@ test-quick: ## Quick conformance check
 	@curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/oidc/userinfo | grep -q "401" && echo "  ✅ UserInfo requires auth" || echo "  ❌ UserInfo endpoint"
 	@echo ""
 	@echo "Run 'make validate' for full conformance test"
+
+test-plans: setup ## Run official test plan validation
+	@echo "$(GREEN)Running Official Test Plans:$(NC)"
+	@echo ""
+	@echo "$(YELLOW)Basic Certification:$(NC)"
+	@python $(SCRIPTS_DIR)/test_plan_runner.py config/test-plans/basic-certification.json || true
+	@echo ""
+	@echo "$(YELLOW)PKCE Certification:$(NC)"
+	@python $(SCRIPTS_DIR)/test_plan_runner.py config/test-plans/pkce-certification.json || true
+	@echo ""
+	@echo "$(GREEN)Test plan reports saved to: reports/test-plans/$(NC)"
 
 all: clean report ## Run complete conformance suite
 	@echo "$(GREEN)Complete conformance test finished$(NC)"

@@ -1,6 +1,8 @@
-# Comprehensive Deployment Guide for Authly
+# Deployment Guide for Authly
 
-This guide covers all deployment scenarios for Authly OAuth 2.1 Authorization Server, from development to enterprise production environments.
+⚠️ **Warning**: Authly is a work in progress with ~90% OIDC compliance. Not recommended for production use without extensive testing and security audit.
+
+This guide covers deployment scenarios for Authly OAuth 2.1 Authorization Server. Use at your own risk in production environments.
 
 ## Table of Contents
 

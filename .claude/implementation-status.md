@@ -1,19 +1,21 @@
 # Claude Memory for Authly OAuth 2.1 Implementation
 
 ## Project Context
-Authly is a production-ready OAuth 2.1 authentication and authorization service built with FastAPI and PostgreSQL. Complete OAuth 2.1 authorization server with admin API and comprehensive security.
+Authly is an OAuth 2.1 and OpenID Connect authorization server in active development. Built with FastAPI and PostgreSQL, it aims for standards compliance but is not production-certified.
 
-## Current Implementation Status - ✅ FULLY COMPLETED
+⚠️ **Status**: Work in progress - ~90% OIDC specification compliance, not security audited
 
-### **✅ COMPLETE OAUTH 2.1 + OIDC CORE 1.0 + SESSION MANAGEMENT 1.0 IMPLEMENTATION**
-- **✅ OAuth 2.1 Authorization Server** - Full PKCE compliance, discovery, revocation, RFC-compliant
-- **✅ OpenID Connect Core 1.0** - Complete OIDC layer with ID tokens, UserInfo, JWKS, Discovery
-- **✅ Session Management 1.0** - Complete session iframe, check session, front-channel logout
-- **✅ 708 Tests Passing** - 100% success rate including comprehensive OIDC and session management tests across 56 test files organized in 7 feature domains
-- **✅ API-First Admin System** - HTTP API + CLI with OAuth authentication and token management
-- **✅ Two-Layer Security Model** - Intrinsic authority + granular OAuth scopes
-- **✅ Bootstrap System** - Complete IAM chicken-and-egg solution with OIDC scope registration
-- **✅ Production Ready** - Docker, lifecycle management, monitoring, security hardening
+## Current Implementation Status - PARTIALLY COMPLETE
+
+### **⚠️ OAUTH 2.1 + OIDC IMPLEMENTATION (90% Compliant)**
+- **⚠️ OAuth 2.1 Authorization Server** - PKCE implemented, basic compliance (not certified)
+- **⚠️ OpenID Connect Core 1.0** - ~90% specification compliance (not certified)
+- **⚠️ Session Management** - Basic implementation, not fully tested
+- **🧪 Tests** - Main functionality covered, edge cases need work
+- **✅ Admin System** - Basic HTTP API + CLI implemented
+- **✅ Two-Layer Security Model** - Intrinsic authority + OAuth scopes
+- **✅ Bootstrap System** - IAM chicken-and-egg solution implemented
+- **⚠️ Deployment** - Docker available, not production-tested
 
 ### **✅ OIDC CORE 1.0 + SESSION MANAGEMENT 1.0 FEATURES**
 - **✅ ID Token Generation** - JWT-based with RS256/HS256, proper claims, nonce support

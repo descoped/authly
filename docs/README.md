@@ -1,10 +1,10 @@
 # Authly Documentation
 
-Complete documentation for Authly OAuth 2.1 Authorization Server with OpenID Connect 1.0 support.
+Documentation for Authly OAuth 2.1 and OpenID Connect authorization server (work in progress).
 
 ## 📚 Documentation Overview
 
-This documentation provides comprehensive guidance for deploying, configuring, and operating Authly in production environments. All guides are verified against the current codebase and follow enterprise security best practices.
+⚠️ **Note**: Authly is in active development. This documentation covers current features but may not reflect all edge cases or production scenarios. The system achieves ~90% OIDC specification compliance but is not certified for production use.
 
 ---
 
@@ -23,12 +23,12 @@ This documentation provides comprehensive guidance for deploying, configuring, a
 ## 🚀 Deployment & Operations
 
 ### [deployment-guide.md](deployment-guide.md)
-**Comprehensive Production Deployment Guide**
+**Deployment Guide** (Use with caution in production)
 - Docker, Kubernetes, and bare-metal deployment scenarios
 - Infrastructure requirements and capacity planning
-- Production security configuration and SSL/TLS setup
+- Security configuration and SSL/TLS setup
 - Monitoring, logging, and alerting configuration
-- Scaling strategies and operational procedures
+- Scaling strategies (not tested under load)
 
 ### [docker-deployment.md](docker-deployment.md)
 **Docker Infrastructure Lifecycle Management**

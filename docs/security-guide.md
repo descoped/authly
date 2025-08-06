@@ -1,27 +1,29 @@
 # Security Implementation Guide
 
-Comprehensive security implementation guide for Authly OAuth 2.1 Authorization Server, covering authentication mechanisms, authorization controls, cryptographic implementations, and security best practices.
+Security implementation guide for Authly OAuth 2.1 Authorization Server, covering authentication mechanisms, authorization controls, and cryptographic implementations.
+
+⚠️ **Security Warning**: No security audit or penetration testing performed. Use at your own risk.
 
 ## 🛡️ Security Overview
 
-Authly implements enterprise-grade security measures with defense-in-depth architecture:
+Authly implements security measures (not professionally audited):
 
-- **OAuth 2.1 Compliance** - Latest security standards with mandatory PKCE
-- **OpenID Connect 1.0** - Complete OIDC security with ID token validation
-- **Enterprise Authentication** - Multi-factor authentication and secure password policies
-- **Cryptographic Security** - Industry-standard encryption and hashing
-- **Access Control** - Multi-layered authorization and rate limiting
-- **Secure Communications** - TLS encryption and comprehensive security headers
-- **Audit and Monitoring** - Comprehensive logging and threat detection
-- **Data Protection** - Secure storage and GDPR compliance
+- **OAuth 2.1 Compliance** - Aims for standards with mandatory PKCE
+- **OpenID Connect 1.0** - ~90% OIDC compliance (not certified)
+- **Authentication** - Basic password security with bcrypt
+- **Cryptographic Security** - Standard encryption and hashing
+- **Access Control** - Basic authorization and rate limiting
+- **Secure Communications** - TLS support and security headers
+- **Audit and Monitoring** - Basic logging (not comprehensive)
+- **Data Protection** - Basic secure storage
 
-### Production Security Status
+### Security Status
 
-**✅ SECURITY POSTURE: PRODUCTION-READY**
-- All critical security vulnerabilities resolved
-- Enterprise-grade secret management implemented
-- OAuth 2.1 and OIDC security compliance validated
-- Independent security assessment completed
+**⚠️ SECURITY POSTURE: DEVELOPMENT USE ONLY**
+- No security vulnerabilities assessment
+- No penetration testing performed
+- OAuth 2.1 and OIDC compliance not certified
+- No independent security review
 
 ## 🔐 Authentication Security
 
