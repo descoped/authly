@@ -37,6 +37,8 @@ services:
     # Use image from GitHub Container Registry if available, otherwise build locally
     image: ${CONFORMANCE_IMAGE:-ghcr.io/descoped/oidc-conformance-suite:latest}
     container_name: tck-server
+    ports:
+      - "9999:9999"  # Conformance suite API port
     environment:
       - JAVA_OPTS=-Xmx2g -XX:MaxMetaspaceSize=512m
       - BASE_URL=https://localhost.emobix.co.uk:8443

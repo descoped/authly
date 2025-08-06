@@ -134,16 +134,28 @@ jobs:
           # Start the TCK conformance suite stack using CI compose file
           cd tck
           docker compose -f docker-compose-tck-ci.yml up -d
+          cd ..
+          
+          # Give services a moment to start
+          sleep 5
           
           # Wait for Authly to be healthy (max 60 seconds)
           echo "⏳ Waiting for Authly to be healthy..."
-          timeout 60 bash -c 'until curl -f http://localhost:8000/health; do sleep 2; done'
-          echo "✅ Authly is healthy"
+          timeout 60 bash -c 'until curl -sf http://localhost:8000/health > /dev/null 2>&1; do echo -n "."; sleep 2; done'
+          echo " ✅ Authly is healthy"
           
-          # Wait for conformance suite to be ready (max 90 seconds)
-          echo "⏳ Waiting for conformance suite to be ready..."
-          timeout 90 bash -c 'until curl -fk https://localhost:8443; do sleep 2; done'
-          echo "✅ Conformance suite is ready"
+          # Wait for conformance suite containers to be running
+          echo "⏳ Waiting for conformance suite containers..."
+          timeout 30 bash -c 'until docker ps | grep -q tck-httpd && docker ps | grep -q tck-server; do echo -n "."; sleep 2; done'
+          echo " ✅ Containers are running"
+          
+          # Additional wait for services to be fully ready
+          sleep 10
+          echo "✅ All services should be ready"
+          
+          # Show running containers for debugging
+          echo "🐳 Running containers:"
+          docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
       
       - name: Set up Python
         uses: actions/setup-python@v5
