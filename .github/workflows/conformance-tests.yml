@@ -105,9 +105,24 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           
+      - name: Checkout Conformance Suite Resources
+        uses: actions/checkout@v4
+        with:
+          repository: openid-certification/conformance-suite
+          path: tck/conformance-suite
+          ref: ${{ steps.conformance-tag.outputs.tag }}
+          sparse-checkout: |
+            src/main/resources/
+          
+      - name: Build Authly from Sources
+        run: |
+          # Build Authly image from latest sources
+          echo "🔨 Building Authly Docker image from sources..."
+          docker compose build authly
+          
       - name: Start Authly and TCK Stack
         run: |
-          # First start the main Authly stack
+          # Start the main Authly stack (using freshly built image)
           docker compose up -d
           
           # Create network if it doesn't exist
@@ -121,10 +136,14 @@ jobs:
           docker compose -f docker-compose-tck-ci.yml up -d
           
           # Wait for Authly to be healthy (max 60 seconds)
+          echo "⏳ Waiting for Authly to be healthy..."
           timeout 60 bash -c 'until curl -f http://localhost:8000/health; do sleep 2; done'
+          echo "✅ Authly is healthy"
           
           # Wait for conformance suite to be ready (max 90 seconds)
+          echo "⏳ Waiting for conformance suite to be ready..."
           timeout 90 bash -c 'until curl -fk https://localhost:8443; do sleep 2; done'
+          echo "✅ Conformance suite is ready"
       
       - name: Set up Python
         uses: actions/setup-python@v5

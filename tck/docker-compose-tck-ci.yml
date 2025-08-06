@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # =================================================================
   # CONFORMANCE SUITE SERVICES (CI Mode with pre-built image)
@@ -22,7 +20,7 @@ services:
   # Conformance suite HTTPS server
   tck-httpd:
     build:
-      context: ./conformance-suite/httpd
+      context: ./httpd-ci
       dockerfile: Dockerfile
     container_name: tck-httpd
     ports:
