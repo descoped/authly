@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  # MongoDB for conformance suite storage
+  conformance-mongo:
+    image: mongo:6.0.13
+    container_name: tck-conformance-mongo
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: admin
+      MONGO_INITDB_DATABASE: test_suite
+    volumes:
+      - conformance_mongo_data:/data/db
+    networks:
+      - tck-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Conformance suite server (will use built JAR)
+  conformance-server:
+    image: eclipse-temurin:17-jre
+    container_name: tck-conformance-server
+    volumes:
+      - ../conformance-suite/target:/server
+    environment:
+      - BASE_URL=https://localhost:8443
+      - MONGODB_HOST=conformance-mongo
+      - JAVA_OPTS=-Xmx2g -XX:MaxMetaspaceSize=512m
+    command: >
+      java
+      -jar /server/fapi-test-suite.jar
+      -Djdk.tls.maxHandshakeMessageSize=65536
+      --fintechlabs.base_url=https://localhost:8443
+      --spring.data.mongodb.uri=mongodb://admin:admin@conformance-mongo:27017/test_suite?authSource=admin
+      --fintechlabs.devmode=true
+    ports:
+      - "9999:9999"  # Default conformance suite port
+    networks:
+      - tck-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      conformance-mongo:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9999/api/runner/available"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Simple HTTPS proxy with self-signed cert
+  conformance-nginx:
+    image: nginx:alpine
+    container_name: tck-conformance-nginx
+    ports:
+      - "8443:8443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+    networks:
+      - tck-network
+    depends_on:
+      - conformance-server
+
+volumes:
+  conformance_mongo_data:
+    driver: local
+
+networks:
+  tck-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16

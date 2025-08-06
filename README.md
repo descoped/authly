@@ -260,6 +260,24 @@ See the [Redis Integration Guide](docs/redis-integration.md) for complete config
 - **Security Testing** - Authentication, authorization, and validation
 - **API Testing** - All endpoints with comprehensive scenarios
 
+### **OIDC Conformance Testing**
+Authly includes integration with the official OpenID Foundation conformance suite:
+```bash
+# Start Authly with integrated conformance suite
+./scripts/start-with-tck.sh
+
+# Access conformance suite at https://localhost:8443
+# Run tests against http://localhost:8000
+```
+
+The TCK (Technology Compatibility Kit) validates:
+- OpenID Connect Core 1.0 compliance
+- OAuth 2.1 authorization flows with PKCE
+- Token validation and session management
+- All required OIDC endpoints and claims
+
+See [TCK Documentation](tck/README.md) for detailed conformance testing instructions.
+
 ### **Test Organization**
 Tests are organized by feature domains for better clarity and parallel execution:
 - **`auth_user_journey/`** - Core authentication lifecycle (8 test files)

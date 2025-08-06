@@ -1,0 +1,172 @@
+{
+  "test_profiles": {
+    "basic": {
+      "name": "OpenID Connect Core: Basic Certification Profile",
+      "description": "Basic OpenID Connect certification profile with authorization code flow",
+      "plan_name": "oidcc-basic-certification-test-plan",
+      "configuration": {
+        "client": {
+          "client_id": "oidc-conformance-test",
+          "client_secret": "conformance-test-secret-change-in-production",
+          "redirect_uri": "https://localhost:8443/test/a/authly/callback"
+        },
+        "server": {
+          "issuer": "http://localhost:8000",
+          "discovery_url": "http://localhost:8000/.well-known/openid_configuration"
+        },
+        "test_config": {
+          "skip_heart_beat_tests": false,
+          "description": "Basic OIDC compliance test for Authly",
+          "alias": "authly-basic",
+          "client_auth_type": "client_secret_basic",
+          "response_type": "code",
+          "response_mode": "default",
+          "request_type": "plain_http_request"
+        }
+      },
+      "expected_tests": [
+        "oidcc-server-rotate-keys",
+        "oidcc-ensure-request-without-nonce-succeeds",
+        "oidcc-ensure-request-with-unknown-parameter-succeeds",
+        "oidcc-ensure-redirect-uri-parameter-added-per-rfc6749",
+        "oidcc-codereuse",
+        "oidcc-codereuse-30seconds",
+        "oidcc-unsigned-request-object-supported-correctly-or-rejected-as-unsupported",
+        "oidcc-request-with-multiple-aud-succeeds",
+        "oidcc-response-type-missing",
+        "oidcc-scope-not-supported",
+        "oidcc-ensure-request-with-valid-pkce-succeeds",
+        "oidcc-ensure-request-without-pkce-fails"
+      ]
+    },
+    "implicit": {
+      "name": "OpenID Connect Core: Implicit Certification Profile",
+      "description": "Implicit flow certification (legacy)",
+      "plan_name": "oidcc-implicit-certification-test-plan",
+      "configuration": {
+        "client": {
+          "client_id": "oidc-conformance-test",
+          "redirect_uri": "https://localhost:8443/test/a/authly/callback/implicit"
+        },
+        "server": {
+          "issuer": "http://localhost:8000",
+          "discovery_url": "http://localhost:8000/.well-known/openid_configuration"
+        },
+        "test_config": {
+          "response_type": "id_token token",
+          "response_mode": "fragment"
+        }
+      }
+    },
+    "hybrid": {
+      "name": "OpenID Connect Core: Hybrid Certification Profile",
+      "description": "Hybrid flow certification",
+      "plan_name": "oidcc-hybrid-certification-test-plan",
+      "configuration": {
+        "client": {
+          "client_id": "oidc-conformance-test",
+          "client_secret": "conformance-test-secret-change-in-production",
+          "redirect_uri": "https://localhost:8443/test/a/authly/callback/hybrid"
+        },
+        "server": {
+          "issuer": "http://localhost:8000",
+          "discovery_url": "http://localhost:8000/.well-known/openid_configuration"
+        },
+        "test_config": {
+          "response_type": "code id_token",
+          "response_mode": "fragment"
+        }
+      }
+    },
+    "session_management": {
+      "name": "OpenID Connect Session Management",
+      "description": "Session management and logout flows",
+      "plan_name": "oidcc-session-management-test-plan",
+      "configuration": {
+        "client": {
+          "client_id": "oidc-conformance-test",
+          "client_secret": "conformance-test-secret-change-in-production",
+          "redirect_uri": "https://localhost:8443/test/a/authly/callback",
+          "post_logout_redirect_uri": "https://localhost:8443/test/a/authly/post_logout_callback"
+        },
+        "server": {
+          "issuer": "http://localhost:8000",
+          "discovery_url": "http://localhost:8000/.well-known/openid_configuration",
+          "check_session_iframe": "http://localhost:8000/oidc/session/iframe",
+          "end_session_endpoint": "http://localhost:8000/oidc/logout"
+        }
+      },
+      "expected_tests": [
+        "oidcc-session-management-discovery",
+        "oidcc-session-management-check-session-iframe",
+        "oidcc-session-management-logout"
+      ]
+    },
+    "frontchannel_logout": {
+      "name": "OpenID Connect Front-Channel Logout",
+      "description": "Front-channel logout implementation",
+      "plan_name": "oidcc-frontchannel-logout-test-plan",
+      "configuration": {
+        "client": {
+          "client_id": "oidc-conformance-test",
+          "client_secret": "conformance-test-secret-change-in-production",
+          "redirect_uri": "https://localhost:8443/test/a/authly/callback",
+          "frontchannel_logout_uri": "https://localhost:8443/test/a/authly/frontchannel_logout",
+          "frontchannel_logout_session_required": true
+        },
+        "server": {
+          "issuer": "http://localhost:8000",
+          "discovery_url": "http://localhost:8000/.well-known/openid_configuration"
+        }
+      }
+    },
+    "refresh_token": {
+      "name": "OpenID Connect Refresh Token",
+      "description": "Refresh token and offline access",
+      "plan_name": "oidcc-refresh-token-test-plan",
+      "configuration": {
+        "client": {
+          "client_id": "oidc-conformance-test",
+          "client_secret": "conformance-test-secret-change-in-production",
+          "redirect_uri": "https://localhost:8443/test/a/authly/callback",
+          "scope": "openid profile offline_access"
+        },
+        "server": {
+          "issuer": "http://localhost:8000",
+          "discovery_url": "http://localhost:8000/.well-known/openid_configuration"
+        }
+      }
+    },
+    "userinfo": {
+      "name": "OpenID Connect UserInfo Endpoint",
+      "description": "UserInfo endpoint validation",
+      "plan_name": "oidcc-userinfo-test-plan",
+      "configuration": {
+        "client": {
+          "client_id": "oidc-conformance-test",
+          "client_secret": "conformance-test-secret-change-in-production",
+          "redirect_uri": "https://localhost:8443/test/a/authly/callback",
+          "scope": "openid profile email phone address"
+        },
+        "server": {
+          "issuer": "http://localhost:8000",
+          "discovery_url": "http://localhost:8000/.well-known/openid_configuration",
+          "userinfo_endpoint": "http://localhost:8000/oidc/userinfo"
+        }
+      },
+      "expected_tests": [
+        "oidcc-userinfo-get",
+        "oidcc-userinfo-post-body",
+        "oidcc-userinfo-post-header",
+        "oidcc-userinfo-invalid-token",
+        "oidcc-userinfo-scope-claims"
+      ]
+    }
+  },
+  "test_suites": {
+    "core": ["basic", "userinfo", "refresh_token"],
+    "advanced": ["implicit", "hybrid"],
+    "session": ["session_management", "frontchannel_logout"],
+    "all": ["basic", "implicit", "hybrid", "session_management", "frontchannel_logout", "refresh_token", "userinfo"]
+  }
+}

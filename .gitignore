@@ -185,3 +185,6 @@ remove-docs/
 docker-compose/nginx/ssl/*.pem
 docker-compose/nginx/ssl/*.key
 docker-compose/nginx/ssl/*.crt
+
+#/tck/conformance-suite/
+
