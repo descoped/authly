@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   # =================================================================
-  # CONFORMANCE SUITE SERVICES
+  # CONFORMANCE SUITE SERVICES (CI Mode with pre-built image)
   # =================================================================
   
   # MongoDB for conformance suite storage
@@ -34,27 +34,16 @@ services:
     depends_on:
       - tck-server
 
-  # Conformance suite server 
-  # Dual mode support:
-  # - Local development: builds from ./conformance-suite/server-dev if CONFORMANCE_IMAGE is not set
-  # - CI/Production: uses pre-built image from CONFORMANCE_IMAGE environment variable
+  # Conformance suite server (using pre-built image from GitHub Packages)
   tck-server:
-    build:
-      context: ${BUILD_CONTEXT:-./conformance-suite/server-dev}
-      dockerfile: ${DOCKERFILE:-Dockerfile}
-    image: ${CONFORMANCE_IMAGE:-tck-server:local}
+    # Use image from GitHub Container Registry if available, otherwise build locally
+    image: ${CONFORMANCE_IMAGE:-ghcr.io/descoped/oidc-conformance-suite:latest}
     container_name: tck-server
-    volumes:
-      - ${JAR_VOLUME:-./conformance-suite/target/}:/server/:ro
     environment:
       - JAVA_OPTS=-Xmx2g -XX:MaxMetaspaceSize=512m
-    command: >
-      java
-      -jar /server/fapi-test-suite.jar
-      -Djdk.tls.maxHandshakeMessageSize=65536
-      --fintechlabs.base_url=https://localhost.emobix.co.uk:8443
-      --fintechlabs.devmode=true
-      --fintechlabs.startredir=true
+      - BASE_URL=https://localhost.emobix.co.uk:8443
+      - DEVMODE=true
+      - STARTREDIR=true
     networks:
       - authly-network
     extra_hosts:
@@ -68,13 +57,6 @@ services:
         max-size: "500k"
         max-file: "5"
 
-  # =================================================================
-  # AUTHLY SERVICES (extends from main docker-compose)
-  # =================================================================
-  
-  # These services are defined in the main docker-compose files
-  # and are extended here to add the TCK network
-  
 networks:
   authly-network:
     external: true

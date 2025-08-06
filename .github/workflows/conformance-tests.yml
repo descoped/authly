@@ -1,38 +1,130 @@
-name: OIDC Conformance Tests
+name: OIDC Spec Validation
+
+# This workflow validates OIDC/OAuth specification compliance
+# using a lightweight Python validator script
 
 on:
   push:
-    branches: [master, main]
+    branches: [master]
     paths:
       - 'src/**'
       - 'tck/**'
       - '.github/workflows/conformance-tests.yml'
   pull_request:
-    branches: [master, main]
+    branches: [master]
     paths:
       - 'src/**'
       - 'tck/**'
-  schedule:
-    # Run nightly at 2 AM UTC
-    - cron: '0 2 * * *'
   workflow_dispatch:
 
 jobs:
   conformance-validation:
-    name: OIDC Spec Conformance (90% Target)
+    name: OIDC Spec Conformance Check (90% Target)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     
     steps:
+      # This job validates OIDC compliance using a Python script that checks:
+      # - Discovery endpoint format and required fields
+      # - JWKS endpoint and key validation
+      # - Token endpoint error responses
+      # - Security requirements (PKCE, algorithms, etc.)
+      
       - name: Checkout code
         uses: actions/checkout@v4
       
-      - name: Start Authly Stack
+      - name: Get Conformance Suite Latest Tag
+        id: conformance-tag
         run: |
+          # Get the latest tag from the conformance suite repository
+          LATEST_TAG=$(curl -s https://api.github.com/repos/openid-certification/conformance-suite/tags | jq -r '.[0].name // "master"')
+          echo "tag=${LATEST_TAG}" >> $GITHUB_OUTPUT
+          echo "Using conformance suite tag: ${LATEST_TAG}"
+      
+      - name: Check if Image Exists
+        id: check-image
+        run: |
+          # Check if the image already exists in GitHub Container Registry
+          TAG="${{ steps.conformance-tag.outputs.tag }}"
+          IMAGE="ghcr.io/${{ github.repository_owner }}/oidc-conformance-suite:${TAG}"
+          
+          if docker manifest inspect ${IMAGE} > /dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "Image ${IMAGE} already exists"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "Image ${IMAGE} does not exist, will build"
+          fi
+      
+      - name: Checkout OIDC Conformance Suite
+        if: steps.check-image.outputs.exists == 'false'
+        uses: actions/checkout@v4
+        with:
+          repository: openid-certification/conformance-suite
+          path: tck/conformance-suite
+          ref: ${{ steps.conformance-tag.outputs.tag }}
+      
+      - name: Set up Java
+        if: steps.check-image.outputs.exists == 'false'
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      
+      - name: Build Conformance Suite JAR
+        if: steps.check-image.outputs.exists == 'false'
+        run: |
+          cd tck/conformance-suite
+          # Build the conformance suite JAR file
+          mvn clean package -DskipTests
+      
+      - name: Set up Docker Buildx
+        if: steps.check-image.outputs.exists == 'false'
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Log in to GitHub Container Registry
+        if: steps.check-image.outputs.exists == 'false'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Build and Push Conformance Suite Image
+        if: steps.check-image.outputs.exists == 'false'
+        uses: docker/build-push-action@v5
+        with:
+          context: ./tck
+          file: ./tck/conformance-suite-production/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/oidc-conformance-suite:${{ steps.conformance-tag.outputs.tag }}
+            ghcr.io/${{ github.repository_owner }}/oidc-conformance-suite:latest
+          build-args: |
+            VERSION=${{ steps.conformance-tag.outputs.tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          
+      - name: Start Authly and TCK Stack
+        run: |
+          # First start the main Authly stack
           docker compose up -d
           
-          # Wait for Authly to be healthy
+          # Create network if it doesn't exist
+          docker network create authly_default || true
+          
+          # Set the conformance image to use
+          export CONFORMANCE_IMAGE="ghcr.io/${{ github.repository_owner }}/oidc-conformance-suite:${{ steps.conformance-tag.outputs.tag }}"
+          
+          # Start the TCK conformance suite stack using CI compose file
+          cd tck
+          docker compose -f docker-compose-tck-ci.yml up -d
+          
+          # Wait for Authly to be healthy (max 60 seconds)
           timeout 60 bash -c 'until curl -f http://localhost:8000/health; do sleep 2; done'
+          
+          # Wait for conformance suite to be ready (max 90 seconds)
+          timeout 90 bash -c 'until curl -fk https://localhost:8443; do sleep 2; done'
       
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -41,19 +133,22 @@ jobs:
       
       - name: Install Dependencies
         run: |
+          # Install Python packages needed for the validator script
           pip install requests urllib3 pyjwt
       
       - name: Run Conformance Validator
         id: validate
         run: |
           cd tck
+          # Run the OIDC spec compliance validator
+          # This checks discovery, JWKS, token formats, and security requirements
           python scripts/conformance-validator.py
         continue-on-error: true
       
       - name: Check Compliance Level
         run: |
           cd tck
-          # Extract compliance percentage from report
+          # Extract compliance percentage from the report
           COMPLIANCE=$(grep "checks passed" reports/latest/SPECIFICATION_CONFORMANCE.md | grep -oE "[0-9]+%" | head -1 | tr -d '%')
           
           echo "## 📊 OIDC Conformance Results" >> $GITHUB_STEP_SUMMARY
@@ -69,7 +164,6 @@ jobs:
             echo "COMPLIANCE_MET=false" >> $GITHUB_ENV
           fi
           
-          # Add summary details
           echo "### Category Scores" >> $GITHUB_STEP_SUMMARY
           grep "Category Score:" conformance-reports/SPECIFICATION_CONFORMANCE.md >> $GITHUB_STEP_SUMMARY || true
       
@@ -82,46 +176,15 @@ jobs:
             tck/conformance-reports/SPECIFICATION_CONFORMANCE.md
             tck/conformance-reports/conformance_results.json
       
-      - name: Comment on PR
-        if: github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const report = fs.readFileSync('tck/conformance-reports/SPECIFICATION_CONFORMANCE.md', 'utf8');
-            
-            // Extract key metrics
-            const complianceMatch = report.match(/(\d+)\/(\d+) checks passed \((\d+)%\)/);
-            const passed = complianceMatch ? complianceMatch[1] : '?';
-            const total = complianceMatch ? complianceMatch[2] : '?';
-            const percentage = complianceMatch ? complianceMatch[3] : '?';
-            
-            const comment = `## 🧪 OIDC Conformance Test Results
-            
-            **Overall Compliance: ${percentage}% (${passed}/${total} checks)**
-            
-            ${percentage >= 90 ? '✅ Meets 90% target' : '❌ Below 90% target'}
-            
-            <details>
-            <summary>View Detailed Report</summary>
-            
-            \`\`\`
-            ${report.substring(0, 2000)}...
-            \`\`\`
-            
-            [Download full report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
-            </details>`;
-            
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: comment
-            });
-      
       - name: Stop Services
         if: always()
         run: |
+          # Stop TCK conformance suite stack
+          cd tck
+          docker compose -f docker-compose-tck-ci.yml down || true
+          cd ..
+          
+          # Stop Authly stack
           docker compose down
       
       - name: Exit Status
