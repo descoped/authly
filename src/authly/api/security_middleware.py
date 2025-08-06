@@ -13,7 +13,7 @@ This middleware provides comprehensive security headers including:
 
 import logging
 import os
-from typing import Callable, Dict, Optional
+from collections.abc import Callable
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -42,11 +42,11 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         hsts_max_age: int = 31536000,  # 1 year
         hsts_include_subdomains: bool = True,
         hsts_preload: bool = True,
-        csp_policy: Optional[str] = None,
+        csp_policy: str | None = None,
         frame_options: str = "DENY",
         referrer_policy: str = "strict-origin-when-cross-origin",
-        permissions_policy: Optional[str] = None,
-        custom_headers: Optional[Dict[str, str]] = None,
+        permissions_policy: str | None = None,
+        custom_headers: dict[str, str] | None = None,
     ):
         super().__init__(app)
         self.hsts_max_age = hsts_max_age
@@ -231,7 +231,7 @@ def setup_security_middleware(app, **kwargs):
 
 
 # Environment variable configuration helpers
-def get_security_config() -> Dict[str, str]:
+def get_security_config() -> dict[str, str]:
     """
     Get security configuration from environment variables.
 

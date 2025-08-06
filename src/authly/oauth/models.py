@@ -1,6 +1,5 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import List, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -87,15 +86,15 @@ class OAuthClientModel(BaseModel):
 
     id: UUID
     client_id: str = Field(..., min_length=1, max_length=255)
-    client_secret_hash: Optional[str] = Field(None, max_length=255)  # NULL for public clients
+    client_secret_hash: str | None = Field(None, max_length=255)  # NULL for public clients
     client_name: str = Field(..., min_length=1, max_length=255)
     client_type: ClientType
-    redirect_uris: List[str] = Field(..., min_items=1)  # At least one redirect URI required
-    grant_types: List[GrantType] = Field(default=[GrantType.AUTHORIZATION_CODE, GrantType.REFRESH_TOKEN])
-    response_types: List[ResponseType] = Field(default=[ResponseType.CODE])
-    scope: Optional[str] = None  # Default scopes (space-separated)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    redirect_uris: list[str] = Field(..., min_items=1)  # At least one redirect URI required
+    grant_types: list[GrantType] = Field(default=[GrantType.AUTHORIZATION_CODE, GrantType.REFRESH_TOKEN])
+    response_types: list[ResponseType] = Field(default=[ResponseType.CODE])
+    scope: str | None = None  # Default scopes (space-separated)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     is_active: bool = True
 
     # OAuth 2.1 specific fields
@@ -103,31 +102,31 @@ class OAuthClientModel(BaseModel):
     token_endpoint_auth_method: TokenEndpointAuthMethod = TokenEndpointAuthMethod.CLIENT_SECRET_BASIC
 
     # Additional metadata
-    client_uri: Optional[str] = None  # Homepage of the client
-    logo_uri: Optional[str] = None  # Logo for consent screen
-    tos_uri: Optional[str] = None  # Terms of service
-    policy_uri: Optional[str] = None  # Privacy policy
-    jwks_uri: Optional[str] = None  # JSON Web Key Set URI
-    software_id: Optional[str] = Field(None, max_length=255)
-    software_version: Optional[str] = Field(None, max_length=50)
+    client_uri: str | None = None  # Homepage of the client
+    logo_uri: str | None = None  # Logo for consent screen
+    tos_uri: str | None = None  # Terms of service
+    policy_uri: str | None = None  # Privacy policy
+    jwks_uri: str | None = None  # JSON Web Key Set URI
+    software_id: str | None = Field(None, max_length=255)
+    software_version: str | None = Field(None, max_length=50)
 
     # OpenID Connect specific fields
     id_token_signed_response_alg: IDTokenSigningAlgorithm = IDTokenSigningAlgorithm.RS256
     subject_type: SubjectType = SubjectType.PUBLIC
-    sector_identifier_uri: Optional[str] = None  # For pairwise subject types
+    sector_identifier_uri: str | None = None  # For pairwise subject types
     require_auth_time: bool = False  # Whether auth_time claim is required in ID tokens
-    default_max_age: Optional[int] = None  # Default max_age for authentication
-    initiate_login_uri: Optional[str] = None  # URI for third-party initiated login
-    request_uris: List[str] = Field(default_factory=list)  # Pre-registered request URIs
+    default_max_age: int | None = None  # Default max_age for authentication
+    initiate_login_uri: str | None = None  # URI for third-party initiated login
+    request_uris: list[str] = Field(default_factory=list)  # Pre-registered request URIs
 
     # OIDC Client Registration fields
     application_type: str = "web"  # "web" or "native"
-    contacts: List[str] = Field(default_factory=list)  # Contact email addresses
-    client_name_localized: Optional[dict] = None  # Localized client names
-    logo_uri_localized: Optional[dict] = None  # Localized logo URIs
-    client_uri_localized: Optional[dict] = None  # Localized client URIs
-    policy_uri_localized: Optional[dict] = None  # Localized policy URIs
-    tos_uri_localized: Optional[dict] = None  # Localized ToS URIs
+    contacts: list[str] = Field(default_factory=list)  # Contact email addresses
+    client_name_localized: dict | None = None  # Localized client names
+    logo_uri_localized: dict | None = None  # Localized logo URIs
+    client_uri_localized: dict | None = None  # Localized client URIs
+    policy_uri_localized: dict | None = None  # Localized policy URIs
+    tos_uri_localized: dict | None = None  # Localized ToS URIs
 
     def is_public_client(self) -> bool:
         """Check if this is a public client (no secret required)"""
@@ -156,7 +155,7 @@ class OAuthClientModel(BaseModel):
         scopes = self.scope.split()
         return "openid" in scopes
 
-    def get_oidc_scopes(self) -> List[str]:
+    def get_oidc_scopes(self) -> list[str]:
         """Get OIDC-specific scopes for this client"""
         if not self.scope:
             return []
@@ -170,10 +169,10 @@ class OAuthScopeModel(BaseModel):
 
     id: UUID
     scope_name: str = Field(..., min_length=1, max_length=255)
-    description: Optional[str] = None
+    description: str | None = None
     is_default: bool = False  # Whether this scope is granted by default
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     is_active: bool = True
 
 
@@ -183,7 +182,7 @@ class OAuthClientScopeModel(BaseModel):
     id: UUID
     client_id: UUID
     scope_id: UUID
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class OAuthAuthorizationCodeModel(BaseModel):
@@ -194,10 +193,10 @@ class OAuthAuthorizationCodeModel(BaseModel):
     client_id: UUID
     user_id: UUID
     redirect_uri: str = Field(..., min_length=1)
-    scope: Optional[str] = None  # Granted scopes (space-separated)
+    scope: str | None = None  # Granted scopes (space-separated)
     expires_at: datetime
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    used_at: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    used_at: datetime | None = None
     is_used: bool = False
 
     # PKCE fields (OAuth 2.1 requirement)
@@ -205,20 +204,20 @@ class OAuthAuthorizationCodeModel(BaseModel):
     code_challenge_method: CodeChallengeMethod = CodeChallengeMethod.S256
 
     # OpenID Connect parameters
-    nonce: Optional[str] = Field(None, max_length=255)  # OpenID Connect nonce
-    state: Optional[str] = Field(None, max_length=255)  # CSRF protection
-    response_mode: Optional[ResponseMode] = Field(None)  # Response mode
-    display: Optional[Display] = Field(None)  # Display preference
-    prompt: Optional[Prompt] = Field(None)  # Prompt parameter
-    max_age: Optional[int] = Field(None)  # Maximum authentication age
-    ui_locales: Optional[str] = Field(None, max_length=255)  # UI locales
-    id_token_hint: Optional[str] = Field(None, max_length=2048)  # ID token hint
-    login_hint: Optional[str] = Field(None, max_length=255)  # Login hint
-    acr_values: Optional[str] = Field(None, max_length=255)  # ACR values
+    nonce: str | None = Field(None, max_length=255)  # OpenID Connect nonce
+    state: str | None = Field(None, max_length=255)  # CSRF protection
+    response_mode: ResponseMode | None = Field(None)  # Response mode
+    display: Display | None = Field(None)  # Display preference
+    prompt: Prompt | None = Field(None)  # Prompt parameter
+    max_age: int | None = Field(None)  # Maximum authentication age
+    ui_locales: str | None = Field(None, max_length=255)  # UI locales
+    id_token_hint: str | None = Field(None, max_length=2048)  # ID token hint
+    login_hint: str | None = Field(None, max_length=255)  # Login hint
+    acr_values: str | None = Field(None, max_length=255)  # ACR values
 
     def is_expired(self) -> bool:
         """Check if the authorization code has expired"""
-        return datetime.now(timezone.utc) > self.expires_at
+        return datetime.now(UTC) > self.expires_at
 
     def is_valid(self) -> bool:
         """Check if the authorization code is valid (not used and not expired)"""
@@ -237,7 +236,7 @@ class OAuthTokenScopeModel(BaseModel):
     id: UUID
     token_id: UUID
     scope_id: UUID
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 # Request/Response models for API endpoints
@@ -248,31 +247,31 @@ class OAuthClientCreateRequest(BaseModel):
 
     client_name: str = Field(..., min_length=1, max_length=255)
     client_type: ClientType
-    redirect_uris: List[str] = Field(..., min_items=1)
-    scope: Optional[str] = None
-    grant_types: Optional[List[GrantType]] = None
-    response_types: Optional[List[ResponseType]] = None
+    redirect_uris: list[str] = Field(..., min_items=1)
+    scope: str | None = None
+    grant_types: list[GrantType] | None = None
+    response_types: list[ResponseType] | None = None
     require_pkce: bool = True
-    token_endpoint_auth_method: Optional[TokenEndpointAuthMethod] = None
+    token_endpoint_auth_method: TokenEndpointAuthMethod | None = None
 
     # Metadata
-    client_uri: Optional[str] = None
-    logo_uri: Optional[str] = None
-    tos_uri: Optional[str] = None
-    policy_uri: Optional[str] = None
-    software_id: Optional[str] = None
-    software_version: Optional[str] = None
+    client_uri: str | None = None
+    logo_uri: str | None = None
+    tos_uri: str | None = None
+    policy_uri: str | None = None
+    software_id: str | None = None
+    software_version: str | None = None
 
     # OpenID Connect specific fields
-    id_token_signed_response_alg: Optional[IDTokenSigningAlgorithm] = None
-    subject_type: Optional[SubjectType] = None
-    sector_identifier_uri: Optional[str] = None
+    id_token_signed_response_alg: IDTokenSigningAlgorithm | None = None
+    subject_type: SubjectType | None = None
+    sector_identifier_uri: str | None = None
     require_auth_time: bool = False
-    default_max_age: Optional[int] = None
-    initiate_login_uri: Optional[str] = None
-    request_uris: Optional[List[str]] = None
-    application_type: Optional[str] = None
-    contacts: Optional[List[str]] = None
+    default_max_age: int | None = None
+    initiate_login_uri: str | None = None
+    request_uris: list[str] | None = None
+    application_type: str | None = None
+    contacts: list[str] | None = None
 
 
 class OAuthClientResponse(BaseModel):
@@ -282,10 +281,10 @@ class OAuthClientResponse(BaseModel):
     client_id: str
     client_name: str
     client_type: ClientType
-    redirect_uris: List[str]
-    grant_types: List[GrantType]
-    response_types: List[ResponseType]
-    scope: Optional[str]
+    redirect_uris: list[str]
+    grant_types: list[GrantType]
+    response_types: list[ResponseType]
+    scope: str | None
     created_at: datetime
     updated_at: datetime
     is_active: bool
@@ -293,30 +292,30 @@ class OAuthClientResponse(BaseModel):
     token_endpoint_auth_method: TokenEndpointAuthMethod
 
     # Metadata (excluding sensitive info like client_secret_hash)
-    client_uri: Optional[str]
-    logo_uri: Optional[str]
-    tos_uri: Optional[str]
-    policy_uri: Optional[str]
-    software_id: Optional[str]
-    software_version: Optional[str]
+    client_uri: str | None
+    logo_uri: str | None
+    tos_uri: str | None
+    policy_uri: str | None
+    software_id: str | None
+    software_version: str | None
 
     # OpenID Connect specific fields
     id_token_signed_response_alg: IDTokenSigningAlgorithm = IDTokenSigningAlgorithm.RS256
     subject_type: SubjectType = SubjectType.PUBLIC
-    sector_identifier_uri: Optional[str] = None
+    sector_identifier_uri: str | None = None
     require_auth_time: bool = False
-    default_max_age: Optional[int] = None
-    initiate_login_uri: Optional[str] = None
-    request_uris: List[str] = Field(default_factory=list)
+    default_max_age: int | None = None
+    initiate_login_uri: str | None = None
+    request_uris: list[str] = Field(default_factory=list)
     application_type: str = "web"
-    contacts: List[str] = Field(default_factory=list)
+    contacts: list[str] = Field(default_factory=list)
 
 
 class OAuthClientCredentialsResponse(BaseModel):
     """Response model for OAuth client credentials (only returned once)"""
 
     client_id: str
-    client_secret: Optional[str] = None  # Only for confidential clients
+    client_secret: str | None = None  # Only for confidential clients
     client_type: ClientType
     client_name: str  # Added for test compatibility
 
@@ -339,37 +338,35 @@ class OAuthAuthorizationRequest(BaseModel):
     )
 
     # Optional parameters
-    scope: Optional[str] = Field(None, description="Requested scopes (space-separated)")
-    state: Optional[str] = Field(None, max_length=255, description="CSRF protection parameter")
+    scope: str | None = Field(None, description="Requested scopes (space-separated)")
+    state: str | None = Field(None, max_length=255, description="CSRF protection parameter")
 
     # OpenID Connect specific parameters
-    nonce: Optional[str] = Field(None, max_length=255, description="OpenID Connect nonce for ID token binding")
-    response_mode: Optional[ResponseMode] = Field(None, description="How the authorization response should be returned")
-    display: Optional[Display] = Field(
-        None, description="How the authorization server displays authentication interface"
-    )
-    prompt: Optional[Prompt] = Field(None, description="Whether to prompt for re-authentication/consent")
-    max_age: Optional[int] = Field(None, ge=0, description="Maximum authentication age in seconds")
-    ui_locales: Optional[str] = Field(None, max_length=255, description="Preferred UI languages (space-separated)")
-    id_token_hint: Optional[str] = Field(
+    nonce: str | None = Field(None, max_length=255, description="OpenID Connect nonce for ID token binding")
+    response_mode: ResponseMode | None = Field(None, description="How the authorization response should be returned")
+    display: Display | None = Field(None, description="How the authorization server displays authentication interface")
+    prompt: Prompt | None = Field(None, description="Whether to prompt for re-authentication/consent")
+    max_age: int | None = Field(None, ge=0, description="Maximum authentication age in seconds")
+    ui_locales: str | None = Field(None, max_length=255, description="Preferred UI languages (space-separated)")
+    id_token_hint: str | None = Field(
         None, max_length=2048, description="ID token hint for logout or re-authentication"
     )
-    login_hint: Optional[str] = Field(None, max_length=255, description="Hint to identify the user for authentication")
-    acr_values: Optional[str] = Field(None, max_length=255, description="Authentication Context Class Reference values")
+    login_hint: str | None = Field(None, max_length=255, description="Hint to identify the user for authentication")
+    acr_values: str | None = Field(None, max_length=255, description="Authentication Context Class Reference values")
 
-    def get_scope_list(self) -> List[str]:
+    def get_scope_list(self) -> list[str]:
         """Convert space-separated scopes to list"""
         if not self.scope:
             return []
         return self.scope.split()
 
-    def get_ui_locales_list(self) -> List[str]:
+    def get_ui_locales_list(self) -> list[str]:
         """Convert space-separated UI locales to list"""
         if not self.ui_locales:
             return []
         return self.ui_locales.split()
 
-    def get_acr_values_list(self) -> List[str]:
+    def get_acr_values_list(self) -> list[str]:
         """Convert space-separated ACR values to list"""
         if not self.acr_values:
             return []
@@ -396,23 +393,20 @@ class OAuthAuthorizationRequest(BaseModel):
             return True
 
         # max_age must be non-negative if provided
-        if self.max_age is not None and self.max_age < 0:
-            return False
-
-        return True
+        return not (self.max_age is not None and self.max_age < 0)
 
 
 class OAuthAuthorizationResponse(BaseModel):
     """OAuth 2.1 Authorization Response Model (RFC 6749 Section 4.1.2)"""
 
     # Success response
-    code: Optional[str] = Field(None, description="Authorization code")
-    state: Optional[str] = Field(None, description="State parameter from request")
+    code: str | None = Field(None, description="Authorization code")
+    state: str | None = Field(None, description="State parameter from request")
 
     # Error response (RFC 6749 Section 4.1.2.1)
-    error: Optional[str] = Field(None, description="Error code")
-    error_description: Optional[str] = Field(None, description="Human-readable error description")
-    error_uri: Optional[str] = Field(None, description="URI to error information page")
+    error: str | None = Field(None, description="Error code")
+    error_description: str | None = Field(None, description="Human-readable error description")
+    error_uri: str | None = Field(None, description="URI to error information page")
 
     def is_success(self) -> bool:
         """Check if this is a successful response"""
@@ -427,9 +421,9 @@ class OAuthAuthorizationErrorResponse(BaseModel):
     """OAuth 2.1 Authorization Error Response Model"""
 
     error: str = Field(..., description="Error code")
-    error_description: Optional[str] = Field(None, description="Human-readable error description")
-    error_uri: Optional[str] = Field(None, description="URI to error information page")
-    state: Optional[str] = Field(None, description="State parameter from request")
+    error_description: str | None = Field(None, description="Human-readable error description")
+    error_uri: str | None = Field(None, description="URI to error information page")
+    state: str | None = Field(None, description="State parameter from request")
 
 
 # OAuth 2.1 Error Codes (RFC 6749 Section 4.1.2.1)
@@ -453,26 +447,26 @@ class UserConsentRequest(BaseModel):
 
     client_id: str = Field(..., description="Client requesting authorization")
     redirect_uri: str = Field(..., description="Redirect URI")
-    scope: Optional[str] = Field(None, description="Requested scopes")
-    state: Optional[str] = Field(None, description="State parameter")
+    scope: str | None = Field(None, description="Requested scopes")
+    state: str | None = Field(None, description="State parameter")
     code_challenge: str = Field(..., description="PKCE code challenge")
     code_challenge_method: CodeChallengeMethod = Field(default=CodeChallengeMethod.S256)
 
     # OpenID Connect parameters
-    nonce: Optional[str] = Field(None, description="OpenID Connect nonce")
-    response_mode: Optional[ResponseMode] = Field(None, description="Response mode")
-    display: Optional[Display] = Field(None, description="Display preference")
-    prompt: Optional[Prompt] = Field(None, description="Prompt parameter")
-    max_age: Optional[int] = Field(None, description="Maximum authentication age")
-    ui_locales: Optional[str] = Field(None, description="UI locales preference")
-    id_token_hint: Optional[str] = Field(None, description="ID token hint")
-    login_hint: Optional[str] = Field(None, description="Login hint")
-    acr_values: Optional[str] = Field(None, description="ACR values")
+    nonce: str | None = Field(None, description="OpenID Connect nonce")
+    response_mode: ResponseMode | None = Field(None, description="Response mode")
+    display: Display | None = Field(None, description="Display preference")
+    prompt: Prompt | None = Field(None, description="Prompt parameter")
+    max_age: int | None = Field(None, description="Maximum authentication age")
+    ui_locales: str | None = Field(None, description="UI locales preference")
+    id_token_hint: str | None = Field(None, description="ID token hint")
+    login_hint: str | None = Field(None, description="Login hint")
+    acr_values: str | None = Field(None, description="ACR values")
 
     # User decision
     user_id: UUID = Field(..., description="Authenticated user ID")
     approved: bool = Field(..., description="Whether user approved the request")
-    approved_scopes: Optional[List[str]] = Field(None, description="Scopes approved by user")
+    approved_scopes: list[str] | None = Field(None, description="Scopes approved by user")
 
 
 class AuthorizationCodeGrantRequest(BaseModel):

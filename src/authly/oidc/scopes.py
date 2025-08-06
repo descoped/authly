@@ -18,7 +18,6 @@ and available via the UserInfo endpoint.
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Optional, Set
 
 
 class OIDCScope(Enum):
@@ -46,7 +45,7 @@ class OIDCScopeDefinition:
 
     scope_name: str
     description: str
-    claims: Set[str]
+    claims: set[str]
     required: bool = False
     default: bool = False
 
@@ -94,7 +93,7 @@ class OIDCStandardClaims:
 
 
 # OIDC Scope to Claims Mapping
-OIDC_SCOPES: Dict[str, OIDCScopeDefinition] = {
+OIDC_SCOPES: dict[str, OIDCScopeDefinition] = {
     OIDCScope.OPENID.value: OIDCScopeDefinition(
         scope_name="openid",
         description="OpenID Connect authentication scope (required for OIDC flows)",
@@ -171,7 +170,7 @@ class OIDCClaimsMapping:
     """
 
     @staticmethod
-    def get_claims_for_scopes(scopes: List[str]) -> Set[str]:
+    def get_claims_for_scopes(scopes: list[str]) -> set[str]:
         """
         Get all claims that should be included for the given scopes.
 
@@ -190,7 +189,7 @@ class OIDCClaimsMapping:
         return claims
 
     @staticmethod
-    def validate_oidc_scopes(scopes: List[str]) -> Dict[str, bool]:
+    def validate_oidc_scopes(scopes: list[str]) -> dict[str, bool]:
         """
         Validate OIDC scopes and return validation results.
 
@@ -208,7 +207,7 @@ class OIDCClaimsMapping:
         return validation_results
 
     @staticmethod
-    def is_oidc_request(scopes: List[str]) -> bool:
+    def is_oidc_request(scopes: list[str]) -> bool:
         """
         Check if a scope request is an OpenID Connect request.
 
@@ -223,7 +222,7 @@ class OIDCClaimsMapping:
         return OIDCScope.OPENID.value in scopes
 
     @staticmethod
-    def get_required_scopes() -> List[str]:
+    def get_required_scopes() -> list[str]:
         """
         Get list of required OIDC scopes.
 
@@ -233,7 +232,7 @@ class OIDCClaimsMapping:
         return [scope_def.scope_name for scope_def in OIDC_SCOPES.values() if scope_def.required]
 
     @staticmethod
-    def get_default_scopes() -> List[str]:
+    def get_default_scopes() -> list[str]:
         """
         Get list of default OIDC scopes.
 
@@ -243,7 +242,7 @@ class OIDCClaimsMapping:
         return [scope_def.scope_name for scope_def in OIDC_SCOPES.values() if scope_def.default]
 
     @staticmethod
-    def get_scope_description(scope_name: str) -> Optional[str]:
+    def get_scope_description(scope_name: str) -> str | None:
         """
         Get description for a specific OIDC scope.
 
@@ -257,7 +256,7 @@ class OIDCClaimsMapping:
         return scope_def.description if scope_def else None
 
     @staticmethod
-    def get_claims_for_scope(scope_name: str) -> Set[str]:
+    def get_claims_for_scope(scope_name: str) -> set[str]:
         """
         Get claims associated with a specific scope.
 
@@ -271,7 +270,7 @@ class OIDCClaimsMapping:
         return scope_def.claims if scope_def else set()
 
     @staticmethod
-    def filter_claims_by_scopes(claims: Dict[str, any], scopes: List[str]) -> Dict[str, any]:
+    def filter_claims_by_scopes(claims: dict[str, any], scopes: list[str]) -> dict[str, any]:
         """
         Filter claims based on granted scopes.
 
@@ -287,7 +286,7 @@ class OIDCClaimsMapping:
         return {claim_name: claim_value for claim_name, claim_value in claims.items() if claim_name in allowed_claims}
 
 
-def get_oidc_scopes_with_descriptions() -> Dict[str, str]:
+def get_oidc_scopes_with_descriptions() -> dict[str, str]:
     """
     Get OIDC scopes with their descriptions.
 
@@ -297,7 +296,7 @@ def get_oidc_scopes_with_descriptions() -> Dict[str, str]:
     return {scope_name: scope_def.description for scope_name, scope_def in OIDC_SCOPES.items()}
 
 
-def get_all_oidc_scope_names() -> List[str]:
+def get_all_oidc_scope_names() -> list[str]:
     """
     Get all OIDC scope names.
 
@@ -307,7 +306,7 @@ def get_all_oidc_scope_names() -> List[str]:
     return list(OIDC_SCOPES.keys())
 
 
-def get_oidc_claims_reference() -> Dict[str, Dict[str, any]]:
+def get_oidc_claims_reference() -> dict[str, dict[str, any]]:
     """
     Get comprehensive OIDC claims reference.
 

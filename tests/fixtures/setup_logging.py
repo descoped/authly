@@ -22,7 +22,7 @@ class LoggerWriter:
         return False
 
 
-def setup_logging(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"):
+def setup_logging(level=logging.INFO, log_format="%(asctime)s - %(levelname)s - %(message)s"):
     # Configure the root logger
     root_logger = logging.getLogger()
     root_logger.setLevel(level)
@@ -33,7 +33,7 @@ def setup_logging(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(me
 
     # Add handler with desired format
     handler = logging.StreamHandler(sys.stdout)
-    handler.setFormatter(logging.Formatter(format))
+    handler.setFormatter(logging.Formatter(log_format))
     root_logger.addHandler(handler)
 
     # Redirect stdout/stderr to catch container and uvicorn output

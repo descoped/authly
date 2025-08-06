@@ -8,8 +8,8 @@ for better observability and parsing in log aggregation systems.
 import json
 import logging
 import traceback
-from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from .context import get_correlation_id, get_request_context
 
@@ -40,7 +40,7 @@ class StructuredFormatter(logging.Formatter):
     def __init__(
         self,
         service_name: str = "authly",
-        service_version: Optional[str] = None,
+        service_version: str | None = None,
         include_location: bool = False,
     ):
         super().__init__()
@@ -51,8 +51,8 @@ class StructuredFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         """Format the log record as JSON."""
         # Base log structure
-        log_entry: Dict[str, Any] = {
-            "timestamp": datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat(),
+        log_entry: dict[str, Any] = {
+            "timestamp": datetime.fromtimestamp(record.created, tz=UTC).isoformat(),
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),
@@ -99,7 +99,7 @@ class StructuredFormatter(logging.Formatter):
 
         return json.dumps(log_entry, ensure_ascii=False, separators=(",", ":"))
 
-    def _format_exception(self, exc_info) -> Dict[str, Any]:
+    def _format_exception(self, exc_info) -> dict[str, Any]:
         """Format exception information."""
         exc_type, exc_value, exc_traceback = exc_info
 
@@ -109,7 +109,7 @@ class StructuredFormatter(logging.Formatter):
             "traceback": traceback.format_exception(exc_type, exc_value, exc_traceback),
         }
 
-    def _extract_extra_fields(self, record: logging.LogRecord) -> Dict[str, Any]:
+    def _extract_extra_fields(self, record: logging.LogRecord) -> dict[str, Any]:
         """Extract extra fields from the log record."""
         # Standard fields that should not be included in extra
         standard_fields = {

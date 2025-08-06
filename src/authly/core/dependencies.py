@@ -5,7 +5,7 @@ patterns without relying on app.state.
 """
 
 import logging
-from typing import AsyncGenerator, Callable, Optional
+from collections.abc import AsyncGenerator, Callable
 
 from fastapi import Depends
 from psycopg import AsyncConnection
@@ -18,7 +18,7 @@ from authly.core.resource_manager import AuthlyResourceManager
 logger = logging.getLogger(__name__)
 
 # Global resource manager instance - will be set by create_resource_manager_provider
-_resource_manager_instance: Optional[AuthlyResourceManager] = None
+_resource_manager_instance: AuthlyResourceManager | None = None
 
 
 def create_resource_manager_provider(resource_manager: AuthlyResourceManager) -> Callable[[], AuthlyResourceManager]:

@@ -5,8 +5,8 @@ pattern with a unified approach supporting all deployment modes.
 """
 
 import logging
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator, Optional
 from urllib.parse import urlparse
 
 from psycopg_pool import AsyncConnectionPool
@@ -40,9 +40,9 @@ class AuthlyResourceManager:
         """
         self.mode = mode
         self.config = config
-        self._database: Optional[Database] = None
-        self._pool: Optional[AsyncConnectionPool] = None
-        self._transaction_manager: Optional[TransactionManager] = None
+        self._database: Database | None = None
+        self._pool: AsyncConnectionPool | None = None
+        self._transaction_manager: TransactionManager | None = None
         self._redis_client = None
         self._redis_pool = None
         self._self_managed = False
@@ -237,7 +237,9 @@ class AuthlyResourceManager:
 
         except Exception as e:
             logger.error(f"Failed to initialize managed Database for {self.mode.value} mode: {e}")
-            raise
+            raise RuntimeError(
+                "Failed to initialize managed Database for {self.mode.value} mode: See logs for details"
+            ) from None
         finally:
             self._database = None
             self._pool = None

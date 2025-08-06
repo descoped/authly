@@ -11,7 +11,6 @@ Based on:
 """
 
 import logging
-from typing import Dict, List, Optional, Set
 
 from pydantic import BaseModel, Field
 
@@ -35,31 +34,64 @@ class UserInfoResponse(BaseModel):
     sub: str = Field(..., description="Subject identifier")
 
     # Profile scope claims
-    name: Optional[str] = Field(None, description="Full name")
-    given_name: Optional[str] = Field(None, description="Given name (first name)")
-    family_name: Optional[str] = Field(None, description="Family name (last name)")
-    middle_name: Optional[str] = Field(None, description="Middle name")
-    nickname: Optional[str] = Field(None, description="Nickname")
-    preferred_username: Optional[str] = Field(None, description="Preferred username")
-    profile: Optional[str] = Field(None, description="Profile page URL")
-    picture: Optional[str] = Field(None, description="Profile picture URL")
-    website: Optional[str] = Field(None, description="Website URL")
-    gender: Optional[str] = Field(None, description="Gender")
-    birthdate: Optional[str] = Field(None, description="Birthdate (YYYY-MM-DD)")
-    zoneinfo: Optional[str] = Field(None, description="Time zone")
-    locale: Optional[str] = Field(None, description="Locale")
-    updated_at: Optional[int] = Field(None, description="Time the information was last updated")
+    name: str | None = Field(None, description="Full name")
+    given_name: str | None = Field(None, description="Given name (first name)")
+    family_name: str | None = Field(None, description="Family name (last name)")
+    middle_name: str | None = Field(None, description="Middle name")
+    nickname: str | None = Field(None, description="Nickname")
+    preferred_username: str | None = Field(None, description="Preferred username")
+    profile: str | None = Field(None, description="Profile page URL")
+    picture: str | None = Field(None, description="Profile picture URL")
+    website: str | None = Field(None, description="Website URL")
+    gender: str | None = Field(None, description="Gender")
+    birthdate: str | None = Field(None, description="Birthdate (YYYY-MM-DD)")
+    zoneinfo: str | None = Field(None, description="Time zone")
+    locale: str | None = Field(None, description="Locale")
+    updated_at: int | None = Field(None, description="Time the information was last updated")
 
     # Email scope claims
-    email: Optional[str] = Field(None, description="Email address")
-    email_verified: Optional[bool] = Field(None, description="Email verification status")
+    email: str | None = Field(None, description="Email address")
+    email_verified: bool | None = Field(None, description="Email verification status")
 
     # Phone scope claims
-    phone_number: Optional[str] = Field(None, description="Phone number")
-    phone_number_verified: Optional[bool] = Field(None, description="Phone number verification status")
+    phone_number: str | None = Field(None, description="Phone number")
+    phone_number_verified: bool | None = Field(None, description="Phone number verification status")
 
     # Address scope claims
-    address: Optional[Dict] = Field(None, description="Address information")
+    address: dict | None = Field(None, description="Address information")
+
+
+class UserInfoUpdateRequest(BaseModel):
+    """
+    OIDC UserInfo update request model.
+
+    This model represents the request body for updating user information
+    via the UserInfo endpoint. Only OIDC standard claims are allowed.
+    """
+
+    # Profile scope claims (updatable by user)
+    name: str | None = Field(None, description="Full name")
+    given_name: str | None = Field(None, description="Given name (first name)")
+    family_name: str | None = Field(None, description="Family name (last name)")
+    middle_name: str | None = Field(None, description="Middle name")
+    nickname: str | None = Field(None, description="Nickname")
+    preferred_username: str | None = Field(None, description="Preferred username")
+    profile: str | None = Field(None, description="Profile page URL")
+    picture: str | None = Field(None, description="Profile picture URL")
+    website: str | None = Field(None, description="Website URL")
+    gender: str | None = Field(None, description="Gender")
+    birthdate: str | None = Field(None, description="Birthdate (YYYY-MM-DD)")
+    zoneinfo: str | None = Field(None, description="Time zone")
+    locale: str | None = Field(None, description="Locale")
+
+    # Phone scope claims (updatable by user)
+    phone_number: str | None = Field(None, description="Phone number")
+
+    # Address scope claims (updatable by user)
+    address: dict | None = Field(None, description="Address information")
+
+    # NOTE: email, email_verified, phone_number_verified are NOT updatable by users
+    # for security reasons - these require admin or verification processes
 
 
 class UserInfoService:
@@ -70,7 +102,7 @@ class UserInfoService:
     based on user data and granted scopes according to OIDC specifications.
     """
 
-    def create_userinfo_response(self, user: UserModel, granted_scopes: List[str]) -> UserInfoResponse:
+    def create_userinfo_response(self, user: UserModel, granted_scopes: list[str]) -> UserInfoResponse:
         """
         Create UserInfo response based on user data and granted scopes.
 
@@ -136,7 +168,7 @@ class UserInfoService:
         """Add address-related claims to UserInfo response."""
         userinfo.address = getattr(user, "address", None)
 
-    def _get_full_name(self, user: UserModel) -> Optional[str]:
+    def _get_full_name(self, user: UserModel) -> str | None:
         """
         Generate full name from user data.
 
@@ -159,7 +191,7 @@ class UserInfoService:
             # Fall back to username if no name components
             return user.username
 
-    def validate_userinfo_request(self, granted_scopes: List[str]) -> bool:
+    def validate_userinfo_request(self, granted_scopes: list[str]) -> bool:
         """
         Validate UserInfo request.
 
@@ -176,7 +208,7 @@ class UserInfoService:
 
         return True
 
-    def get_supported_claims(self, granted_scopes: List[str]) -> Set[str]:
+    def get_supported_claims(self, granted_scopes: list[str]) -> set[str]:
         """
         Get supported claims based on granted scopes.
 
@@ -187,3 +219,35 @@ class UserInfoService:
             Set of supported claim names
         """
         return OIDCClaimsMapping.get_claims_for_scopes(granted_scopes)
+
+    def validate_userinfo_update_request(
+        self, granted_scopes: list[str], update_request: "UserInfoUpdateRequest"
+    ) -> dict[str, str]:
+        """
+        Validate UserInfo update request and return only allowed fields.
+
+        Args:
+            granted_scopes: List of granted scopes
+            update_request: Update request containing new values
+
+        Returns:
+            Dict of validated update fields based on scopes
+        """
+        # UserInfo update requires the 'openid' scope
+        if "openid" not in granted_scopes:
+            logger.warning("UserInfo update request without 'openid' scope")
+            raise ValueError("UserInfo update requires 'openid' scope")
+
+        # Get allowed claims based on scopes
+        allowed_claims = self.get_supported_claims(granted_scopes)
+
+        # Extract only the allowed fields from the update request
+        update_data = {}
+        for field, value in update_request.model_dump(exclude_unset=True).items():
+            if value is not None and field in allowed_claims:
+                update_data[field] = value
+            elif value is not None:
+                logger.warning(f"Attempted to update claim '{field}' without required scope")
+
+        logger.info(f"UserInfo update validated: {len(update_data)} fields allowed")
+        return update_data

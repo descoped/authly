@@ -1,7 +1,6 @@
 import logging
 import secrets
-from datetime import datetime, timedelta, timezone
-from typing import Optional
+from datetime import UTC, datetime, timedelta
 
 import bcrypt
 from jose import JWTError, jwt
@@ -35,15 +34,15 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
         # Track password verification metrics
         if METRICS_ENABLED and metrics:
-            duration = time.time() - start_time
+            time.time() - start_time
             status = "success" if result else "failed"
             metrics.track_login_attempt(status, "password")
 
         return result
-    except Exception as e:
+    except Exception:
         # Track password verification errors
         if METRICS_ENABLED and metrics:
-            duration = time.time() - start_time
+            time.time() - start_time
             metrics.track_login_attempt("error", "password")
         raise
 
@@ -54,7 +53,7 @@ def get_password_hash(password: str) -> str:
 
 
 def create_access_token(
-    data: dict, secret_key: str, config: AuthlyConfig, algorithm: str = "HS256", expires_delta: Optional[int] = None
+    data: dict, secret_key: str, config: AuthlyConfig, algorithm: str = "HS256", expires_delta: int | None = None
 ) -> str:
     """Create access token with required configuration.
 
@@ -74,9 +73,9 @@ def create_access_token(
 
     try:
         if expires_delta:
-            expire = datetime.now(timezone.utc) + timedelta(minutes=expires_delta)
+            expire = datetime.now(UTC) + timedelta(minutes=expires_delta)
         else:
-            expire = datetime.now(timezone.utc) + timedelta(minutes=config.access_token_expire_minutes)
+            expire = datetime.now(UTC) + timedelta(minutes=config.access_token_expire_minutes)
 
         to_encode = data.copy()
         to_encode.update({"exp": int(expire.timestamp())})
@@ -88,14 +87,14 @@ def create_access_token(
             metrics.oauth_token_generation_duration_seconds.labels(token_type="access_token").observe(duration)
 
         return token
-    except Exception as e:
+    except Exception:
         # Track token generation errors
         if METRICS_ENABLED and metrics:
             metrics.track_security_event("token_generation_error", "error")
         raise
 
 
-def create_refresh_token(user_id: str, secret_key: str, config: AuthlyConfig, jti: Optional[str] = None) -> str:
+def create_refresh_token(user_id: str, secret_key: str, config: AuthlyConfig, jti: str | None = None) -> str:
     """
     Create a refresh token with a unique JTI (JWT ID) claim.
 
@@ -114,12 +113,9 @@ def create_refresh_token(user_id: str, secret_key: str, config: AuthlyConfig, jt
 
     try:
         # Generate a new JTI if one is not provided
-        if jti is None:
-            token_jti = secrets.token_hex(config.token_hex_length)
-        else:
-            token_jti = jti
+        token_jti = secrets.token_hex(config.token_hex_length) if jti is None else jti
 
-        expire = datetime.now(timezone.utc) + timedelta(days=config.refresh_token_expire_days)
+        expire = datetime.now(UTC) + timedelta(days=config.refresh_token_expire_days)
         payload = {"sub": user_id, "type": "refresh", "jti": token_jti, "exp": int(expire.timestamp())}
 
         token = jwt.encode(payload, secret_key, algorithm=config.algorithm)
@@ -130,7 +126,7 @@ def create_refresh_token(user_id: str, secret_key: str, config: AuthlyConfig, jt
             metrics.oauth_token_generation_duration_seconds.labels(token_type="refresh_token").observe(duration)
 
         return token
-    except Exception as e:
+    except Exception:
         # Track token generation errors
         if METRICS_ENABLED and metrics:
             metrics.track_security_event("token_generation_error", "error")
@@ -174,5 +170,5 @@ def decode_token(token: str, secret_key: str, algorithm: str = "HS256") -> dict:
             duration = time.time() - start_time
             metrics.track_security_event("token_validation_failed", "warning")
 
-        logger.error(f"JWT decode error: {str(e)}")
-        raise ValueError("Could not validate credentials")
+        logger.error(f"JWT decode error: {e!s}")
+        raise ValueError("Could not validate credentials") from e

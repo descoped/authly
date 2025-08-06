@@ -17,13 +17,10 @@ Usage:
 
 import asyncio
 import logging
-import os
 import sys
-from typing import Optional
 
 import click
 import uvicorn
-from fastapi import FastAPI
 
 from authly.app import create_production_app
 from authly.main import lifespan, setup_logging
@@ -101,11 +98,8 @@ def status(output_format: str) -> None:
     # Import and call admin status command
     from authly.admin.cli import status as admin_status
 
-    ctx = click.Context(admin_status)
-    ctx.obj = {}  # Initialize context object
-
     # Call the admin command directly (it doesn't use format parameter)
-    ctx.invoke(admin_status)
+    admin_status()
 
 
 @admin.group()
@@ -134,7 +128,7 @@ def list_clients(output_format: str) -> None:
 @click.option("--redirect-uri", multiple=True, help="Redirect URI (can be specified multiple times)")
 @click.option("--scope", multiple=True, help="Allowed scopes (can be specified multiple times)")
 @click.option("--description", help="Client description")
-def create_client(name: str, client_type: str, redirect_uri: tuple, scope: tuple, description: Optional[str]) -> None:
+def create_client(name: str, client_type: str, redirect_uri: tuple, scope: tuple, description: str | None) -> None:
     """Create a new OAuth client."""
     # Import admin command
     from authly.admin.client_commands import create_client as admin_create_client
@@ -184,7 +178,7 @@ def auth() -> None:
     help="OAuth scopes to request",
 )
 @click.option("--api-url", help="API URL (default: http://localhost:8000 or AUTHLY_API_URL env var)")
-def login(username: str, password: Optional[str], scope: str, api_url: Optional[str]) -> None:
+def login(username: str, password: str | None, scope: str, api_url: str | None) -> None:
     """Login to the Authly Admin API."""
     # Create a mock context for the admin command
     import click
@@ -202,11 +196,7 @@ def login(username: str, password: Optional[str], scope: str, api_url: Optional[
 def logout() -> None:
     """Logout from the Authly Admin API."""
     # Create a mock context for the admin command
-    import click
-
     from authly.admin.auth_commands import logout as admin_logout
-
-    ctx = click.Context(admin_logout)
 
     # Run the admin command
     admin_logout.callback()
@@ -230,15 +220,10 @@ def whoami(verbose: bool) -> None:
 
 @auth.command()
 @click.option("--verbose", "-v", is_flag=True, help="Show detailed token information")
-def status(verbose: bool) -> None:
+def auth_status(verbose: bool) -> None:
     """Show authentication and API status."""
     # Create a mock context for the admin command
-    import click
-
     from authly.admin.auth_commands import status as admin_auth_status
-
-    ctx = click.Context(admin_auth_status)
-    ctx.params = {"verbose": verbose}
 
     # Run the admin command
     admin_auth_status.callback(verbose)
@@ -248,11 +233,7 @@ def status(verbose: bool) -> None:
 def refresh() -> None:
     """Refresh authentication tokens."""
     # Create a mock context for the admin command
-    import click
-
     from authly.admin.auth_commands import refresh as admin_refresh
-
-    ctx = click.Context(admin_refresh)
 
     # Run the admin command
     admin_refresh.callback()
@@ -269,48 +250,34 @@ def refresh() -> None:
     help="OAuth scopes to request",
 )
 @click.option("--api-url", help="API URL (default: http://localhost:8000 or AUTHLY_API_URL env var)")
-def login(username: str, password: Optional[str], scope: str, api_url: Optional[str]) -> None:
+def admin_login(username: str, password: str | None, scope: str, api_url: str | None) -> None:
     """Login to the Authly Admin API (alias for 'auth login')."""
     # Create a mock context for the admin command
-    import click
-
-    from authly.admin.auth_commands import login as admin_login
-
-    ctx = click.Context(admin_login)
-    ctx.params = {"username": username, "password": password, "scope": scope, "api_url": api_url}
+    from authly.admin.auth_commands import login as admin_login_cmd
 
     # Run the admin command
-    admin_login.callback(username, password, scope, api_url)
+    admin_login_cmd.callback(username, password, scope, api_url)
 
 
 @admin.command()
-def logout() -> None:
+def admin_logout() -> None:
     """Logout from the Authly Admin API (alias for 'auth logout')."""
     # Create a mock context for the admin command
-    import click
-
-    from authly.admin.auth_commands import logout as admin_logout
-
-    ctx = click.Context(admin_logout)
+    from authly.admin.auth_commands import logout as admin_logout_cmd
 
     # Run the admin command
-    admin_logout.callback()
+    admin_logout_cmd.callback()
 
 
 @admin.command()
 @click.option("--verbose", "-v", is_flag=True, help="Show detailed token information")
-def whoami(verbose: bool) -> None:
+def admin_whoami(verbose: bool) -> None:
     """Show current authentication status (alias for 'auth whoami')."""
     # Create a mock context for the admin command
-    import click
-
-    from authly.admin.auth_commands import whoami as admin_whoami
-
-    ctx = click.Context(admin_whoami)
-    ctx.params = {"verbose": verbose}
+    from authly.admin.auth_commands import whoami as admin_whoami_cmd
 
     # Run the admin command
-    admin_whoami.callback(verbose)
+    admin_whoami_cmd.callback(verbose)
 
 
 @admin.group()

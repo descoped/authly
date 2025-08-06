@@ -6,21 +6,17 @@ support for mandatory password changes on first login.
 """
 
 import logging
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from authly.api.users_dependencies import get_current_user, get_user_repository
+from authly.api.validation_models import create_password_change_request_model
 from authly.auth import get_password_hash, verify_password
 from authly.users.models import UserModel
 from authly.users.repository import UserRepository
 
 logger = logging.getLogger(__name__)
-
-
-# Import dynamic validation model
-from authly.api.validation_models import create_password_change_request_model
 
 # Create model with config-based validation
 PasswordChangeRequest = create_password_change_request_model()
@@ -75,7 +71,7 @@ async def change_password(
         # Update password and clear requires_password_change flag
         update_data = {"password_hash": get_password_hash(request.new_password), "requires_password_change": False}
 
-        updated_user = await user_repo.update(current_user.id, update_data)
+        await user_repo.update(current_user.id, update_data)
 
         logger.info(f"Password successfully changed for user {current_user.username}")
 
@@ -85,7 +81,9 @@ async def change_password(
         raise
     except Exception as e:
         logger.error(f"Error changing password for user {current_user.username}: {e}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not change password")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not change password"
+        ) from e
 
 
 @router.get("/password-status", response_model=dict)

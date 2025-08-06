@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import List, Optional
 from uuid import UUID
 
 from psycopg import AsyncConnection
@@ -40,7 +39,7 @@ class TokenStore(ABC):
         pass
 
     @abstractmethod
-    async def get_token(self, token_jti: str) -> Optional[TokenModel]:
+    async def get_token(self, token_jti: str) -> TokenModel | None:
         """
         Retrieve a token by its JTI.
 
@@ -57,8 +56,8 @@ class TokenStore(ABC):
 
     @abstractmethod
     async def get_user_tokens(
-        self, user_id: UUID, token_type: Optional[TokenType] = None, valid_only: bool = True
-    ) -> List[TokenModel]:
+        self, user_id: UUID, token_type: TokenType | None = None, valid_only: bool = True
+    ) -> list[TokenModel]:
         """
         Get all tokens for a user.
 
@@ -92,7 +91,7 @@ class TokenStore(ABC):
         pass
 
     @abstractmethod
-    async def invalidate_user_tokens(self, user_id: UUID, token_type: Optional[TokenType] = None) -> int:
+    async def invalidate_user_tokens(self, user_id: UUID, token_type: TokenType | None = None) -> int:
         """
         Invalidate all tokens for a user.
 
@@ -141,7 +140,7 @@ class TokenStore(ABC):
         pass
 
     @abstractmethod
-    async def count_user_valid_tokens(self, user_id: UUID, token_type: Optional[TokenType] = None) -> int:
+    async def count_user_valid_tokens(self, user_id: UUID, token_type: TokenType | None = None) -> int:
         """
         Count valid tokens for a user.
 

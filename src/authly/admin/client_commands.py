@@ -4,10 +4,8 @@ import asyncio
 import json
 import os
 import sys
-from typing import Dict, List, Optional
 
 import click
-from fastapi import HTTPException
 
 from authly.admin.api_client import AdminAPIClient, AdminAPIError
 from authly.oauth.models import ClientType, OAuthClientCreateRequest, TokenEndpointAuthMethod
@@ -31,8 +29,10 @@ def validate_client_type(ctx, param, value):
 
     try:
         return ClientType(value)
-    except ValueError:
-        raise click.BadParameter(f"Invalid client type. Must be one of: {', '.join([ct.value for ct in ClientType])}")
+    except ValueError as e:
+        raise click.BadParameter(
+            f"Invalid client type. Must be one of: {', '.join([ct.value for ct in ClientType])}"
+        ) from e
 
 
 def validate_auth_method(ctx, param, value):
@@ -44,7 +44,7 @@ def validate_auth_method(ctx, param, value):
         return TokenEndpointAuthMethod(value)
     except ValueError:
         methods = [method.value for method in TokenEndpointAuthMethod]
-        raise click.BadParameter(f"Invalid auth method. Must be one of: {', '.join(methods)}")
+        raise click.BadParameter(f"Invalid auth method. Must be one of: {', '.join(methods)}") from None
 
 
 @click.group(name="client")
@@ -84,13 +84,13 @@ def create_client(
     ctx: click.Context,
     name: str,
     client_type: ClientType,
-    redirect_uris: List[str],
-    scope: Optional[str],
-    client_uri: Optional[str],
-    logo_uri: Optional[str],
-    tos_uri: Optional[str],
-    policy_uri: Optional[str],
-    auth_method: Optional[TokenEndpointAuthMethod],
+    redirect_uris: list[str],
+    scope: str | None,
+    client_uri: str | None,
+    logo_uri: str | None,
+    tos_uri: str | None,
+    policy_uri: str | None,
+    auth_method: TokenEndpointAuthMethod | None,
     no_pkce: bool,
     output: str,
 ):
@@ -262,15 +262,15 @@ def show_client(ctx: click.Context, client_id: str, output: str):
                     click.echo(f"Created: {client_details.created_at}")
                     click.echo(f"Updated: {client_details.updated_at}")
 
-                    click.echo(f"\nRedirect URIs:")
+                    click.echo("\nRedirect URIs:")
                     for uri in client_details.redirect_uris:
                         click.echo(f"  - {uri}")
 
-                    click.echo(f"\nGrant Types:")
+                    click.echo("\nGrant Types:")
                     for grant_type in client_details.grant_types:
                         click.echo(f"  - {grant_type.value}")
 
-                    click.echo(f"\nResponse Types:")
+                    click.echo("\nResponse Types:")
                     for response_type in client_details.response_types:
                         click.echo(f"  - {response_type.value}")
 
@@ -317,11 +317,11 @@ def show_client(ctx: click.Context, client_id: str, output: str):
 def update_client(
     ctx: click.Context,
     client_id: str,
-    name: Optional[str],
-    client_uri: Optional[str],
-    logo_uri: Optional[str],
-    tos_uri: Optional[str],
-    policy_uri: Optional[str],
+    name: str | None,
+    client_uri: str | None,
+    logo_uri: str | None,
+    tos_uri: str | None,
+    policy_uri: str | None,
     activate: bool,
     deactivate: bool,
 ):
@@ -400,10 +400,9 @@ def regenerate_secret(ctx: click.Context, client_id: str, confirm: bool):
     if verbose:
         click.echo(f"Regenerating secret for client: {client_id}")
 
-    if not confirm and not dry_run:
-        if not click.confirm("This will invalidate the current client secret. Continue?"):
-            click.echo("Operation cancelled.")
-            return
+    if not confirm and not dry_run and not click.confirm("This will invalidate the current client secret. Continue?"):
+        click.echo("Operation cancelled.")
+        return
 
     if dry_run:
         click.echo("DRY RUN: Would regenerate client secret")
@@ -449,10 +448,9 @@ def delete_client(ctx: click.Context, client_id: str, confirm: bool):
     if verbose:
         click.echo(f"Deleting client: {client_id}")
 
-    if not confirm and not dry_run:
-        if not click.confirm(f"This will deactivate client '{client_id}'. Continue?"):
-            click.echo("Operation cancelled.")
-            return
+    if not confirm and not dry_run and not click.confirm(f"This will deactivate client '{client_id}'. Continue?"):
+        click.echo("Operation cancelled.")
+        return
 
     if dry_run:
         click.echo("DRY RUN: Would deactivate client")

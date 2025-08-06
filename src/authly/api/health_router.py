@@ -1,5 +1,4 @@
 import logging
-from typing import Dict
 
 from fastapi import APIRouter, Depends
 
@@ -9,7 +8,7 @@ router = APIRouter()
 
 
 @router.get("/health", tags=["health"])
-async def health_check(db_connection=Depends(get_database_connection)) -> Dict[str, str]:
+async def health_check(db_connection=Depends(get_database_connection)) -> dict[str, str]:
     try:
         async with db_connection.cursor() as cur:
             await cur.execute("SELECT txid_current()")

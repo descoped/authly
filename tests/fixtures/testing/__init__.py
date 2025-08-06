@@ -19,24 +19,24 @@ from fixtures.testing.postgres import (
 )
 
 __all__ = [
-    # PostgreSQL fixtures
-    "postgres_container",
-    "db_pool",
-    "db_connection",
-    "db_connection_rollback_transaction",
-    "transaction_manager",
-    "transaction",
     "_database_instance",
-    "_db_settings",
-    "register_db_init_callback",
     "_db_callbacks",
+    "_db_settings",
     # FastAPI test server fixtures (legacy)
     "custom_test_server",
-    "test_server",
+    "db_connection",
+    "db_connection_rollback_transaction",
+    "db_pool",
+    "hybrid_test_server",
+    # PostgreSQL fixtures
+    "postgres_container",
+    "register_db_init_callback",
+    "resource_manager_server",
     # FastAPI test server fixtures (resource manager)
     "resource_manager_test_server",
-    "resource_manager_server",
-    "hybrid_test_server",
+    "test_server",
+    "transaction",
+    "transaction_manager",
 ]
 
 

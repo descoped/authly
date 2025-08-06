@@ -8,21 +8,19 @@ authentication, token management, and secure credential storage.
 import json
 import logging
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 from urllib.parse import urljoin
 
 import httpx
 from pydantic import BaseModel
 
 from authly.oauth.models import (
-    ClientType,
     OAuthClientCreateRequest,
     OAuthClientCredentialsResponse,
     OAuthClientModel,
     OAuthScopeModel,
-    TokenEndpointAuthMethod,
 )
 
 logger = logging.getLogger(__name__)
@@ -31,7 +29,7 @@ logger = logging.getLogger(__name__)
 class AdminAPIError(Exception):
     """Custom exception for Admin API errors with user-friendly messages."""
 
-    def __init__(self, message: str, status_code: Optional[int] = None, response_body: Optional[str] = None):
+    def __init__(self, message: str, status_code: int | None = None, response_body: str | None = None):
         self.message = message
         self.status_code = status_code
         self.response_body = response_body
@@ -42,18 +40,16 @@ class TokenInfo(BaseModel):
     """Token information with expiration tracking."""
 
     access_token: str
-    refresh_token: Optional[str] = None
+    refresh_token: str | None = None
     expires_at: datetime
     token_type: str = "Bearer"
-    scope: Optional[str] = None
+    scope: str | None = None
 
 
 class AdminAPIClient:
     """HTTP client for Authly admin API operations."""
 
-    def __init__(
-        self, base_url: str, token_file: Optional[Path] = None, timeout: float = 30.0, verify_ssl: bool = True
-    ):
+    def __init__(self, base_url: str, token_file: Path | None = None, timeout: float = 30.0, verify_ssl: bool = True):
         """
         Initialize the admin API client.
 
@@ -80,14 +76,14 @@ class AdminAPIClient:
         self.client = httpx.AsyncClient(timeout=timeout, verify=verify_ssl, follow_redirects=True)
 
         # Current token info
-        self._token_info: Optional[TokenInfo] = None
+        self._token_info: TokenInfo | None = None
         self._load_tokens()
 
     def _load_tokens(self) -> None:
         """Load tokens from file if they exist."""
         if self.token_file.exists():
             try:
-                with open(self.token_file, "r") as f:
+                with open(self.token_file) as f:
                     data = json.load(f)
                     # Convert expires_at string to datetime
                     if "expires_at" in data:
@@ -134,7 +130,7 @@ class AdminAPIClient:
             return False
 
         # Check if token is expired (with 1 minute buffer)
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         buffer = timedelta(minutes=1)
         return now < (self._token_info.expires_at - buffer)
 
@@ -142,8 +138,8 @@ class AdminAPIClient:
         self,
         method: str,
         path: str,
-        json_data: Optional[Dict[str, Any]] = None,
-        params: Optional[Dict[str, Any]] = None,
+        json_data: dict[str, Any] | None = None,
+        params: dict[str, Any] | None = None,
         authenticated: bool = True,
     ) -> httpx.Response:
         """
@@ -272,7 +268,7 @@ class AdminAPIClient:
             if hasattr(response, "request") and response.request.content:
                 request_data = json.loads(response.request.content)
                 return request_data.get("scope_name", "unknown")
-        except:
+        except Exception:
             pass
 
         return "unknown"
@@ -290,12 +286,12 @@ class AdminAPIClient:
             if hasattr(response, "request") and response.request.content:
                 request_data = json.loads(response.request.content)
                 return request_data.get("client_name", "unknown")
-        except:
+        except Exception:
             pass
 
         return "unknown"
 
-    async def login(self, username: str, password: str, scope: Optional[str] = None) -> TokenInfo:
+    async def login(self, username: str, password: str, scope: str | None = None) -> TokenInfo:
         """
         Authenticate with username and password.
 
@@ -316,13 +312,13 @@ class AdminAPIClient:
         if scope:
             data["scope"] = scope
 
-        response = await self._request("POST", "/api/v1/auth/token", json_data=data, authenticated=False)
+        response = await self._request("POST", "/api/v1/oauth/token", json_data=data, authenticated=False)
 
         token_data = response.json()
 
         # Calculate expiration time
         expires_in = token_data.get("expires_in", 3600)  # Default 1 hour
-        expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
+        expires_at = datetime.now(UTC) + timedelta(seconds=expires_in)
 
         self._token_info = TokenInfo(
             access_token=token_data["access_token"],
@@ -348,7 +344,7 @@ class AdminAPIClient:
                 # Try to revoke the access token
                 await self._request(
                     "POST",
-                    "/api/v1/auth/revoke",
+                    "/api/v1/oauth/revoke",
                     json_data={"token": self._token_info.access_token, "token_type_hint": "access_token"},
                 )
                 logger.info("Successfully revoked access token")
@@ -360,7 +356,7 @@ class AdminAPIClient:
                     # Try to revoke the refresh token
                     await self._request(
                         "POST",
-                        "/api/v1/auth/revoke",
+                        "/api/v1/oauth/revoke",
                         json_data={"token": self._token_info.refresh_token, "token_type_hint": "refresh_token"},
                     )
                     logger.info("Successfully revoked refresh token")
@@ -387,7 +383,7 @@ class AdminAPIClient:
 
         response = await self._request(
             "POST",
-            "/api/v1/auth/refresh",
+            "/api/v1/oauth/refresh",
             json_data={"grant_type": "refresh_token", "refresh_token": self._token_info.refresh_token},
             authenticated=False,
         )
@@ -396,7 +392,7 @@ class AdminAPIClient:
 
         # Calculate expiration time
         expires_in = token_data.get("expires_in", 3600)
-        expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
+        expires_at = datetime.now(UTC) + timedelta(seconds=expires_in)
 
         self._token_info = TokenInfo(
             access_token=token_data["access_token"],
@@ -427,19 +423,19 @@ class AdminAPIClient:
                 try:
                     await self.refresh_token()
                 except Exception as e:
-                    raise ValueError(f"Failed to refresh token: {e}")
+                    raise ValueError(f"Failed to refresh token: {e}") from e
             else:
                 raise ValueError("Token expired and no refresh token available. Please login again.")
 
     # Admin API Methods
 
-    async def get_status(self) -> Dict[str, Any]:
+    async def get_status(self) -> dict[str, Any]:
         """Get admin API status and system information."""
         await self.ensure_authenticated()
         response = await self._request("GET", "/admin/status")
         return response.json()
 
-    async def get_health(self) -> Dict[str, str]:
+    async def get_health(self) -> dict[str, str]:
         """Get admin API health check."""
         # Health check doesn't require authentication
         response = await self._request("GET", "/admin/health", authenticated=False)
@@ -447,7 +443,7 @@ class AdminAPIClient:
 
     # Client Management
 
-    async def list_clients(self, active_only: bool = True, limit: int = 100, offset: int = 0) -> List[OAuthClientModel]:
+    async def list_clients(self, active_only: bool = True, limit: int = 100, offset: int = 0) -> list[OAuthClientModel]:
         """List OAuth clients."""
         await self.ensure_authenticated()
 
@@ -458,7 +454,7 @@ class AdminAPIClient:
         clients_data = response.json()
         return [OAuthClientModel(**client) for client in clients_data]
 
-    async def create_client(self, request: OAuthClientCreateRequest) -> Tuple[OAuthClientModel, Optional[str]]:
+    async def create_client(self, request: OAuthClientCreateRequest) -> tuple[OAuthClientModel, str | None]:
         """
         Create a new OAuth client.
 
@@ -489,7 +485,7 @@ class AdminAPIClient:
         response = await self._request("GET", f"/admin/clients/{client_id}")
         return OAuthClientModel(**response.json())
 
-    async def update_client(self, client_id: str, update_data: Dict[str, Any]) -> OAuthClientModel:
+    async def update_client(self, client_id: str, update_data: dict[str, Any]) -> OAuthClientModel:
         """Update OAuth client."""
         await self.ensure_authenticated()
 
@@ -505,7 +501,7 @@ class AdminAPIClient:
 
         return OAuthClientCredentialsResponse(**response.json())
 
-    async def delete_client(self, client_id: str) -> Dict[str, str]:
+    async def delete_client(self, client_id: str) -> dict[str, str]:
         """Delete (deactivate) OAuth client."""
         await self.ensure_authenticated()
 
@@ -514,7 +510,7 @@ class AdminAPIClient:
 
     # Scope Management
 
-    async def list_scopes(self, active_only: bool = True, limit: int = 100, offset: int = 0) -> List[OAuthScopeModel]:
+    async def list_scopes(self, active_only: bool = True, limit: int = 100, offset: int = 0) -> list[OAuthScopeModel]:
         """List OAuth scopes."""
         await self.ensure_authenticated()
 
@@ -541,7 +537,7 @@ class AdminAPIClient:
 
         return OAuthScopeModel(**response.json())
 
-    async def get_default_scopes(self) -> List[OAuthScopeModel]:
+    async def get_default_scopes(self) -> list[OAuthScopeModel]:
         """Get default OAuth scopes."""
         await self.ensure_authenticated()
 
@@ -559,9 +555,9 @@ class AdminAPIClient:
     async def update_scope(
         self,
         scope_name: str,
-        description: Optional[str] = None,
-        is_default: Optional[bool] = None,
-        is_active: Optional[bool] = None,
+        description: str | None = None,
+        is_default: bool | None = None,
+        is_active: bool | None = None,
     ) -> OAuthScopeModel:
         """Update OAuth scope."""
         await self.ensure_authenticated()
@@ -578,7 +574,7 @@ class AdminAPIClient:
 
         return OAuthScopeModel(**response.json())
 
-    async def delete_scope(self, scope_name: str) -> Dict[str, str]:
+    async def delete_scope(self, scope_name: str) -> dict[str, str]:
         """Delete (deactivate) OAuth scope."""
         await self.ensure_authenticated()
 
@@ -589,7 +585,7 @@ class AdminAPIClient:
 
     async def list_users(
         self, active_only: bool = True, admin_only: bool = False, limit: int = 100, offset: int = 0
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """List users (admin users only for now)."""
         await self.ensure_authenticated()
 

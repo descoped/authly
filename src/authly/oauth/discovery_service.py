@@ -5,7 +5,6 @@ according to RFC 8414 and OAuth 2.1 specifications.
 """
 
 import logging
-from typing import List, Optional
 from urllib.parse import urljoin
 
 from authly.oauth.discovery_models import OAuthServerMetadata
@@ -22,7 +21,7 @@ class DiscoveryService:
     and capabilities according to RFC 8414 and OAuth 2.1 requirements.
     """
 
-    def __init__(self, scope_repo: Optional[ScopeRepository] = None):
+    def __init__(self, scope_repo: ScopeRepository | None = None):
         """
         Initialize the discovery service.
 
@@ -47,8 +46,8 @@ class DiscoveryService:
 
         # Build endpoint URLs
         authorization_endpoint = urljoin(f"{base_url}{api_prefix}/", "oauth/authorize")
-        token_endpoint = urljoin(f"{base_url}{api_prefix}/", "auth/token")
-        revocation_endpoint = urljoin(f"{base_url}{api_prefix}/", "auth/revoke")
+        token_endpoint = urljoin(f"{base_url}{api_prefix}/", "oauth/token")
+        revocation_endpoint = urljoin(f"{base_url}{api_prefix}/", "oauth/revoke")
 
         # Get supported scopes from database if repository is available
         scopes_supported = None
@@ -90,7 +89,7 @@ class DiscoveryService:
         return metadata
 
     def get_static_metadata(
-        self, issuer_url: str, api_prefix: str = "/api/v1", scopes: Optional[List[str]] = None
+        self, issuer_url: str, api_prefix: str = "/api/v1", scopes: list[str] | None = None
     ) -> OAuthServerMetadata:
         """
         Generate static server metadata without database access.
@@ -110,8 +109,8 @@ class DiscoveryService:
         return OAuthServerMetadata(
             issuer=base_url,
             authorization_endpoint=urljoin(f"{base_url}{api_prefix}/", "oauth/authorize"),
-            token_endpoint=urljoin(f"{base_url}{api_prefix}/", "auth/token"),
-            revocation_endpoint=urljoin(f"{base_url}{api_prefix}/", "auth/revoke"),
+            token_endpoint=urljoin(f"{base_url}{api_prefix}/", "oauth/token"),
+            revocation_endpoint=urljoin(f"{base_url}{api_prefix}/", "oauth/revoke"),
             # OAuth 2.1 defaults
             response_types_supported=["code"],
             grant_types_supported=["authorization_code", "refresh_token"],

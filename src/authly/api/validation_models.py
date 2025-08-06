@@ -6,9 +6,7 @@ validation constraints. Since these are called at import time, they use
 sensible defaults and can be overridden at runtime through dependency injection.
 """
 
-from typing import Optional
-
-from pydantic import BaseModel, Field, constr
+from pydantic import BaseModel, constr
 
 
 def get_username_type():
@@ -49,7 +47,7 @@ def create_user_create_model():
         username: username_type
         email: str
         password: password_type
-        is_admin: Optional[bool] = False
+        is_admin: bool | None = False
 
     return UserCreate
 
@@ -60,10 +58,10 @@ def create_user_update_model():
     password_type = get_password_type()
 
     class UserUpdate(BaseModel):
-        username: Optional[username_type] = None
-        email: Optional[str] = None
-        password: Optional[password_type] = None
-        is_admin: Optional[bool] = None
+        username: username_type | None = None
+        email: str | None = None
+        password: password_type | None = None
+        is_admin: bool | None = None
 
     return UserUpdate
 

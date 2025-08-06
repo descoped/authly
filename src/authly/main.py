@@ -9,8 +9,8 @@ import asyncio
 import logging
 import os
 import signal
-from contextlib import asynccontextmanager
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager, suppress
 
 import uvicorn
 from fastapi import FastAPI
@@ -19,7 +19,7 @@ from fastapi import FastAPI
 from authly.app import create_production_app
 from authly.bootstrap import bootstrap_admin_system
 from authly.config import AuthlyConfig, EnvDatabaseProvider, EnvSecretProvider
-from authly.core.database import get_configuration, get_database, get_database_pool
+from authly.core.database import get_database
 from authly.core.deployment_modes import DeploymentMode
 from authly.core.mode_factory import AuthlyModeFactory
 
@@ -37,7 +37,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("Starting Authly application with psycopg-toolkit Database integration...")
 
     try:
-        # Phase 2: Create resource manager with mode auto-detection
+        # Create resource manager with mode auto-detection
         # Force production mode for main.py entry point
         os.environ.setdefault("AUTHLY_MODE", "production")
         resource_manager = AuthlyModeFactory.create_resource_manager()
@@ -94,7 +94,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     except Exception as e:
         logger.error(f"Failed to initialize application: {e}")
-        raise
+        raise RuntimeError("Failed to initialize application: See logs for details") from None
     finally:
         logger.info("Shutting down Authly application...")
         # Cleanup Redis connections if initialized
@@ -140,9 +140,13 @@ async def main():
 
     app = create_app()
 
-    # Configuration from environment
-    host = os.getenv("HOST", "0.0.0.0")
-    port = int(os.getenv("PORT", "8000"))
+    # Load configuration to get defaults
+
+    authly_config = AuthlyConfig.load(EnvSecretProvider(), EnvDatabaseProvider())
+
+    # Configuration from environment with config defaults
+    host = os.getenv("HOST", authly_config.default_host)
+    port = int(os.getenv("PORT", str(authly_config.default_port)))
     workers = int(os.getenv("WORKERS", "1"))
 
     # Create uvicorn configuration
@@ -173,14 +177,12 @@ async def main():
         await server.serve()
     except Exception as e:
         logger.error(f"Server error: {e}")
-        raise
+        raise RuntimeError("An error occurred") from None
     finally:
         # Remove signal handlers
         for sig in signals:
-            try:
+            with suppress(ValueError):
                 loop.remove_signal_handler(sig)
-            except ValueError:
-                pass
 
 
 # FastAPI app instance for WSGI servers (gunicorn, etc.)

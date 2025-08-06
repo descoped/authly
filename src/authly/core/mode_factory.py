@@ -7,7 +7,6 @@ resource managers.
 
 import logging
 import os
-from typing import Optional
 
 from authly.config import AuthlyConfig
 from authly.core.deployment_modes import DeploymentMode, ModeConfiguration
@@ -66,7 +65,7 @@ class AuthlyModeFactory:
 
     @staticmethod
     def create_resource_manager(
-        config: Optional[AuthlyConfig] = None, mode: Optional[DeploymentMode] = None
+        config: AuthlyConfig | None = None, mode: DeploymentMode | None = None
     ) -> AuthlyResourceManager:
         """Create resource manager with auto-detection.
 
@@ -126,10 +125,10 @@ class AuthlyModeFactory:
 
         except Exception as e:
             logger.error(f"Failed to load configuration: {e}")
-            raise
+            raise RuntimeError("Failed to load configuration: See logs for details") from None
 
     @staticmethod
-    def validate_context_compatibility(context: str, mode: Optional[DeploymentMode] = None) -> DeploymentMode:
+    def validate_context_compatibility(context: str, mode: DeploymentMode | None = None) -> DeploymentMode:
         """Validate that deployment mode is compatible with execution context.
 
         Args:
@@ -151,7 +150,7 @@ class AuthlyModeFactory:
             return mode
         except RuntimeError as e:
             logger.error(f"Mode validation failed: {e}")
-            raise
+            raise RuntimeError("An error occurred") from None
 
     @staticmethod
     def get_mode_info() -> dict:

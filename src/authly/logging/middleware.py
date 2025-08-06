@@ -7,12 +7,12 @@ for better observability and request tracing.
 
 import logging
 import time
-from typing import Callable
+from collections.abc import Callable
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from .context import LoggingContext, generate_correlation_id, set_request_context
+from .context import LoggingContext, generate_correlation_id
 
 logger = logging.getLogger(__name__)
 

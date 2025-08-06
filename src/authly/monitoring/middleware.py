@@ -8,7 +8,6 @@ into existing middleware without creating additional middleware layers.
 import logging
 import re
 import time
-from typing import Dict, Optional
 
 from fastapi import Request, Response
 
@@ -19,13 +18,12 @@ logger = logging.getLogger(__name__)
 # Endpoint pattern mapping for better metrics grouping
 ENDPOINT_PATTERNS = {
     # Auth endpoints
-    r"^/api/v1/auth/token$": "/api/v1/auth/token",
-    r"^/api/v1/auth/refresh$": "/api/v1/auth/refresh",
-    r"^/api/v1/auth/revoke$": "/api/v1/auth/revoke",
+    r"^/api/v1/oauth/token$": "/api/v1/oauth/token",
+    r"^/api/v1/oauth/refresh$": "/api/v1/oauth/refresh",
+    r"^/api/v1/oauth/revoke$": "/api/v1/oauth/revoke",
     r"^/api/v1/auth/logout$": "/api/v1/auth/logout",
     # OAuth endpoints
     r"^/api/v1/oauth/authorize$": "/api/v1/oauth/authorize",
-    r"^/api/v1/oauth/token$": "/api/v1/oauth/token",
     # OIDC endpoints
     r"^/\.well-known/openid_configuration$": "/.well-known/openid_configuration",
     r"^/\.well-known/jwks\.json$": "/.well-known/jwks.json",
@@ -87,7 +85,7 @@ class MetricsCollector:
 
     def __init__(self):
         """Initialize metrics collector."""
-        self._active_requests: Dict[str, float] = {}
+        self._active_requests: dict[str, float] = {}
 
     def start_request_tracking(self, request: Request, correlation_id: str) -> None:
         """
@@ -112,7 +110,7 @@ class MetricsCollector:
             logger.warning(f"Failed to start request metrics tracking: {e}")
 
     def end_request_tracking(
-        self, request: Request, response: Optional[Response], correlation_id: str, error: Optional[Exception] = None
+        self, request: Request, response: Response | None, correlation_id: str, error: Exception | None = None
     ) -> None:
         """
         End tracking metrics for a request.

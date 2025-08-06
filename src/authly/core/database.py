@@ -6,8 +6,8 @@ pattern with proper dependency injection.
 """
 
 import logging
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
 from urllib.parse import urlparse
 
 from psycopg_pool import AsyncConnectionPool
@@ -68,7 +68,7 @@ async def get_database(config: AuthlyConfig) -> AsyncGenerator[Database, None]:
 
     except Exception as e:
         logger.error(f"Failed to initialize psycopg-toolkit Database: {e}")
-        raise
+        raise RuntimeError("Failed to initialize psycopg-toolkit Database: See logs for details") from None
     finally:
         # Cleanup on shutdown
         logger.info("Shutting down psycopg-toolkit Database")
@@ -128,7 +128,7 @@ async def get_configuration() -> AsyncGenerator[AuthlyConfig, None]:
 
     except Exception as e:
         logger.error(f"Failed to load configuration: {e}")
-        raise
+        raise RuntimeError("Failed to load configuration: See logs for details") from None
     finally:
         # No cleanup needed for config
         logger.debug("Configuration context cleanup completed")

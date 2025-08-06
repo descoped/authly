@@ -21,7 +21,7 @@ dependencies = [
     "python-dotenv>=1.0.1",
     "psycopg>=3.2.3",
     "psycopg-pool>=3.2.4",
-    "psycopg-toolkit>=0.1.5",
+    "psycopg-toolkit>=0.2.0",
     "tenacity>=9.0.0",
     "pydantic>=2.10.5",
     "pydantic-settings>=2.1.0",
@@ -45,6 +45,7 @@ embedded = [
     "testcontainers[postgres]>=4.10.0",
 ]
 dev = [
+    "pytest-xdist>=3.8.0",
     "ruff>=0.8.6",
 ]
 test = [
@@ -65,8 +66,17 @@ asyncio_default_fixture_loop_scope = "function"
 markers = [
     "asyncio: mark test as async",
     "integration: mark test as integration test",
+    "auth: Authentication and user management tests",
+    "oauth: OAuth 2.1 core flow tests",
+    "oidc: OpenID Connect feature tests",
+    "oidc_integration: OIDC integration scenario tests",
+    "admin: Admin portal tests",
+    "admin_users: Admin user management tests",
+    "infrastructure: Core infrastructure tests",
+    "slow: Slow running tests",
+    "unit: Unit tests without external dependencies",
 ]
-addopts = "-m 'not integration'"
+addopts = "-m 'not integration' --verbose --tb=short --strict-markers -ra"
 
 [build-system]
 requires = ["hatchling>=1.26.3"]
@@ -112,49 +122,65 @@ url = "https://test.pypi.org/simple/"
 publish-url = "https://test.pypi.org/legacy/"
 
 [tool.ruff]
-# Target Python 3.11+
 target-version = "py311"
-# Modern line length for readability
 line-length = 120
-# Include all Python files
-include = ["*.py", "*.pyi", "**/pyproject.toml"]
+indent-width = 4
+respect-gitignore = true
+extend-exclude = [
+    "__pycache__",
+    ".pytest_cache",
+    "build",
+    "dist",
+    ".venv",
+    ".env",
+    "htmlcov",
+]
 
 [tool.ruff.lint]
-# Only select rules that catch real errors/bugs that should block builds
 select = [
-    "E9",    # Runtime errors (syntax errors, indentation errors)
-    "F63",   # Invalid print syntax
-    "F7",    # Syntax errors  
-    "I",     # Import sorting
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "N",   # pep8-naming
+    "UP",  # pyupgrade
+    "C4",  # flake8-comprehensions
+    "B",   # flake8-bugbear
+    "A",   # flake8-builtins
+    "T20", # flake8-print
+    "SIM", # flake8-simplify
+    "RUF", # Ruff-specific rules
 ]
-
-# Ignore common architectural patterns and forward references
 ignore = [
-    "E402",   # Module level import not at top (needed for circular import avoidance)
-    "E501",   # Line length (handled by formatter)
-    "E722",   # Bare except (sometimes intentional)
-    "F821",   # Undefined name (forward references in type annotations)
+    "E501",   # Line too long (handled by formatter)
+    "E741",   # Ambiguous variable name
+    "B008",   # Do not perform function calls in argument defaults
+    "B017",   # Assert raises on Exception - sometimes needed for testing
+    "T201",   # Print found (allow print statements)
+    "RUF012", # Mutable class attributes should be annotated with `typing.ClassVar`
+    "RUF013", # PEP 484 prohibits implicit Optional (keeping Optional[] syntax)
 ]
-
-# Allow autofix for all enabled rules
-fixable = ["ALL"]
-unfixable = []
 
 [tool.ruff.lint.per-file-ignores]
 # Test files can have unused imports
-"tests/*" = ["F401"]
+#"tests/*" = ["F401"]
 # Examples can be more relaxed
-"examples/*" = ["F401", "F841"]
+#"examples/*" = ["F401", "F841"]
 
 [tool.ruff.lint.isort]
-# Group imports cleanly
+known-first-party = ["authly"]
+force-single-line = false
 combine-as-imports = true
-force-wrap-aliases = true
+split-on-trailing-comma = true
+
+[tool.ruff.lint.pyupgrade]
+keep-runtime-typing = true
 
 [tool.ruff.format]
-# Use double quotes for strings
 quote-style = "double"
-# Indent with spaces
 indent-style = "space"
-# Unix line endings
-line-ending = "lf"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+docstring-code-format = true
+docstring-code-line-length = "dynamic"
+

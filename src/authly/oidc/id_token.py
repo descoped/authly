@@ -26,8 +26,8 @@ Optional Claims:
 """
 
 import logging
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Any
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -89,10 +89,10 @@ class IDTokenGenerator:
         self,
         user: UserModel,
         client: OAuthClientModel,
-        scopes: List[str],
-        nonce: Optional[str] = None,
-        auth_time: Optional[datetime] = None,
-        additional_claims: Optional[Dict[str, Any]] = None,
+        scopes: list[str],
+        nonce: str | None = None,
+        auth_time: datetime | None = None,
+        additional_claims: dict[str, Any] | None = None,
     ) -> str:
         """
         Generate an ID token for the user.
@@ -120,7 +120,7 @@ class IDTokenGenerator:
 
         try:
             # Generate token timing
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             issued_at = now
             expires_at = now + timedelta(minutes=self.id_token_expire_minutes)
 
@@ -181,12 +181,16 @@ class IDTokenGenerator:
 
         except JWTError as e:
             logger.error(f"Failed to generate ID token: {e}")
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to generate ID token")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to generate ID token"
+            ) from e
         except Exception as e:
             logger.error(f"Unexpected error generating ID token: {e}")
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error"
+            ) from e
 
-    def _extract_user_claims(self, user: UserModel, scopes: List[str]) -> Dict[str, Any]:
+    def _extract_user_claims(self, user: UserModel, scopes: list[str]) -> dict[str, Any]:
         """
         Extract user claims based on granted scopes.
 
@@ -237,7 +241,7 @@ class IDTokenGenerator:
 
         return user_claims
 
-    def _get_user_name(self, user: UserModel) -> Optional[str]:
+    def _get_user_name(self, user: UserModel) -> str | None:
         """
         Get user's full name from the user model.
 
@@ -261,7 +265,7 @@ class IDTokenGenerator:
             # Fallback to username if no name components available
             return user.username
 
-    def validate_id_token(self, token: str, client_id: str) -> Dict[str, Any]:
+    def validate_id_token(self, token: str, client_id: str) -> dict[str, Any]:
         """
         Validate an ID token.
 
@@ -312,17 +316,19 @@ class IDTokenGenerator:
             logger.warning(f"Invalid ID token: {e}")
             # Check if the error is audience-related
             if "audience" in str(e).lower():
-                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid audience")
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid audience") from e
             else:
-                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid ID token")
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid ID token") from e
         except HTTPException:
             # Re-raise HTTPExceptions as-is (don't wrap in 500)
             raise
         except Exception as e:
             logger.error(f"Error validating ID token: {e}")
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Token validation error")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Token validation error"
+            ) from e
 
-    def _validate_id_token_claims(self, claims: Dict[str, Any], expected_client_id: str):
+    def _validate_id_token_claims(self, claims: dict[str, Any], expected_client_id: str):
         """
         Validate ID token claims.
 
@@ -361,7 +367,7 @@ class IDTokenGenerator:
 
         # Validate expiration
         exp = claims[IDTokenClaims.EXP]
-        if datetime.now(timezone.utc).timestamp() > exp:
+        if datetime.now(UTC).timestamp() > exp:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token has expired")
 
     def extract_user_id(self, token: str) -> UUID:
@@ -388,7 +394,7 @@ class IDTokenGenerator:
 
         except (JWTError, ValueError) as e:
             logger.warning(f"Failed to extract user ID from token: {e}")
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token format")
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token format") from None
 
 
 class IDTokenService:
@@ -412,10 +418,10 @@ class IDTokenService:
         self,
         user: UserModel,
         client: OAuthClientModel,
-        scopes: List[str],
-        nonce: Optional[str] = None,
-        auth_time: Optional[datetime] = None,
-        additional_claims: Optional[Dict[str, Any]] = None,
+        scopes: list[str],
+        nonce: str | None = None,
+        auth_time: datetime | None = None,
+        additional_claims: dict[str, Any] | None = None,
     ) -> str:
         """
         Create an ID token for the user.
@@ -440,7 +446,7 @@ class IDTokenService:
             additional_claims=additional_claims,
         )
 
-    async def validate_id_token(self, token: str, client_id: str) -> Dict[str, Any]:
+    async def validate_id_token(self, token: str, client_id: str) -> dict[str, Any]:
         """
         Validate an ID token.
 
@@ -480,7 +486,7 @@ def create_id_token_service(config: AuthlyConfig) -> IDTokenService:
     return IDTokenService(config)
 
 
-def validate_id_token_scopes(scopes: List[str]) -> bool:
+def validate_id_token_scopes(scopes: list[str]) -> bool:
     """
     Validate that scopes are appropriate for ID token generation.
 

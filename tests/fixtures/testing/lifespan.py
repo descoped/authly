@@ -1,6 +1,6 @@
 import logging
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
 
 import pytest
 from fastapi.applications import AppType
@@ -57,16 +57,6 @@ async def resource_manager_test_server(
     server = AsyncTestServer()
     server.app = app
 
-    # Set up dependency injection without app.state
-    from authly.core.dependencies import create_resource_manager_provider, get_resource_manager
-
-    # Create the provider and override the default dependency
-    provider = create_resource_manager_provider(test_resource_manager)
-    app.dependency_overrides[get_resource_manager] = provider
-
-    # Wire up dependencies using proper FastAPI dependency overrides
-    app_: AppType = server.app
-
     # Create test-specific dependency factory functions
     def get_test_resource_manager():
         return test_resource_manager
@@ -104,6 +94,8 @@ async def resource_manager_test_server(
         dependency_overrides[get_database_connection] = db_connection_override
         # Legacy dependency override removed - using resource manager patterns
 
+    # Wire up dependencies using proper FastAPI dependency overrides
+    app_: AppType = server.app
     app_.dependency_overrides.update(dependency_overrides)
 
     try:
@@ -169,9 +161,25 @@ async def custom_test_server(
     # Wire up dependencies using proper FastAPI dependency overrides
     app_: AppType = server.app
 
+    # Set up dependency injection without app.state
+    from authly.core.dependencies import create_resource_manager_provider
+
+    # Create the provider and override the default dependency
+    provider = create_resource_manager_provider(initialize_authly)
+    app.dependency_overrides[get_resource_manager] = provider
+
     # Create test-specific dependency factory functions
+    def get_test_resource_manager():
+        return initialize_authly
+
     def get_test_config() -> AuthlyConfig:
         return test_config
+
+    def get_test_database():
+        return initialize_authly.get_database()
+
+    def get_test_transaction_manager():
+        return initialize_authly.get_transaction_manager()
 
     async def get_test_db_pool():
         return await db.get_pool()
@@ -184,7 +192,10 @@ async def custom_test_server(
 
     # Set up dependency overrides (no app state pollution)
     dependency_overrides = {
+        get_resource_manager: get_test_resource_manager,
         get_config: get_test_config,
+        get_database: get_test_database,
+        get_transaction_manager: get_test_transaction_manager,
         get_database_pool: get_test_db_pool,
         get_database_connection: get_test_db_connection,
     }

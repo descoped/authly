@@ -3,7 +3,6 @@
 import logging
 import secrets
 import time
-from typing import Dict, List, Optional
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -14,13 +13,11 @@ from authly.oauth.client_repository import ClientRepository
 from authly.oauth.models import (
     ClientType,
     GrantType,
-    IDTokenSigningAlgorithm,
     OAuthClientCreateRequest,
     OAuthClientCredentialsResponse,
     OAuthClientModel,
     OAuthClientResponse,
     ResponseType,
-    SubjectType,
     TokenEndpointAuthMethod,
 )
 from authly.oauth.scope_repository import ScopeRepository
@@ -190,7 +187,7 @@ class ClientService:
                 client_name=request.client_name,
             )
 
-        except HTTPException as e:
+        except HTTPException:
             # Track validation errors
             if METRICS_ENABLED and metrics:
                 duration = time.time() - start_time
@@ -217,14 +214,14 @@ class ClientService:
             logger.error(f"Error creating OAuth client: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create OAuth client"
-            ) from e
+            ) from None
 
     async def authenticate_client(
         self,
         client_id: str,
-        client_secret: Optional[str] = None,
+        client_secret: str | None = None,
         auth_method: TokenEndpointAuthMethod = TokenEndpointAuthMethod.CLIENT_SECRET_BASIC,
-    ) -> Optional[OAuthClientModel]:
+    ) -> OAuthClientModel | None:
         """
         Authenticate OAuth client credentials.
 
@@ -416,7 +413,7 @@ class ClientService:
             logger.error(f"Error authenticating client {client_id}: {e}")
             return None
 
-    async def get_client_by_id(self, client_id: str) -> Optional[OAuthClientResponse]:
+    async def get_client_by_id(self, client_id: str) -> OAuthClientResponse | None:
         """Get client information by client_id (without sensitive data)"""
         try:
             client = await self._client_repo.get_by_client_id(client_id)
@@ -449,10 +446,10 @@ class ClientService:
             logger.error(f"Error getting client {client_id}: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to retrieve client"
-            ) from e
+            ) from None
 
     async def update_client(
-        self, client_id: str, update_data: Dict, requesting_admin: bool = False
+        self, client_id: str, update_data: dict, requesting_admin: bool = False
     ) -> OAuthClientResponse:
         """
         Update client information.
@@ -505,7 +502,7 @@ class ClientService:
                 self._validate_redirect_uris(filtered_data["redirect_uris"], existing_client.client_type)
 
             # Validate scopes if being updated
-            if "scope" in filtered_data and filtered_data["scope"]:
+            if filtered_data.get("scope"):
                 await self._validate_scope_string(filtered_data["scope"])
 
             # Update client
@@ -545,7 +542,7 @@ class ClientService:
             logger.error(f"Error updating client {client_id}: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update client"
-            ) from e
+            ) from None
 
     async def deactivate_client(self, client_id: str) -> bool:
         """Deactivate (soft delete) an OAuth client"""
@@ -564,9 +561,9 @@ class ClientService:
             logger.error(f"Error deactivating client {client_id}: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to deactivate client"
-            ) from e
+            ) from None
 
-    async def list_clients(self, limit: int = 100, offset: int = 0) -> List[OAuthClientResponse]:
+    async def list_clients(self, limit: int = 100, offset: int = 0) -> list[OAuthClientResponse]:
         """List active OAuth clients with pagination"""
         try:
             clients = await self._client_repo.get_active_clients(limit=limit, offset=offset)
@@ -600,9 +597,9 @@ class ClientService:
             logger.error(f"Error listing clients: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to list clients"
-            ) from e
+            ) from None
 
-    async def get_client_scopes(self, client_id: str) -> List[str]:
+    async def get_client_scopes(self, client_id: str) -> list[str]:
         """Get all scope names associated with a client"""
         try:
             client = await self._client_repo.get_by_client_id(client_id)
@@ -617,9 +614,9 @@ class ClientService:
             logger.error(f"Error getting client scopes for {client_id}: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get client scopes"
-            ) from e
+            ) from None
 
-    def _validate_redirect_uris(self, redirect_uris: List[str], client_type: ClientType) -> None:
+    def _validate_redirect_uris(self, redirect_uris: list[str], client_type: ClientType) -> None:
         """Validate redirect URIs according to OAuth 2.1 security requirements"""
         if not redirect_uris:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="At least one redirect URI is required")
@@ -686,12 +683,11 @@ class ClientService:
             is_oidc_client = "openid" in scopes
 
         # Validate sector_identifier_uri for pairwise subject type
-        if request.subject_type == "pairwise" and not request.sector_identifier_uri:
-            if is_oidc_client:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="sector_identifier_uri is required for pairwise subject type",
-                )
+        if request.subject_type == "pairwise" and not request.sector_identifier_uri and is_oidc_client:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="sector_identifier_uri is required for pairwise subject type",
+            )
 
         # Validate default_max_age
         if request.default_max_age is not None and request.default_max_age < 0:
@@ -719,7 +715,7 @@ class ClientService:
                 status_code=status.HTTP_400_BAD_REQUEST, detail="application_type must be 'web' or 'native'"
             )
 
-    async def _assign_scopes_to_client(self, client_id: UUID, scope_string: Optional[str]) -> None:
+    async def _assign_scopes_to_client(self, client_id: UUID, scope_string: str | None) -> None:
         """Assign scopes to a client by creating client-scope associations"""
         if not scope_string:
             return
@@ -736,7 +732,7 @@ class ClientService:
         for scope_id in scope_ids:
             await self._client_repo.add_client_scope(client_id, scope_id)
 
-    async def regenerate_client_secret(self, client_id: str) -> Optional[str]:
+    async def regenerate_client_secret(self, client_id: str) -> str | None:
         """
         Regenerate client secret for confidential clients.
 
@@ -770,4 +766,4 @@ class ClientService:
             logger.error(f"Error regenerating client secret for {client_id}: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to regenerate client secret"
-            ) from e
+            ) from None

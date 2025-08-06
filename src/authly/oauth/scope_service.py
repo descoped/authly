@@ -1,7 +1,6 @@
 """OAuth 2.1 scope service layer for business logic."""
 
 import logging
-from typing import Dict, List, Optional
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -24,7 +23,7 @@ class ScopeService:
         self._scope_repo = scope_repo
 
     async def create_scope(
-        self, scope_name: str, description: Optional[str] = None, is_default: bool = False, is_active: bool = True
+        self, scope_name: str, description: str | None = None, is_default: bool = False, is_active: bool = True
     ) -> OAuthScopeModel:
         """
         Create a new OAuth scope with validation.
@@ -71,9 +70,9 @@ class ScopeService:
             logger.error(f"Error creating scope {scope_name}: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create scope"
-            ) from e
+            ) from None
 
-    async def get_scope_by_name(self, scope_name: str) -> Optional[OAuthScopeModel]:
+    async def get_scope_by_name(self, scope_name: str) -> OAuthScopeModel | None:
         """Get scope by name"""
         try:
             return await self._scope_repo.get_by_scope_name(scope_name)
@@ -81,9 +80,9 @@ class ScopeService:
             logger.error(f"Error getting scope {scope_name}: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to retrieve scope"
-            ) from e
+            ) from None
 
-    async def update_scope(self, scope_name: str, update_data: Dict, requesting_admin: bool = True) -> OAuthScopeModel:
+    async def update_scope(self, scope_name: str, update_data: dict, requesting_admin: bool = True) -> OAuthScopeModel:
         """
         Update scope information.
 
@@ -130,7 +129,7 @@ class ScopeService:
             logger.error(f"Error updating scope {scope_name}: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update scope"
-            ) from e
+            ) from None
 
     async def deactivate_scope(self, scope_name: str, requesting_admin: bool = True) -> bool:
         """
@@ -171,11 +170,11 @@ class ScopeService:
             logger.error(f"Error deactivating scope {scope_name}: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to deactivate scope"
-            ) from e
+            ) from None
 
     async def list_scopes(
         self, limit: int = 100, offset: int = 0, include_inactive: bool = False
-    ) -> List[OAuthScopeModel]:
+    ) -> list[OAuthScopeModel]:
         """
         List OAuth scopes with pagination.
 
@@ -199,9 +198,9 @@ class ScopeService:
             logger.error(f"Error listing scopes: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to list scopes"
-            ) from e
+            ) from None
 
-    async def get_default_scopes(self) -> List[OAuthScopeModel]:
+    async def get_default_scopes(self) -> list[OAuthScopeModel]:
         """Get all default scopes (automatically granted)"""
         try:
             return await self._scope_repo.get_default_scopes()
@@ -209,11 +208,11 @@ class ScopeService:
             logger.error(f"Error getting default scopes: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get default scopes"
-            ) from e
+            ) from None
 
     async def validate_requested_scopes(
         self, requested_scopes: str, client_id: UUID, include_defaults: bool = True
-    ) -> List[str]:
+    ) -> list[str]:
         """
         Validate and filter requested scopes for a client.
 
@@ -230,10 +229,7 @@ class ScopeService:
         """
         try:
             # Parse requested scopes
-            if not requested_scopes.strip():
-                requested_scope_names = []
-            else:
-                requested_scope_names = requested_scopes.split()
+            requested_scope_names = [] if not requested_scopes.strip() else requested_scopes.split()
 
             # Get client's allowed scopes
             client_scopes = await self._scope_repo.get_scopes_for_client(client_id)
@@ -281,9 +277,9 @@ class ScopeService:
             logger.error(f"Error validating scopes for client {client_id}: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to validate scopes"
-            ) from e
+            ) from None
 
-    async def reduce_scopes_to_granted(self, requested_scopes: List[str], granted_scopes: List[str]) -> List[str]:
+    async def reduce_scopes_to_granted(self, requested_scopes: list[str], granted_scopes: list[str]) -> list[str]:
         """
         Reduce requested scopes to those actually granted.
 
@@ -317,7 +313,7 @@ class ScopeService:
             # Return empty list on error for security
             return []
 
-    async def associate_token_with_scopes(self, token_id: UUID, scope_names: List[str]) -> int:
+    async def associate_token_with_scopes(self, token_id: UUID, scope_names: list[str]) -> int:
         """
         Associate a token with specific scopes.
 
@@ -352,9 +348,9 @@ class ScopeService:
             logger.error(f"Error associating token {token_id} with scopes: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to associate token with scopes"
-            ) from e
+            ) from None
 
-    async def get_token_scopes(self, token_id: UUID) -> List[str]:
+    async def get_token_scopes(self, token_id: UUID) -> list[str]:
         """
         Get all scope names associated with a token.
 
@@ -371,7 +367,7 @@ class ScopeService:
             logger.error(f"Error getting scopes for token {token_id}: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get token scopes"
-            ) from e
+            ) from None
 
     async def check_token_has_scope(self, token_id: UUID, required_scope: str) -> bool:
         """
@@ -392,7 +388,7 @@ class ScopeService:
             # Default to False for security
             return False
 
-    async def check_token_has_any_scope(self, token_id: UUID, required_scopes: List[str]) -> bool:
+    async def check_token_has_any_scope(self, token_id: UUID, required_scopes: list[str]) -> bool:
         """
         Check if a token has any of the required scopes.
 
@@ -414,7 +410,7 @@ class ScopeService:
             # Default to False for security
             return False
 
-    async def check_token_has_all_scopes(self, token_id: UUID, required_scopes: List[str]) -> bool:
+    async def check_token_has_all_scopes(self, token_id: UUID, required_scopes: list[str]) -> bool:
         """
         Check if a token has all of the required scopes.
 

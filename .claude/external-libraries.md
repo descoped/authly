@@ -3,12 +3,14 @@
 This document contains learnings and usage patterns for external libraries developed by the Descoped team that are used in this project.
 
 **Local Repository References:**
-- **psycopg-toolkit**: `../psycopg-toolkit/` (local development repository)
+- **psycopg-toolkit**: `../psycopg-toolkit/` (local development repository) - **v0.2.1 with JSONB support**
 - **fastapi-testing**: `../fastapi-testing/` (local development repository)
 
-## psycopg-toolkit
+## psycopg-toolkit (v0.2.2)
 
-The `psycopg-toolkit` library provides enhanced PostgreSQL operations with modern async patterns, connection pooling, and transaction management.
+The `psycopg-toolkit` library provides enhanced PostgreSQL operations with modern async patterns, connection pooling, transaction management, and comprehensive JSONB support with array field preservation and date field conversion.
+
+**Latest Update (v0.2.2)**: Enhanced `date_fields` parameter to handle both DATE and TIMESTAMP types, fully resolving date/timestamp conversion issues for Pydantic models.
 
 ### Key Components
 
@@ -132,6 +134,60 @@ query = PsycopgHelper.build_select_query(
 )
 ```
 
+#### Common Pitfalls
+
+##### 1. Forgetting to Include All Date/Timestamp Fields
+```python
+# ❌ Incomplete - missing timestamp fields
+date_fields={"birthdate"}  # Missing created_at, updated_at, etc.
+
+# ✅ Complete - all date/timestamp fields included
+date_fields={"birthdate", "created_at", "updated_at", "last_login"}
+```
+
+##### 2. Mixing Array and JSONB List Fields
+```python
+# ❌ All lists become JSONB
+auto_detect_json=True  # redirect_uris becomes JSONB!
+
+# ✅ Preserve PostgreSQL arrays
+auto_detect_json=True,
+array_fields={"redirect_uris", "grant_types", "scopes"}
+```
+
+#### Testing JSONB Features
+
+```python
+# Test JSONB field updates
+async def test_jsonb_update():
+    user = await user_repo.create(UserModel(
+        username="test",
+        address={"city": "Boston", "state": "MA"}
+    ))
+    
+    # Update nested JSONB
+    updated = await user_repo.update(user.id, {
+        "address": {**user.address, "postal_code": "02101"}
+    })
+    assert updated.address["postal_code"] == "02101"
+
+# Test array preservation
+async def test_array_fields():
+    client = await client_repo.create(OAuthClientModel(
+        client_id="test",
+        redirect_uris=["http://localhost:3000", "http://localhost:3001"]
+    ))
+    
+    # Arrays stored as PostgreSQL TEXT[]
+    async with conn.cursor() as cur:
+        await cur.execute(
+            "SELECT redirect_uris[1] FROM oauth_clients WHERE id = %s",
+            [client.id]
+        )
+        first_uri = await cur.fetchone()
+        assert first_uri[0] == "http://localhost:3000"
+```
+
 ### Common Patterns
 
 #### Repository Implementation
@@ -174,6 +230,373 @@ if "grant_types" in data:
 - Always catch and re-raise as `OperationError` or `RecordNotFoundError`
 - Use descriptive error messages
 - Log errors before re-raising
+
+### JSONB Support (v0.2.2)
+
+**See `../psycopg-toolkit/docs/jsonb_support.md` for comprehensive documentation**
+
+**Key Features in v0.2.2**:
+- `array_fields` parameter preserves PostgreSQL array types (TEXT[], INTEGER[])
+- `date_fields` parameter handles both DATE and TIMESTAMP/TIMESTAMPTZ types
+- Full control over JSONB processing with `auto_detect_json`
+- Clear field precedence: array_fields > json_fields > auto_detect
+
+#### Overview
+psycopg-toolkit v0.2.1 provides comprehensive JSONB support with:
+- Automatic JSON field detection from Pydantic type hints
+- Array field preservation for PostgreSQL array types (NEW)
+- Date field conversion between PostgreSQL and Pydantic (NEW)
+- Seamless serialization/deserialization between Python objects and PostgreSQL JSONB
+- Multiple configuration approaches for different use cases
+- psycopg JSON adapter integration for optimal performance
+
+#### Key Features (v0.2.2)
+
+##### 1. Automatic JSON Field Detection
+The toolkit automatically detects these types as JSON fields when `auto_detect_json=True`:
+- `Dict[K, V]` - Any dictionary type → JSONB
+- `List[T]` - Any list type → JSONB (unless in `array_fields`)
+- `Optional[Dict[K, V]]` / `Optional[List[T]]` - Optional JSON types → JSONB
+- `Union` types containing dictionaries or lists → JSONB
+- Complex nested structures (e.g., `List[Dict[str, Any]]`) → JSONB
+
+**Note**: When `auto_detect_json=False` with psycopg JSON adapters enabled, you may see "Failed to deserialize JSON field" warnings. These are expected and can be safely ignored.
+
+##### 2. Array Field Preservation (NEW in v0.2.1)
+Preserve PostgreSQL native array types (TEXT[], INTEGER[]) instead of converting to JSONB:
+```python
+class ClientRepository(BaseRepository[OAuthClientModel, UUID]):
+    def __init__(self, db_connection):
+        super().__init__(
+            db_connection=db_connection,
+            table_name="oauth_clients",
+            model_class=OAuthClientModel,
+            primary_key="id",
+            auto_detect_json=True,  # Detects Dict fields as JSON
+            array_fields={"redirect_uris", "grant_types", "response_types"}  # Keep as PostgreSQL arrays
+        )
+```
+
+**Use Cases for Array Fields**:
+- Simple list values that benefit from PostgreSQL array operators
+- Fields that need array-specific indexing (GIN, GiST)
+- Legacy database schemas using array columns
+- Performance-critical queries using array containment operators
+
+##### 3. Date Field Conversion (Enhanced in v0.2.2)
+Automatic conversion between PostgreSQL DATE/TIMESTAMP and Pydantic string fields:
+```python
+class UserRepository(BaseRepository[UserModel, UUID]):
+    def __init__(self, db_connection):
+        super().__init__(
+            db_connection=db_connection,
+            table_name="users",
+            model_class=UserModel,
+            primary_key="id",
+            auto_detect_json=True,
+            # Include ALL date/timestamp fields
+            date_fields={"birthdate", "created_at", "updated_at", "last_login"}
+        )
+```
+
+**Important**: Include ALL date and timestamp fields in `date_fields`, not just DATE columns:
+- DATE columns (e.g., `birthdate`)
+- TIMESTAMP columns (e.g., `created_at`, `updated_at`)
+- TIMESTAMPTZ columns (timezone-aware timestamps)
+- Nullable date/timestamp fields (e.g., `last_login`)
+
+**Conversion Behavior**:
+- PostgreSQL DATE → ISO date string ("2024-01-15")
+- PostgreSQL TIMESTAMP → ISO datetime string ("2024-01-15T10:30:00")
+- PostgreSQL TIMESTAMPTZ → ISO datetime string with timezone
+- Python string → PostgreSQL DATE/TIMESTAMP (automatic)
+- Handles None/NULL values gracefully
+
+#### Configuration for Authly (v0.2.1)
+
+With the new features, Authly can completely remove manual JSON handling:
+
+```python
+# UserRepository - handles JSONB address and date conversion
+class UserRepository(BaseRepository[UserModel, UUID]):
+    def __init__(self, db_connection: AsyncConnection):
+        super().__init__(
+            db_connection=db_connection,
+            table_name="users",
+            model_class=UserModel,
+            primary_key="id",
+            auto_detect_json=True,  # Detects address as JSONB
+            date_fields={"birthdate"}  # Converts date to ISO string
+        )
+# Remove ALL custom methods - no more manual JSON or date handling!
+
+# ClientRepository - preserves arrays, handles JSONB
+class ClientRepository(BaseRepository[OAuthClientModel, UUID]):
+    def __init__(self, db_connection: AsyncConnection):
+        super().__init__(
+            db_connection=db_connection,
+            table_name="oauth_clients",
+            model_class=OAuthClientModel,
+            primary_key="id",
+            auto_detect_json=True,  # Detects metadata as JSONB
+            array_fields={"redirect_uris", "grant_types", "response_types", "request_uris", "contacts"}
+        )
+# Remove custom create() method - arrays handled automatically!
+```
+
+#### Field Precedence (v0.2.2)
+The order of precedence for field handling:
+1. `array_fields` (highest priority - overrides JSON detection)
+2. `json_fields` (explicit JSON fields)
+3. `auto_detect_json` (lowest priority - automatic detection)
+
+**Example**: If a field is both auto-detected as JSON and listed in `array_fields`, it will be treated as a PostgreSQL array, not JSONB.
+
+**Processing Modes**:
+- `auto_detect_json=True`: Always uses custom JSON processing
+- `auto_detect_json=False` with no `json_fields`: Uses psycopg adapters
+- Explicit `json_fields`: Always uses custom processing
+
+#### Configuration Approaches
+
+##### 1. Repository-Level Configuration (Recommended for Authly)
+```python
+# Fine-grained control per repository
+class UserRepository(BaseRepository[UserModel, UUID]):
+    def __init__(self, db_connection):
+        super().__init__(
+            db_connection=db_connection,
+            table_name="users",
+            model_class=UserModel,
+            primary_key="id",
+            auto_detect_json=True,  # Enable for this repository
+            date_fields={"birthdate"}  # Repository-specific date handling
+        )
+
+class ClientRepository(BaseRepository[OAuthClientModel, UUID]):
+    def __init__(self, db_connection):
+        super().__init__(
+            db_connection=db_connection,
+            table_name="oauth_clients",
+            model_class=OAuthClientModel,
+            primary_key="id",
+            auto_detect_json=True,
+            array_fields={"redirect_uris", "grant_types", "response_types", "contacts"}
+        )
+```
+
+##### 2. psycopg JSON Adapters (Alternative Approach)
+```python
+# Enable at database level
+settings = DatabaseSettings(
+    host="localhost",
+    port=5432,
+    dbname="mydb",
+    user="user",
+    password="password",
+    enable_json_adapters=True  # Enable psycopg JSON adapters
+)
+
+# Let psycopg handle JSON
+class UserRepository(BaseRepository[UserProfile, int]):
+    def __init__(self, db_connection):
+        super().__init__(
+            db_connection=db_connection,
+            table_name="users",
+            model_class=UserProfile,
+            primary_key="id",
+            auto_detect_json=False  # Let psycopg handle JSON
+        )
+```
+
+##### 3. Mixed Configuration Example
+```python
+# Complex repository with all features
+class OrderRepository(BaseRepository[Order, UUID]):
+    def __init__(self, db_connection):
+        super().__init__(
+            db_connection=db_connection,
+            table_name="orders",
+            model_class=Order,
+            primary_key="id",
+            auto_detect_json=True,  # Auto-detect Dict/List fields
+            array_fields={"tags", "categories"},  # Keep as arrays
+            date_fields={"created_at", "shipped_at", "delivered_at"},  # Convert dates
+            strict_json_processing=True  # Raise errors on JSON issues
+        )
+```
+
+##### 4. Disable All JSONB Features
+When you need full control over JSON/JSONB processing:
+```python
+class LegacyRepository(BaseRepository[LegacyModel, int]):
+    def __init__(self, db_connection):
+        super().__init__(
+            db_connection=db_connection,
+            table_name="legacy_table",
+            model_class=LegacyModel,
+            primary_key="id",
+            json_fields=set(),      # Empty set = no JSON fields
+            auto_detect_json=False  # No auto-detection
+        )
+        # Handle JSON manually in custom methods if needed
+```
+
+#### JSONB Query Operators
+PostgreSQL JSONB operators for queries:
+- `->` - Get JSON object field (returns JSON)
+- `->>` - Get JSON object field as text
+- `#>` - Get JSON object at path (returns JSON)
+- `#>>` - Get JSON object at path as text
+- `?` - Does JSON contain key?
+- `?|` - Does JSON contain any of these keys?
+- `?&` - Does JSON contain all of these keys?
+- `@>` - Does JSON contain sub-JSON?
+- `<@` - Is JSON contained within?
+- `||` - Concatenate JSON objects
+- `jsonb_set()` - Update specific paths
+- `jsonb_array_length()` - Get array length
+- `jsonb_array_elements()` - Expand JSON array
+- `jsonb_path_query()` - SQL/JSON path queries (PostgreSQL 12+)
+
+Example queries:
+```python
+# Find users by address city
+await cur.execute("""
+    SELECT username FROM users
+    WHERE address->>'city' = 'Boston'
+""")
+
+# Update nested JSON data
+await cur.execute("""
+    UPDATE users 
+    SET address = jsonb_set(
+        address,
+        '{street}',
+        %s::jsonb
+    )
+    WHERE id = %s
+""", ['"123 New Street"', user_id])
+```
+
+#### Error Handling
+JSON-specific exceptions:
+- `JSONProcessingError` - Base JSON error
+- `JSONSerializationError` - Serialization failures
+- `JSONDeserializationError` - Deserialization failures
+
+```python
+from psycopg_toolkit import JSONSerializationError, JSONDeserializationError
+
+try:
+    user = await repo.create(user_data)
+except JSONSerializationError as e:
+    print(f"Failed to serialize field {e.field_name}: {e}")
+except JSONDeserializationError as e:
+    print(f"Failed to deserialize field {e.field_name}: {e}")
+```
+
+#### Migration Path for Authly (v0.2.2)
+
+1. **UserRepository Migration**:
+   ```python
+   # Before: Manual JSON handling
+   if "address" in data and isinstance(data["address"], dict):
+       data["address"] = json.dumps(data["address"])
+   
+   # After: Automatic with v0.2.2
+   super().__init__(
+       auto_detect_json=True,
+       date_fields={"birthdate", "created_at", "updated_at", "last_login"}
+   )
+   ```
+
+2. **ClientRepository Migration**:
+   ```python
+   # Before: Manual array handling
+   if "redirect_uris" in data:
+       data["redirect_uris"] = list(data["redirect_uris"])
+   
+   # After: Automatic with v0.2.1
+   super().__init__(
+       auto_detect_json=True,
+       array_fields={"redirect_uris", "grant_types", "response_types", "contacts"}
+   )
+   ```
+
+3. **Benefits Achieved**:
+   - ✅ ~150 lines of manual code removed
+   - ✅ Automatic JSONB serialization/deserialization
+   - ✅ Complete date/timestamp field handling (v0.2.2)
+   - ✅ PostgreSQL array preservation
+   - ✅ Better performance with psycopg optimizations
+   - ✅ Cleaner, more maintainable architecture
+
+#### Performance Optimization
+For best performance with JSONB:
+```sql
+-- Create GIN indexes for JSONB columns
+CREATE INDEX idx_users_address ON users USING GIN (address);
+
+-- Create functional indexes for specific queries
+CREATE INDEX idx_users_city ON users USING BTREE ((address->>'city'));
+
+-- For array columns, use GIN with array operators
+CREATE INDEX idx_clients_uris ON oauth_clients USING GIN (redirect_uris);
+```
+
+#### Common Patterns and Best Practices
+
+##### Pattern 1: OIDC User Profile with Address
+```python
+class UserModel(BaseModel):
+    # Standard fields
+    username: str
+    email: str
+    
+    # JSONB field for OIDC address claim
+    address: Dict[str, Any] | None = None  # {formatted, street_address, locality, ...}
+    
+    # Date field needing conversion
+    birthdate: str | None = None  # ISO date string
+
+# Repository automatically handles both
+UserRepository(..., auto_detect_json=True, date_fields={"birthdate"})
+```
+
+##### Pattern 2: OAuth Client with Arrays
+```python
+class OAuthClientModel(BaseModel):
+    # PostgreSQL arrays (not JSONB)
+    redirect_uris: List[str]  # TEXT[]
+    grant_types: List[str]    # TEXT[]
+    
+    # JSONB field
+    metadata: Dict[str, Any] | None = None
+
+# Repository preserves arrays, detects JSONB
+ClientRepository(..., auto_detect_json=True, array_fields={"redirect_uris", "grant_types"})
+```
+
+##### Pattern 3: Complex Nested Structures
+```python
+class OrderModel(BaseModel):
+    # Complex JSONB with nested objects
+    items: List[Dict[str, Any]]  # [{product_id, quantity, price, ...}]
+    shipping_address: Dict[str, Any]  # {street, city, state, ...}
+    
+    # Simple PostgreSQL array
+    tags: List[str]  # TEXT[]
+
+# Mixed configuration
+OrderRepository(..., auto_detect_json=True, array_fields={"tags"})
+```
+
+#### Key Examples
+- **Array & Date Fields**: `../psycopg-toolkit/examples/array_and_date_fields.py` - v0.2.2 features
+- **Simple Usage**: `../psycopg-toolkit/examples/jsonb_usage_simple.py` - Basic JSONB operations
+- **Complex Operations**: `../psycopg-toolkit/examples/complex_json_operations.py` - Advanced patterns
+- **Full Documentation**: `../psycopg-toolkit/docs/jsonb_support.md` - Complete reference
 
 ## fastapi-testing
 

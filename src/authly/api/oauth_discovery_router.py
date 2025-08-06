@@ -68,22 +68,22 @@ def _build_issuer_url(request: Request) -> str:
     summary="OAuth 2.1 Authorization Server Discovery",
     description="""
     OAuth 2.1 Authorization Server Metadata endpoint as defined in RFC 8414.
-    
+
     Returns server capabilities, supported features, and endpoint URLs.
-    This endpoint provides essential information for OAuth 2.1 clients to 
+    This endpoint provides essential information for OAuth 2.1 clients to
     discover server capabilities and construct proper authorization requests.
-    
+
     **Key Features:**
     - OAuth 2.1 compliant metadata
     - PKCE requirement indication (mandatory in OAuth 2.1)
     - Supported grant types and response types
     - Client authentication methods
     - Dynamic scope discovery from database
-    
+
     **Security:**
     - No authentication required (public endpoint)
     - Rate limiting applied through server configuration
-    
+
     **RFC 8414 Compliance:**
     - Endpoint accessible at root level without API prefix
     - Standard .well-known path for OAuth server metadata discovery
@@ -96,8 +96,8 @@ def _build_issuer_url(request: Request) -> str:
                     "example": {
                         "issuer": "https://auth.example.com",
                         "authorization_endpoint": "https://auth.example.com/api/v1/oauth/authorize",
-                        "token_endpoint": "https://auth.example.com/api/v1/auth/token",
-                        "revocation_endpoint": "https://auth.example.com/api/v1/auth/revoke",
+                        "token_endpoint": "https://auth.example.com/api/v1/oauth/token",
+                        "revocation_endpoint": "https://auth.example.com/api/v1/oauth/revoke",
                         "response_types_supported": ["code"],
                         "grant_types_supported": ["authorization_code", "refresh_token"],
                         "code_challenge_methods_supported": ["S256"],

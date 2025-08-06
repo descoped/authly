@@ -7,11 +7,11 @@ from authly.tokens.repository import TokenRepository
 from authly.tokens.service import TokenService
 
 __all__ = [
-    "TokenType",
     "TokenModel",
     "TokenPairResponse",
     "TokenRepository",
     "TokenService",
+    "TokenType",
     "get_token_repository",
     "get_token_service",
 ]

@@ -1,6 +1,5 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -20,13 +19,13 @@ class TokenModel(BaseModel):
     token_type: TokenType
     token_value: str  # The actual JWT token value
     invalidated: bool = False
-    invalidated_at: Optional[datetime] = None
+    invalidated_at: datetime | None = None
     expires_at: datetime
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     # OAuth 2.1 fields (matches database schema)
-    client_id: Optional[UUID] = None  # For OAuth flows
-    scope: Optional[str] = None  # Space-separated scopes
+    client_id: UUID | None = None  # For OAuth flows
+    scope: str | None = None  # Space-separated scopes
 
 
 class TokenPairResponse(BaseModel):
@@ -36,4 +35,4 @@ class TokenPairResponse(BaseModel):
     refresh_token: str
     token_type: str = "Bearer"
     expires_in: int  # Access token expiration in seconds
-    id_token: Optional[str] = None  # ID token for OpenID Connect flows
+    id_token: str | None = None  # ID token for OpenID Connect flows

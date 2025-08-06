@@ -8,11 +8,10 @@ using the AdminAPIClient.
 import asyncio
 import os
 from getpass import getpass
-from typing import Optional
 
 import click
 
-from authly.admin.api_client import AdminAPIClient, AdminAPIError
+from authly.admin.api_client import AdminAPIClient
 
 
 def get_api_url() -> str:
@@ -42,7 +41,7 @@ def auth_group():
     help="OAuth scopes to request",
 )
 @click.option("--api-url", help="API URL (default: http://localhost:8000 or AUTHLY_API_URL env var)")
-def login(username: str, password: Optional[str], scope: str, api_url: Optional[str]):
+def login(username: str, password: str | None, scope: str, api_url: str | None):
     """
     Login to the Authly Admin API.
 
@@ -55,16 +54,10 @@ def login(username: str, password: Optional[str], scope: str, api_url: Optional[
 
     async def run_login():
         # Get API URL
-        if api_url:
-            base_url = api_url
-        else:
-            base_url = get_api_url()
+        base_url = api_url or get_api_url()
 
         # Get password if not provided
-        if not password:
-            password_input = getpass("Password: ")
-        else:
-            password_input = password
+        password_input = password if password else getpass("Password: ")
 
         async with AdminAPIClient(base_url=base_url) as client:
             try:
@@ -85,7 +78,7 @@ def login(username: str, password: Optional[str], scope: str, api_url: Optional[
 
             except Exception as e:
                 click.echo(f"❌ Login failed: {e}")
-                raise click.ClickException(f"Authentication failed: {e}")
+                raise click.ClickException(f"Authentication failed: {e}") from e
 
     asyncio.run(run_login())
 
@@ -109,7 +102,7 @@ def logout():
                     click.echo("✅ Successfully logged out")
                     click.echo("   Tokens have been revoked and cleared")
                 else:
-                    click.echo("ℹ️  Already logged out")
+                    click.echo("i  Already logged out")
             except Exception as e:
                 click.echo(f"⚠️  Logout warning: {e}")
                 # Still clear tokens locally even if server logout fails
@@ -169,7 +162,7 @@ def whoami(verbose: bool):
             except Exception as e:
                 click.echo(f"❌ Authentication verification failed: {e}")
                 click.echo("   Your token may have expired. Try logging in again.")
-                raise click.ClickException(f"Authentication verification failed: {e}")
+                raise click.ClickException(f"Authentication verification failed: {e}") from e
 
     asyncio.run(run_whoami())
 
@@ -229,7 +222,7 @@ def status(verbose: bool):
                     click.echo(f"   OAuth scopes: {scopes_info.get('total', 0)}")
 
             except Exception as e:
-                click.echo(f"⚠️  Authentication: Token may be expired")
+                click.echo("⚠️  Authentication: Token may be expired")
                 click.echo(f"   Error: {e}")
                 click.echo("   Try logging in again with 'authly-admin auth login'")
 
@@ -274,7 +267,7 @@ def refresh():
             except Exception as e:
                 click.echo(f"❌ Token refresh failed: {e}")
                 click.echo("   Use 'authly-admin auth login' to authenticate")
-                raise click.ClickException(f"Token refresh failed: {e}")
+                raise click.ClickException(f"Token refresh failed: {e}") from e
 
     asyncio.run(run_refresh())
 
@@ -290,7 +283,7 @@ def refresh():
     help="OAuth scopes to request",
 )
 @click.option("--api-url", help="API URL (default: http://localhost:8000 or AUTHLY_API_URL env var)")
-def login_alias(username: str, password: Optional[str], scope: str, api_url: Optional[str]):
+def login_alias(username: str, password: str | None, scope: str, api_url: str | None):
     """Alias for 'auth login' command."""
     # Create a context to pass to the login command
     ctx = click.Context(login)

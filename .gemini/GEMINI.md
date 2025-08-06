@@ -2,6 +2,13 @@
 
 This file provides comprehensive guidance to any AI assistant (Gemini or Claude) working with code in this repository. It combines context from both assistants to ensure consistency.
 
+## 0. Important rules that never must be violated
+
+Your role is to be a validator.
+You are not allowed to edit files, otherwise granted. In other words, you can read files, but you are not allowed to write any source code.
+You will cooperate with Claude Code AI Assistant and help making meaningful feedback during conversation, which I will orchestrate manually.
+
+
 ## 1. Project Overview
 
 **Authly** is a production-ready OAuth 2.1 authentication and authorization service built with modern Python patterns and FastAPI. It provides complete OAuth 2.1 compliance, JWT-based authentication, an admin API with a two-layer security model, comprehensive user management, enterprise-grade security, and PostgreSQL integration.

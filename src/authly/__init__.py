@@ -30,6 +30,7 @@ from authly.core.resource_manager import AuthlyResourceManager
 __all__ = [
     "AuthlyConfig",
     "AuthlyResourceManager",
+    "__version__",
 ]
 
 # Import version dynamically

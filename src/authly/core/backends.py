@@ -9,7 +9,7 @@ import json
 import logging
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +51,7 @@ class CacheBackend(ABC):
     """Abstract interface for caching backends."""
 
     @abstractmethod
-    async def get(self, key: str) -> Optional[str]:
+    async def get(self, key: str) -> str | None:
         """Get value from cache.
 
         Args:
@@ -63,7 +63,7 @@ class CacheBackend(ABC):
         pass
 
     @abstractmethod
-    async def set(self, key: str, value: str, ttl: Optional[int] = None) -> bool:
+    async def set(self, key: str, value: str, ttl: int | None = None) -> bool:
         """Set value in cache.
 
         Args:
@@ -105,7 +105,7 @@ class SessionBackend(ABC):
     """Abstract interface for session storage backends."""
 
     @abstractmethod
-    async def get_session(self, session_id: str) -> Optional[Dict[str, Any]]:
+    async def get_session(self, session_id: str) -> dict[str, Any] | None:
         """Get session data.
 
         Args:
@@ -117,7 +117,7 @@ class SessionBackend(ABC):
         pass
 
     @abstractmethod
-    async def set_session(self, session_id: str, data: Dict[str, Any], ttl: Optional[int] = None) -> bool:
+    async def set_session(self, session_id: str, data: dict[str, Any], ttl: int | None = None) -> bool:
         """Set session data.
 
         Args:
@@ -150,7 +150,7 @@ class MemoryRateLimitBackend(RateLimitBackend):
     """In-memory rate limiting backend."""
 
     def __init__(self):
-        self.requests: Dict[str, List[datetime]] = {}
+        self.requests: dict[str, list[datetime]] = {}
 
     async def check_rate_limit(self, key: str, max_requests: int, window_seconds: int) -> bool:
         """Check rate limit using in-memory storage."""
@@ -183,9 +183,9 @@ class MemoryCacheBackend(CacheBackend):
     """In-memory caching backend."""
 
     def __init__(self):
-        self.cache: Dict[str, Dict[str, Union[str, datetime]]] = {}
+        self.cache: dict[str, dict[str, str | datetime]] = {}
 
-    async def get(self, key: str) -> Optional[str]:
+    async def get(self, key: str) -> str | None:
         """Get value from memory cache."""
         if key not in self.cache:
             return None
@@ -200,7 +200,7 @@ class MemoryCacheBackend(CacheBackend):
 
         return entry["value"]
 
-    async def set(self, key: str, value: str, ttl: Optional[int] = None) -> bool:
+    async def set(self, key: str, value: str, ttl: int | None = None) -> bool:
         """Set value in memory cache."""
         expires_at = None
         if ttl:
@@ -236,9 +236,9 @@ class MemorySessionBackend(SessionBackend):
     """In-memory session storage backend."""
 
     def __init__(self):
-        self.sessions: Dict[str, Dict[str, Union[Dict[str, Any], datetime]]] = {}
+        self.sessions: dict[str, dict[str, dict[str, Any] | datetime]] = {}
 
-    async def get_session(self, session_id: str) -> Optional[Dict[str, Any]]:
+    async def get_session(self, session_id: str) -> dict[str, Any] | None:
         """Get session from memory storage."""
         if session_id not in self.sessions:
             return None
@@ -253,7 +253,7 @@ class MemorySessionBackend(SessionBackend):
 
         return entry["data"]
 
-    async def set_session(self, session_id: str, data: Dict[str, Any], ttl: Optional[int] = None) -> bool:
+    async def set_session(self, session_id: str, data: dict[str, Any], ttl: int | None = None) -> bool:
         """Set session in memory storage."""
         expires_at = None
         if ttl:
@@ -333,7 +333,7 @@ class RedisCacheBackend(CacheBackend):
     def __init__(self, redis_client):
         self.redis = redis_client
 
-    async def get(self, key: str) -> Optional[str]:
+    async def get(self, key: str) -> str | None:
         """Get value from Redis cache."""
         try:
             value = await self.redis.get(key)
@@ -342,7 +342,7 @@ class RedisCacheBackend(CacheBackend):
             logger.error(f"Redis cache get error: {e}")
             return None
 
-    async def set(self, key: str, value: str, ttl: Optional[int] = None) -> bool:
+    async def set(self, key: str, value: str, ttl: int | None = None) -> bool:
         """Set value in Redis cache."""
         try:
             if ttl:
@@ -384,7 +384,7 @@ class RedisSessionBackend(SessionBackend):
         """Generate Redis key for session."""
         return f"{self.key_prefix}{session_id}"
 
-    async def get_session(self, session_id: str) -> Optional[Dict[str, Any]]:
+    async def get_session(self, session_id: str) -> dict[str, Any] | None:
         """Get session from Redis storage."""
         try:
             key = self._session_key(session_id)
@@ -396,7 +396,7 @@ class RedisSessionBackend(SessionBackend):
             logger.error(f"Redis session get error: {e}")
             return None
 
-    async def set_session(self, session_id: str, data: Dict[str, Any], ttl: Optional[int] = None) -> bool:
+    async def set_session(self, session_id: str, data: dict[str, Any], ttl: int | None = None) -> bool:
         """Set session in Redis storage."""
         try:
             key = self._session_key(session_id)

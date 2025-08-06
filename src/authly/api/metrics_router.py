@@ -6,12 +6,10 @@ following the existing dependency injection and security patterns.
 """
 
 import logging
-from typing import Callable
 
 from fastapi import APIRouter, Depends, Request
 from starlette.responses import Response
 
-from authly.api.auth_dependencies import get_rate_limiter
 from authly.api.rate_limiter import RateLimiter
 from authly.monitoring.metrics import metrics_handler
 

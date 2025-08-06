@@ -9,7 +9,6 @@ OAuth 2.1 server metadata with OpenID Connect specific capabilities.
 """
 
 import logging
-from typing import List, Optional
 from urllib.parse import urljoin
 
 from pydantic import BaseModel, Field
@@ -36,56 +35,54 @@ class OIDCServerMetadata(BaseModel):
     issuer: str = Field(..., description="URL using the https scheme that identifies the authorization server")
     authorization_endpoint: str = Field(..., description="URL of the authorization server's authorization endpoint")
     token_endpoint: str = Field(..., description="URL of the authorization server's token endpoint")
-    revocation_endpoint: Optional[str] = Field(
-        None, description="URL of the authorization server's revocation endpoint"
-    )
+    revocation_endpoint: str | None = Field(None, description="URL of the authorization server's revocation endpoint")
 
     # OAuth 2.1 specific requirements
-    response_types_supported: List[str] = Field(
+    response_types_supported: list[str] = Field(
         default=["code"], description="List of OAuth 2.0 response types that this server supports"
     )
-    grant_types_supported: List[str] = Field(
+    grant_types_supported: list[str] = Field(
         default=["authorization_code", "refresh_token"],
         description="List of OAuth 2.0 grant types that this server supports",
     )
-    code_challenge_methods_supported: List[str] = Field(
+    code_challenge_methods_supported: list[str] = Field(
         default=["S256"], description="List of PKCE code challenge methods supported"
     )
-    token_endpoint_auth_methods_supported: List[str] = Field(
+    token_endpoint_auth_methods_supported: list[str] = Field(
         default=["client_secret_basic", "client_secret_post", "none"],
         description="List of client authentication methods supported at the token endpoint",
     )
-    scopes_supported: List[str] = Field(
+    scopes_supported: list[str] = Field(
         default_factory=list, description="List of OAuth 2.0 scopes that this server supports"
     )
 
     # OIDC-specific metadata fields
     userinfo_endpoint: str = Field(..., description="URL of the OP's UserInfo endpoint")
-    end_session_endpoint: Optional[str] = Field(
+    end_session_endpoint: str | None = Field(
         None,
         description="URL at the OP to which a Relying Party can perform a redirect to request that the End-User be logged out",
     )
-    check_session_iframe: Optional[str] = Field(
+    check_session_iframe: str | None = Field(
         None, description="URL of an OP iframe that supports cross-origin communications for session state information"
     )
     frontchannel_logout_supported: bool = Field(default=True, description="Whether the OP supports HTTP-based logout")
     frontchannel_logout_session_supported: bool = Field(
         default=True, description="Whether the OP can pass iss and sid query parameters to identify the RP session"
     )
-    jwks_uri: Optional[str] = Field(None, description="URL of the OP's JSON Web Key Set document")
+    jwks_uri: str | None = Field(None, description="URL of the OP's JSON Web Key Set document")
 
     # OIDC response types (extends OAuth 2.1)
-    id_token_signing_alg_values_supported: List[str] = Field(
+    id_token_signing_alg_values_supported: list[str] = Field(
         default=["RS256"], description="List of JWS signing algorithms supported for ID tokens"
     )
 
     # OIDC subject types
-    subject_types_supported: List[str] = Field(
+    subject_types_supported: list[str] = Field(
         default=["public"], description="List of subject identifier types supported"
     )
 
     # OIDC claims
-    claims_supported: List[str] = Field(
+    claims_supported: list[str] = Field(
         default_factory=list, description="List of claim names supported by the UserInfo endpoint"
     )
 
@@ -100,13 +97,13 @@ class OIDCServerMetadata(BaseModel):
     )
 
     # OIDC UI locales
-    ui_locales_supported: List[str] = Field(default=["en"], description="List of UI locales supported")
+    ui_locales_supported: list[str] = Field(default=["en"], description="List of UI locales supported")
 
     # OIDC additional requirements
     require_pkce: bool = Field(
         default=True, description="Whether PKCE is required for all clients (OAuth 2.1 requirement)"
     )
-    response_modes_supported: List[str] = Field(
+    response_modes_supported: list[str] = Field(
         default=["query", "fragment"], description="List of response modes supported"
     )
 
@@ -182,7 +179,7 @@ class OIDCDiscoveryService:
             jwks_uri=urljoin(base_url, "/.well-known/jwks.json"),
             id_token_signing_alg_values_supported=["RS256", "HS256"],
             subject_types_supported=["public"],
-            claims_supported=sorted(list(all_claims)),
+            claims_supported=sorted(all_claims),
             claims_parameter_supported=False,
             request_parameter_supported=False,
             request_uri_parameter_supported=False,
@@ -243,8 +240,8 @@ class OIDCDiscoveryService:
         return OIDCServerMetadata(
             issuer=base_url,
             authorization_endpoint=urljoin(base_url, f"{api_prefix}/oauth/authorize"),
-            token_endpoint=urljoin(base_url, f"{api_prefix}/auth/token"),
-            revocation_endpoint=urljoin(base_url, f"{api_prefix}/auth/revoke"),
+            token_endpoint=urljoin(base_url, f"{api_prefix}/oauth/token"),
+            revocation_endpoint=urljoin(base_url, f"{api_prefix}/oauth/revoke"),
             userinfo_endpoint=urljoin(base_url, "/oidc/userinfo"),
             end_session_endpoint=urljoin(base_url, f"{api_prefix}/oidc/logout"),
             check_session_iframe=urljoin(base_url, f"{api_prefix}/oidc/session/iframe"),

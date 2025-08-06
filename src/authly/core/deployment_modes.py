@@ -5,7 +5,7 @@ configurations for the unified resource manager architecture.
 """
 
 from enum import Enum
-from typing import Any, Dict
+from typing import Any
 
 
 class DeploymentMode(Enum):
@@ -29,7 +29,7 @@ class ModeConfiguration:
     """
 
     @staticmethod
-    def get_pool_settings(mode: DeploymentMode) -> Dict[str, Any]:
+    def get_pool_settings(mode: DeploymentMode) -> dict[str, Any]:
         """Get database pool configuration optimized for deployment mode.
 
         Args:
@@ -120,7 +120,7 @@ class ModeConfiguration:
             return "fixture_managed"  # Managed by test fixtures
 
     @staticmethod
-    def get_mode_aliases() -> Dict[str, DeploymentMode]:
+    def get_mode_aliases() -> dict[str, DeploymentMode]:
         """Get mapping of mode aliases to deployment modes.
 
         Provides user-friendly aliases for the AUTHLY_MODE environment variable.
@@ -166,12 +166,14 @@ class ModeConfiguration:
 
             os.environ["AUTHLY_MODE"] = DeploymentMode.EMBEDDED.value
 
-        if context == "pytest" and mode not in [DeploymentMode.TESTING, DeploymentMode.EMBEDDED]:
-            # Allow tests to use embedded mode for integration testing
-            if mode != DeploymentMode.EMBEDDED:
-                import logging
+        if (
+            context == "pytest"
+            and mode not in [DeploymentMode.TESTING, DeploymentMode.EMBEDDED]
+            and mode != DeploymentMode.EMBEDDED
+        ):
+            import logging
 
-                logger = logging.getLogger(__name__)
-                logger.warning(
-                    f"Tests detected {mode.value} mode, consider AUTHLY_MODE=testing for optimal test performance"
-                )
+            logger = logging.getLogger(__name__)
+            logger.warning(
+                f"Tests detected {mode.value} mode, consider AUTHLY_MODE=testing for optimal test performance"
+            )

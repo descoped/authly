@@ -13,7 +13,6 @@ Metrics Categories:
 """
 
 import time
-from typing import Dict, Optional
 
 from prometheus_client import (
     CONTENT_TYPE_LATEST,
@@ -36,7 +35,7 @@ class AuthlyMetrics:
     server performance and usage patterns.
     """
 
-    def __init__(self, registry: Optional[CollectorRegistry] = None):
+    def __init__(self, registry: CollectorRegistry | None = None):
         """Initialize metrics collectors."""
         self.registry = registry or REGISTRY
 
@@ -285,7 +284,7 @@ class AuthlyMetrics:
         token_type: str = "unknown",
         duration: float = 0.0,
         is_oidc: bool = False,
-        extra_data: Optional[Dict] = None,
+        extra_data: dict | None = None,
     ):
         """
         Track token service operations with detailed context.

@@ -1,5 +1,5 @@
 import logging
-from typing import Annotated, List
+from typing import Annotated
 from uuid import UUID
 
 from fastapi import Depends, HTTPException, status
@@ -84,13 +84,13 @@ async def _validate_token_and_get_user_id(token: str, token_service: TokenServic
         try:
             return UUID(user_id_str)
         except ValueError:
-            raise credentials_exception
+            raise credentials_exception from None
 
     except JWTError:
-        raise credentials_exception
+        raise credentials_exception from None
     except Exception as e:
         logger.error(f"Error validating token: {e}")
-        raise credentials_exception
+        raise credentials_exception from e
 
 
 async def _get_user_by_id(user_repo: UserRepository, user_id: UUID) -> UserModel:
@@ -112,9 +112,9 @@ async def _get_user_by_id(user_repo: UserRepository, user_id: UUID) -> UserModel
     try:
         return await user_repo.get_by_id(user_id)
     except RecordNotFoundError:
-        raise credentials_exception
+        raise credentials_exception from None
     except OperationError as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)) from e
 
 
 async def get_current_user(
@@ -214,7 +214,7 @@ async def get_token_scopes(
     token: Annotated[str, Depends(oauth2_scheme)],
     token_service: TokenService = Depends(get_token_service),
     config: AuthlyConfig = Depends(get_config),
-) -> List[str]:
+) -> list[str]:
     """
     Extract scopes from JWT access token.
 
@@ -236,26 +236,22 @@ async def get_token_scopes(
 
         # Validate token is not revoked (reuse existing logic)
         jti = payload.get("jti")
-        if jti is not None:
-            if not await token_service.is_token_valid(jti):
-                logger.info(f"Access attempt with revoked token JTI: {jti}")
-                raise credentials_exception
+        if jti is not None and not await token_service.is_token_valid(jti):
+            logger.info(f"Access attempt with revoked token JTI: {jti}")
+            raise credentials_exception
 
         # Extract scopes from token
         scope_string = payload.get("scope", "")
-        if scope_string:
-            scopes = scope_string.split()
-        else:
-            scopes = []
+        scopes = scope_string.split() if scope_string else []
 
         logger.debug(f"Extracted scopes from token: {scopes}")
         return scopes
 
     except JWTError:
-        raise credentials_exception
+        raise credentials_exception from None
     except Exception as e:
         logger.error(f"Error extracting scopes from token: {e}")
-        raise credentials_exception
+        raise credentials_exception from e
 
 
 async def get_userinfo_service() -> UserInfoService:

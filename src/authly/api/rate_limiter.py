@@ -6,7 +6,6 @@ configurations.
 """
 
 import logging
-from typing import Optional
 
 from authly.core.backend_factory import get_rate_limit_backend
 from authly.core.backends import RateLimitBackend
@@ -17,7 +16,7 @@ logger = logging.getLogger(__name__)
 class RateLimiter:
     """Rate limiter with configurable backend support."""
 
-    def __init__(self, max_requests: int = 5, window_seconds: int = 60, backend: Optional[RateLimitBackend] = None):
+    def __init__(self, max_requests: int = 5, window_seconds: int = 60, backend: RateLimitBackend | None = None):
         """Initialize rate limiter with configurable backend.
 
         Args:

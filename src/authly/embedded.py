@@ -6,10 +6,11 @@ container for development and testing purposes.
 """
 
 import asyncio
+import contextlib
 import logging
 import os
 import signal
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
 import uvicorn
@@ -24,7 +25,6 @@ from authly.bootstrap import bootstrap_admin_system
 from authly.config import AuthlyConfig, StaticDatabaseProvider, StaticSecretProvider, find_root_folder
 from authly.core.deployment_modes import DeploymentMode
 from authly.core.mode_factory import AuthlyModeFactory
-from authly.core.resource_manager import AuthlyResourceManager
 from authly.users import UserModel, UserRepository
 
 logger = logging.getLogger("authly.embedded")
@@ -33,11 +33,10 @@ logger = logging.getLogger("authly.embedded")
 async def _post_initialize_db(pool: AsyncConnectionPool, seed: bool = False) -> None:
     """Execute initialization after Docker Postgres container has run init-db-and-user.sql"""
     # Log tables to verify setup
-    async with pool.connection() as connection:
-        async with connection.cursor() as cursor:
-            await cursor.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';")
-            tables = await cursor.fetchall()
-            logger.info("Tables: %s", ", ".join(table[0] for table in tables))
+    async with pool.connection() as connection, connection.cursor() as cursor:
+        await cursor.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';")
+        tables = await cursor.fetchall()
+        logger.info("Tables: %s", ", ".join(table[0] for table in tables))
 
     # Create test users including admin user for testing
     if seed:
@@ -65,8 +64,8 @@ async def _post_initialize_db(pool: AsyncConnectionPool, seed: bool = False) -> 
                         username=user_data["username"],
                         email=user_data["email"],
                         password_hash=get_password_hash(user_data["password"]),
-                        created_at=datetime.now(timezone.utc),
-                        updated_at=datetime.now(timezone.utc),
+                        created_at=datetime.now(UTC),
+                        updated_at=datetime.now(UTC),
                         is_active=True,
                         is_verified=True,
                         is_admin=bool(user_data["is_admin"]),
@@ -141,7 +140,7 @@ async def run_embedded_server(host: str = "0.0.0.0", port: int = 8000, seed: boo
         database_url = (
             f"postgresql://{settings.user}:{settings.password}@{settings.host}:{settings.port}/{settings.dbname}"
         )
-        print(f"\n🔧 To test CLI with this database, run:")
+        print("\n🔧 To test CLI with this database, run:")
         print(
             f"JWT_SECRET_KEY='test-secret-key' JWT_REFRESH_SECRET_KEY='test-refresh-key' DATABASE_URL='{database_url}' python -m authly admin status\n"
         )
@@ -152,7 +151,7 @@ async def run_embedded_server(host: str = "0.0.0.0", port: int = 8000, seed: boo
         await db.register_init_callback(lambda pool: _post_initialize_db(pool, seed))
         await db.init_db()
 
-        db_pool = await db.get_pool()
+        await db.get_pool()
 
         # Initialize resource manager for embedded mode
         secret_provider = StaticSecretProvider("my-secret", "refresh-secret")
@@ -204,7 +203,7 @@ async def run_embedded_server(host: str = "0.0.0.0", port: int = 8000, seed: boo
                 # Clean up database with timeout from config
                 cleanup_timeout = config.db_cleanup_timeout_seconds
                 await asyncio.wait_for(db.cleanup(), timeout=cleanup_timeout)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.warning("Database cleanup timed out")
             except Exception as e:
                 logger.error(f"Error during database cleanup: {e}")
@@ -232,12 +231,10 @@ async def run_embedded_server(host: str = "0.0.0.0", port: int = 8000, seed: boo
     except Exception as e:
         logger.error(f"Embedded server error: {e}")
         postgres.stop()
-        raise
+        raise RuntimeError("An error occurred") from e
     finally:
         # Cleanup signal handlers
         loop = asyncio.get_event_loop()
         for sig in signals:
-            try:
+            with contextlib.suppress(ValueError):
                 loop.remove_signal_handler(sig)
-            except ValueError:
-                pass

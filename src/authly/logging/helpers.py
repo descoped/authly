@@ -6,7 +6,7 @@ user authentication, admin actions, etc.
 """
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any
 
 from .context import set_request_context
 
@@ -15,10 +15,10 @@ logger = logging.getLogger(__name__)
 
 def log_oauth_event(
     event: str,
-    client_id: Optional[str] = None,
-    user_id: Optional[str] = None,
-    scope: Optional[str] = None,
-    grant_type: Optional[str] = None,
+    client_id: str | None = None,
+    user_id: str | None = None,
+    scope: str | None = None,
+    grant_type: str | None = None,
     **extra: Any,
 ) -> None:
     """
@@ -53,10 +53,10 @@ def log_oauth_event(
 
 def log_authentication_event(
     event: str,
-    user_id: Optional[str] = None,
-    username: Optional[str] = None,
-    success: Optional[bool] = None,
-    failure_reason: Optional[str] = None,
+    user_id: str | None = None,
+    username: str | None = None,
+    success: bool | None = None,
+    failure_reason: str | None = None,
     **extra: Any,
 ) -> None:
     """
@@ -94,11 +94,11 @@ def log_authentication_event(
 
 def log_admin_action(
     action: str,
-    admin_user_id: Optional[str] = None,
-    target_user_id: Optional[str] = None,
-    resource_type: Optional[str] = None,
-    resource_id: Optional[str] = None,
-    changes: Optional[Dict[str, Any]] = None,
+    admin_user_id: str | None = None,
+    target_user_id: str | None = None,
+    resource_type: str | None = None,
+    resource_id: str | None = None,
+    changes: dict[str, Any] | None = None,
     **extra: Any,
 ) -> None:
     """
@@ -137,10 +137,10 @@ def log_admin_action(
 def log_security_event(
     event: str,
     severity: str = "medium",
-    user_id: Optional[str] = None,
-    client_id: Optional[str] = None,
-    threat_type: Optional[str] = None,
-    details: Optional[Dict[str, Any]] = None,
+    user_id: str | None = None,
+    client_id: str | None = None,
+    threat_type: str | None = None,
+    details: dict[str, Any] | None = None,
     **extra: Any,
 ) -> None:
     """
@@ -183,11 +183,11 @@ def log_security_event(
 
 def log_database_event(
     event: str,
-    operation: Optional[str] = None,
-    table: Optional[str] = None,
-    duration_ms: Optional[float] = None,
-    rows_affected: Optional[int] = None,
-    error: Optional[str] = None,
+    operation: str | None = None,
+    table: str | None = None,
+    duration_ms: float | None = None,
+    rows_affected: int | None = None,
+    error: str | None = None,
     **extra: Any,
 ) -> None:
     """
@@ -226,7 +226,7 @@ def log_database_event(
         logger.debug(f"Database: {event}", extra=context)
 
 
-def set_user_context(user_id: str, username: Optional[str] = None, roles: Optional[list] = None) -> None:
+def set_user_context(user_id: str, username: str | None = None, roles: list | None = None) -> None:
     """
     Set user context for all subsequent log messages in the current request.
 
@@ -245,7 +245,7 @@ def set_user_context(user_id: str, username: Optional[str] = None, roles: Option
     set_request_context(**context)
 
 
-def set_client_context(client_id: str, client_name: Optional[str] = None, client_type: Optional[str] = None) -> None:
+def set_client_context(client_id: str, client_name: str | None = None, client_type: str | None = None) -> None:
     """
     Set OAuth client context for all subsequent log messages in the current request.
 

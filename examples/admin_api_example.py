@@ -7,7 +7,6 @@ administrative operations through the HTTP API.
 
 import asyncio
 import logging
-from pathlib import Path
 
 from authly.admin.api_client import AdminAPIClient
 from authly.oauth.models import ClientType, OAuthClientCreateRequest
@@ -47,7 +46,7 @@ async def main():
                 scope="admin:clients:read admin:clients:write admin:scopes:read admin:scopes:write",
             )
 
-            print(f"Successfully logged in!")
+            print("Successfully logged in!")
             print(f"Token expires at: {token_info.expires_at}")
             print(f"Scopes: {token_info.scope}")
         except Exception as e:

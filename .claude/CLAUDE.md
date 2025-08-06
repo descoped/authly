@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Current Implementation Status
 
-**✅ COMPLETED (100% Test Success - 510/510 tests passing):**
+**✅ COMPLETED (100% Test Success - 708/708 tests passing):**
 - Complete OAuth 2.1 implementation with PKCE support
 - Admin API with two-layer security model (intrinsic authority + scoped permissions)
 - Bootstrap system solving IAM chicken-and-egg paradox
@@ -18,12 +18,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - JWT token management with revocation and rotation
 - User management with role-based access control
 - Complete OpenID Connect (OIDC) Core 1.0 + Session Management 1.0 implementation
+- Unified resource manager architecture (Phase 1-5 from implementation roadmap)
+- Redis integration for distributed deployments
+- Structured JSON logging with correlation IDs
+- Enterprise-grade security headers middleware
+- Prometheus metrics for comprehensive monitoring
+- Query optimization with CTE-based queries
+- Caching layer with TTL and invalidation
 
 **📝 NEXT STEPS:**
 - Phase 3: Argon2 password hashing implementation
 - Phase 4: Advanced OIDC features (prompt, max_age, ACR support)
-- GDPR compliance features
-- Enhanced enterprise integrations
+- GDPR compliance features (data retention, consent tracking, audit logging)
+- Enhanced enterprise integrations (Vault, cloud providers)
+- Features scheduled in `.claude/roadmap/` (Admin Frontend, W3C DID, etc.)
 
 ### Core Technologies
 - **Python 3.11+**: Modern async/await, type annotations, dataclasses
@@ -79,8 +87,10 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 - Run API tests with: `./examples/api-test.sh`
 - `examples/embeded.py`: Powerful script to run entire service with database container
 - Comprehensive test suite with realistic database integration testing
+- **Test Suite Organization**: Tests organized by feature domains in 7 categories
 - **See `docs/testing-guide.md` for comprehensive testing patterns and current methodology**
-- **Current Status**: 510 tests passing (100% success rate) with comprehensive OAuth 2.1 + OIDC 1.0 coverage
+- **See `tests/README.md` for test organization and running specific test suites**
+- **Current Status**: 708 tests passing (100% success rate) with comprehensive OAuth 2.1 + OIDC 1.0 coverage
 
 ## Architecture Overview
 
@@ -90,14 +100,14 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 **See `.claude/codebase-structure.md` for complete project structure with metrics.**
 
-**Current Project Status**: Version 0.5.1 with complete OAuth 2.1 + OIDC Core 1.0 implementation and 510 tests passing.
+**Current Project Status**: Version 0.5.5 with complete OAuth 2.1 + OIDC Core 1.0 implementation and 708 tests passing.
 
 Key architectural components:
 - **Package-by-Feature**: OAuth, users, tokens, admin as self-contained packages
 - **Layered Architecture**: API → Service → Repository → Database
 - **Pluggable Components**: Abstract base classes for flexible backends
 - **Security-First**: Two-layer admin security, JWT with JTI tracking
-- **Real Integration Testing**: 510 tests with PostgreSQL testcontainers across 49 test files with comprehensive OIDC coverage
+- **Real Integration Testing**: 708 tests with PostgreSQL testcontainers across 56 test files organized in 7 feature domains
 
 ### Core Components
 
@@ -175,14 +185,14 @@ Core patterns:
 - **Transaction Rollback**: Isolated test transactions for database tests
 - **Type Safety**: Proper typing in test functions and fixtures
 
-**Test Excellence Achievement**: 510 tests passing (100% success rate)
+**Test Excellence Achievement**: 708 tests passing (100% success rate)
 
 **Testing Excellence**: Real integration testing with PostgreSQL testcontainers and authentic HTTP testing patterns
-- **Comprehensive Coverage**: 510 tests across 49 test files ensuring complete specification compliance
+- **Comprehensive Coverage**: 708 tests across 56 test files organized in 7 feature domains
 
 ## OAuth 2.1 + OIDC 1.0 Implementation - COMPLETED ✅
 
-**Current Status**: Complete OAuth 2.1 + OIDC Core 1.0 + Session Management 1.0 implementation with 100% test coverage (510 tests passing)
+**Current Status**: Complete OAuth 2.1 + OIDC Core 1.0 + Session Management 1.0 implementation with 100% test coverage (708 tests passing)
 
 ### ✅ FULLY IMPLEMENTED FEATURES
 
@@ -228,19 +238,21 @@ Core patterns:
 
 ### 🧪 TEST EXCELLENCE ACHIEVED
 
-**510 Tests Passing (100% Success Rate):**
+**708 Tests Passing (100% Success Rate):**
 - ✅ Real integration testing with PostgreSQL testcontainers
 - ✅ No mocking - authentic database and HTTP testing
 - ✅ Systematic test isolation with transaction management
 - ✅ OAuth flow end-to-end testing
-- ✅ OIDC complete flow testing with 221 OIDC-specific tests across 15 test files
+- ✅ OIDC complete flow testing with comprehensive coverage
 - ✅ Session management endpoint testing
 - ✅ OIDC End Session and logout coordination testing
 - ✅ Complete OIDC Core 1.0 + Session Management 1.0 specification compliance
-- ✅ 49 test files with comprehensive integration testing
-- ✅ Admin API comprehensive testing
+- ✅ 56 test files organized in 7 feature domains
+- ✅ Admin API comprehensive testing with query optimization
 - ✅ Security and error handling testing
 - ✅ Performance and scalability testing
+- ✅ Redis caching layer testing
+- ✅ Structured logging and metrics testing
 
 **See `.claude/implementation-status.md` for detailed testing achievements and debugging journey.**
 
@@ -268,17 +280,24 @@ Core patterns:
 
 ## File and Folder Intentions
 
-**See `.claude/codebase-structure-current.md` for complete project structure with metrics and detailed file descriptions.**
+**See `.claude/codebase-structure.md` for complete project structure with metrics and detailed file descriptions.**
 
 **Key architectural components:**
 - **Package-by-Feature Structure**: OAuth, OIDC, users, tokens, admin as self-contained packages
-- **Testing Architecture**: 470+ tests with real PostgreSQL integration
-- **Documentation System**: 11 detailed files plus comprehensive `.claude/` memory system
+- **Testing Architecture**: 708 tests organized in 7 feature domains with real PostgreSQL integration
+  - auth_user_journey: Core authentication flows (8 files)
+  - oauth_flows: OAuth 2.1 implementation (7 files)
+  - oidc_features: OIDC functionality (7 files)
+  - oidc_scenarios: End-to-end OIDC flows (8 files)
+  - admin_portal: Admin interface (10 files)
+  - admin_user_management: Admin user operations (7 files)
+  - infrastructure: Core framework (9 files)
+- **Documentation System**: Comprehensive docs plus `.claude/` memory system
 - **Production Infrastructure**: Docker, monitoring, deployment guides
 
 ## Session History and Memory Integration
 
-**See `.claude/session-consolidation-summary.md` for detailed session documentation and patterns.**
+**See `.claude/evolution/consolidation-history/session-consolidation-summary.md` for detailed session documentation and patterns.**
 
 ### **Consolidation Session (July 10, 2025)**
 This session established a comprehensive memory system and cleaned up the enormous commit history preparation after achieving 100% completion (470+ tests passing).
@@ -312,7 +331,7 @@ This session established a comprehensive memory system and cleaned up the enormo
 - **Database Connection Visibility**: Fixed OAuth flow transaction isolation with auto-commit mode
 - **OIDC Flow Testing**: Replaced manual database insertion with proper OAuth flow patterns
 - **PKCE Security**: Fixed cryptographic code challenge/verifier mismatches
-- **100% Success Rate**: Achieved 470+ tests passing through systematic debugging
+- **100% Success Rate**: Achieved 708 tests passing through systematic debugging
 - **Quality Standards**: Maintained security-first design with comprehensive error handling
 
 ## Repository Organization
@@ -353,27 +372,30 @@ This session established a comprehensive memory system and cleaned up the enormo
 
 The `.claude/` directory contains the comprehensive project memory system. Each file serves a distinct purpose:
 
-**Core Project Memory:**
-- **`.claude/CLAUDE.md`** - **PRIMARY ENTRY POINT** (this file) - Complete project memory, architecture, and development guidance
-- **`.claude/implementation-status.md`** - Current implementation status, next steps, and detailed progress tracking
-- **`.claude/architecture.md`** - Comprehensive system architecture, design patterns, and technical decisions
+**🎯 Core Project Memory:**
+- **`.claude/CLAUDE.md`** - **PRIMARY ENTRY POINT** (this file) - Complete project memory, current status, and development guidance
+- **`.claude/implementation-status.md`** - Current implementation status (708 tests), completion tracking, next steps
+- **`.claude/architecture.md`** - Comprehensive system architecture, design patterns, data flows, security model
 
-**Technical References:**
-- **`.claude/codebase-structure.md`** - Complete project structure with metrics and organization
-- **`.claude/external-libraries.md`** - Local library integration patterns (psycopg-toolkit, fastapi-testing)
-- **`.claude/psycopg3-transaction-patterns.md`** - Database transaction patterns and best practices
-- **`.claude/capabilities.md`** - Development focus, tool configuration, and quality standards
+**📊 Technical References:**
+- **`.claude/codebase-structure.md`** - Complete project structure with 708 tests in 7 domains, file organization
+- **`.claude/external-libraries.md`** - Local library integration (psycopg-toolkit v0.2.2, fastapi-testing v0.2.0)
+- **`.claude/psycopg3-transaction-patterns.md`** - PostgreSQL async patterns, transaction management, connection pooling
+- **`.claude/task-management.md`** - TodoWrite/TodoRead patterns for enterprise-scale task management
+- **`.claude/capabilities.md`** - AI development configuration and tool usage (Updated: 2025-08-06)
 
-**Development Workflows:**
-- **`.claude/task-management.md`** - TodoWrite/TodoRead enterprise patterns and project management
+**📚 Historical Knowledge:**
+- **`.claude/evolution/`** - **HISTORICAL ARCHIVE** - Complete implementation journey, architectural decisions, learning patterns
+  - Used for understanding project evolution and learning from past decisions
+  - Contains corrected code reviews, OIDC implementation details, production excellence achievements
+  - **`completed-planning-docs/`** - Archived planning documents from ai_docs/ (implementation-roadmap.md, api-standardization-analysis.md, unified-user-management-plan.md)
 
-**Historical Knowledge:**
-- **`.claude/evolution/`** - **HISTORICAL PURPOSES ONLY** - Complete implementation history, learning, and development journey preservation. Used for understanding how the project evolved and for learning from past decisions.
+**🚀 Future Planning:**
+- **`.claude/roadmap/`** - **FUTURE FEATURES** - Strategic roadmaps and technical specifications
+  - Admin Frontend (React/MUI), W3C DID Integration, Advanced Security Features
+  - OIDC Conformance Testing, CLI Integration Testing, Enterprise Features
 
-**Future Planning:**
-- **`.claude/roadmap/`** - **FUTURE FEATURES** - Strategic roadmaps and specifications for features to be implemented in future phases.
-
-**Configuration:**
+**⚙️ Configuration:**
 - **`.claude/settings.json`** - Team-shared Claude configuration (committed to git)
 - **`.claude/settings.local.json`** - Personal Claude preferences (gitignored)
 
@@ -386,17 +408,38 @@ The `.claude/` directory contains the comprehensive project memory system. Each 
 
 ### AI Assistant Documentation (`ai_docs/`)
 - **`ai_docs/TODO.md`** - Current tasks and implementation priorities
+  - Note: Completed planning documents have been archived to `.claude/evolution/completed-planning-docs/`
 
-### Core Documentation (`docs/`)
+### Core Documentation (`docs/`) - 20 Production Guides
+**Core Implementation Guides:**
 - **`docs/oauth-guide.md`** - Complete OAuth 2.1 implementation guide
-- **`docs/api-reference.md`** - Complete API endpoint documentation
+- **`docs/oidc-guide.md`** - OpenID Connect usage and integration
+- **`docs/oidc-implementation.md`** - Detailed OIDC technical implementation (74KB)
+- **`docs/api-reference.md`** - Complete REST API endpoint documentation
 - **`docs/cli-guide.md`** - Admin CLI usage and OAuth management
-- **`docs/security-guide.md`** - Comprehensive security implementation details
-- **`docs/testing-guide.md`** - Testing methodology and patterns
-- **`docs/deployment-guide.md`** - Production deployment instructions
-- **`docs/oidc-implementation.md`** - OpenID Connect implementation guide
-- **`docs/performance-guide.md`** - Performance benchmarks and optimization
-- **`docs/troubleshooting-guide.md`** - Comprehensive troubleshooting guide
+
+**Deployment & Operations:**
+- **`docs/deployment-guide.md`** - Comprehensive production deployment (47KB)
+- **`docs/docker-deployment.md`** - Docker infrastructure and configuration
+- **`docs/docker-hub-deployment.md`** - Docker Hub integration guide
+- **`docs/redis-integration.md`** - Redis configuration for distributed deployments
+
+**Security & Compliance:**
+- **`docs/security-guide.md`** - Comprehensive security implementation (34KB)
+- **`docs/security-audit.md`** - Security analysis and validation report
+- **`docs/gdpr-compliance.md`** - GDPR compliance analysis and requirements
+- **`docs/gdpr-implementation-guide.md`** - Technical GDPR implementation (45KB)
+- **`docs/privacy-statement-template.md`** - Ready-to-use privacy policy template
+
+**Development & Testing:**
+- **`docs/testing-guide.md`** - Testing methodology and patterns (46KB)
+- **`docs/parallel-testing-guide.md`** - Parallel test execution strategies
+- **`docs/performance-guide.md`** - Performance benchmarks and optimization (46KB)
+- **`docs/troubleshooting-guide.md`** - Comprehensive debugging guide
+- **`docs/architecture.md`** - High-level architecture overview
+
+**Index:**
+- **`docs/README.md`** - Documentation index and navigation guide
 
 ### Local Library References
 - **`../psycopg-toolkit/`** - Enhanced PostgreSQL operations with modern async patterns

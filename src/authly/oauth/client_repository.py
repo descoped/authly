@@ -1,6 +1,5 @@
 import logging
-from datetime import datetime, timezone
-from typing import List, Optional
+from datetime import UTC, datetime
 from uuid import UUID
 
 from psycopg import AsyncConnection
@@ -39,18 +38,20 @@ class ClientRepository(BaseRepository[OAuthClientModel, UUID]):
 
     def __init__(self, db_connection: AsyncConnection):
         super().__init__(
-            db_connection=db_connection, table_name="oauth_clients", model_class=OAuthClientModel, primary_key="id"
+            db_connection=db_connection,
+            table_name="oauth_clients",
+            model_class=OAuthClientModel,
+            primary_key="id",
+            # Enable automatic JSON detection for metadata and other dict fields
+            auto_detect_json=True,
+            # Preserve PostgreSQL array types for list fields
+            array_fields={"redirect_uris", "grant_types", "response_types", "request_uris", "contacts"},
+            # Specify all date/timestamp fields for automatic conversion (v0.2.2)
+            date_fields={"created_at", "updated_at"},
         )
 
     def _process_client_result(self, result: dict) -> dict:
-        """Process database result and convert arrays, handle missing OIDC fields"""
-        # Convert PostgreSQL arrays to Python lists
-        result["redirect_uris"] = list(result["redirect_uris"]) if result["redirect_uris"] else []
-        result["grant_types"] = list(result["grant_types"]) if result["grant_types"] else []
-        result["response_types"] = list(result["response_types"]) if result["response_types"] else []
-        result["request_uris"] = list(result["request_uris"]) if result["request_uris"] else []
-        result["contacts"] = list(result["contacts"]) if result["contacts"] else []
-
+        """Process database result to handle missing OIDC fields"""
         # Handle missing OIDC fields with defaults
         if "id_token_signed_response_alg" not in result or result["id_token_signed_response_alg"] is None:
             result["id_token_signed_response_alg"] = "RS256"
@@ -63,7 +64,7 @@ class ClientRepository(BaseRepository[OAuthClientModel, UUID]):
 
         return result
 
-    async def get_by_client_id(self, client_id: str) -> Optional[OAuthClientModel]:
+    async def get_by_client_id(self, client_id: str) -> OAuthClientModel | None:
         """Get OAuth client by client_id"""
         with DatabaseTimer("client_read_by_id"):
             try:
@@ -79,7 +80,7 @@ class ClientRepository(BaseRepository[OAuthClientModel, UUID]):
                     return None
             except Exception as e:
                 logger.error(f"Error in get_by_client_id: {e}")
-                raise OperationError(f"Failed to get client by client_id: {str(e)}") from e
+                raise OperationError(f"Failed to get client by client_id: {e!s}") from e
 
     async def create_client(self, client_data: dict) -> OAuthClientModel:
         """Create a new OAuth client"""
@@ -96,9 +97,7 @@ class ClientRepository(BaseRepository[OAuthClientModel, UUID]):
                     else:
                         insert_data["client_secret_hash"] = None
 
-                # Handle array fields for PostgreSQL
-                if "redirect_uris" in insert_data:
-                    insert_data["redirect_uris"] = list(insert_data["redirect_uris"])
+                # Convert enums to strings for array fields
                 if "grant_types" in insert_data:
                     insert_data["grant_types"] = [
                         gt.value if hasattr(gt, "value") else str(gt) for gt in insert_data["grant_types"]
@@ -108,26 +107,18 @@ class ClientRepository(BaseRepository[OAuthClientModel, UUID]):
                         rt.value if hasattr(rt, "value") else str(rt) for rt in insert_data["response_types"]
                     ]
 
-                # Handle OIDC array fields
-                if "request_uris" in insert_data:
-                    insert_data["request_uris"] = (
-                        list(insert_data["request_uris"]) if insert_data["request_uris"] else []
-                    )
-                if "contacts" in insert_data:
-                    insert_data["contacts"] = list(insert_data["contacts"]) if insert_data["contacts"] else []
-
                 # Build insert query with database-generated timestamps for consistency
                 # Remove any manually set timestamps to use NOW() from database
                 insert_data.pop("created_at", None)
                 insert_data.pop("updated_at", None)
 
                 # Build columns and values for the insert
-                columns = list(insert_data.keys()) + ["created_at", "updated_at"]
+                columns = [*list(insert_data.keys()), "created_at", "updated_at"]
                 values_placeholders = ["%s"] * len(insert_data) + ["NOW()", "NOW()"]
                 values = list(insert_data.values())
 
                 insert_query = SQL("INSERT INTO oauth_clients ({}) VALUES ({})").format(
-                    SQL(", ").join(SQL('"{}"'.format(col)) for col in columns),
+                    SQL(", ").join(SQL(f'"{col}"') for col in columns),
                     SQL(", ").join(SQL(placeholder) for placeholder in values_placeholders),
                 )
 
@@ -143,7 +134,7 @@ class ClientRepository(BaseRepository[OAuthClientModel, UUID]):
 
             except Exception as e:
                 logger.error(f"Error in create_client: {e}")
-                raise OperationError(f"Failed to create client: {str(e)}") from e
+                raise OperationError(f"Failed to create client: {e!s}") from e
 
     async def update_client(self, client_id: UUID, update_data: dict) -> OAuthClientModel:
         """Update an existing OAuth client"""
@@ -151,9 +142,7 @@ class ClientRepository(BaseRepository[OAuthClientModel, UUID]):
             # Prepare update data
             prepared_data = update_data.copy()
 
-            # Handle array fields
-            if "redirect_uris" in prepared_data:
-                prepared_data["redirect_uris"] = list(prepared_data["redirect_uris"])
+            # Convert enums to strings for array fields
             if "grant_types" in prepared_data:
                 prepared_data["grant_types"] = [
                     gt.value if hasattr(gt, "value") else str(gt) for gt in prepared_data["grant_types"]
@@ -162,14 +151,6 @@ class ClientRepository(BaseRepository[OAuthClientModel, UUID]):
                 prepared_data["response_types"] = [
                     rt.value if hasattr(rt, "value") else str(rt) for rt in prepared_data["response_types"]
                 ]
-
-            # Handle OIDC array fields
-            if "request_uris" in prepared_data:
-                prepared_data["request_uris"] = (
-                    list(prepared_data["request_uris"]) if prepared_data["request_uris"] else []
-                )
-            if "contacts" in prepared_data:
-                prepared_data["contacts"] = list(prepared_data["contacts"]) if prepared_data["contacts"] else []
 
             # Set updated timestamp using NOW() for accurate timing
             # We need to do this in the query, not in Python, to ensure proper ordering
@@ -206,7 +187,7 @@ class ClientRepository(BaseRepository[OAuthClientModel, UUID]):
             raise
         except Exception as e:
             logger.error(f"Error in update_client: {e}")
-            raise OperationError(f"Failed to update client: {str(e)}") from e
+            raise OperationError(f"Failed to update client: {e!s}") from e
 
     async def delete_client(self, client_id: UUID) -> bool:
         """Delete an OAuth client (soft delete by setting is_active=False)"""
@@ -221,15 +202,15 @@ class ClientRepository(BaseRepository[OAuthClientModel, UUID]):
 
         except Exception as e:
             logger.error(f"Error in delete_client: {e}")
-            raise OperationError(f"Failed to delete client: {str(e)}") from e
+            raise OperationError(f"Failed to delete client: {e!s}") from e
 
-    async def get_active_clients(self, limit: int = 100, offset: int = 0) -> List[OAuthClientModel]:
+    async def get_active_clients(self, limit: int = 100, offset: int = 0) -> list[OAuthClientModel]:
         """Get all active OAuth clients with pagination"""
         try:
             query = """
-                SELECT * FROM oauth_clients 
-                WHERE is_active = true 
-                ORDER BY created_at DESC 
+                SELECT * FROM oauth_clients
+                WHERE is_active = true
+                ORDER BY created_at DESC
                 LIMIT %s OFFSET %s
             """
 
@@ -240,19 +221,14 @@ class ClientRepository(BaseRepository[OAuthClientModel, UUID]):
                 clients = []
                 for result in results:
                     result = dict(result)
-                    # Convert PostgreSQL arrays to Python lists
-                    result["redirect_uris"] = list(result["redirect_uris"]) if result["redirect_uris"] else []
-                    result["grant_types"] = list(result["grant_types"]) if result["grant_types"] else []
-                    result["response_types"] = list(result["response_types"]) if result["response_types"] else []
-                    result["request_uris"] = list(result["request_uris"]) if result["request_uris"] else []
-                    result["contacts"] = list(result["contacts"]) if result["contacts"] else []
+                    result = self._process_client_result(result)
                     clients.append(OAuthClientModel(**result))
 
                 return clients
 
         except Exception as e:
             logger.error(f"Error in get_active_clients: {e}")
-            raise OperationError(f"Failed to get active clients: {str(e)}") from e
+            raise OperationError(f"Failed to get active clients: {e!s}") from e
 
     async def count_active_clients(self) -> int:
         """Count the total number of active OAuth clients"""
@@ -266,7 +242,7 @@ class ClientRepository(BaseRepository[OAuthClientModel, UUID]):
 
         except Exception as e:
             logger.error(f"Error in count_active_clients: {e}")
-            raise OperationError(f"Failed to count active clients: {str(e)}") from e
+            raise OperationError(f"Failed to count active clients: {e!s}") from e
 
     async def client_exists(self, client_id: str) -> bool:
         """Check if a client exists by client_id"""
@@ -280,13 +256,13 @@ class ClientRepository(BaseRepository[OAuthClientModel, UUID]):
 
         except Exception as e:
             logger.error(f"Error in client_exists: {e}")
-            raise OperationError(f"Failed to check client existence: {str(e)}") from e
+            raise OperationError(f"Failed to check client existence: {e!s}") from e
 
-    async def get_client_scopes(self, client_id: UUID) -> List[str]:
+    async def get_client_scopes(self, client_id: UUID) -> list[str]:
         """Get all scope names associated with a client"""
         try:
             query = """
-                SELECT s.scope_name 
+                SELECT s.scope_name
                 FROM oauth_scopes s
                 JOIN oauth_client_scopes cs ON s.id = cs.scope_id
                 WHERE cs.client_id = %s AND s.is_active = true
@@ -300,7 +276,7 @@ class ClientRepository(BaseRepository[OAuthClientModel, UUID]):
 
         except Exception as e:
             logger.error(f"Error in get_client_scopes: {e}")
-            raise OperationError(f"Failed to get client scopes: {str(e)}") from e
+            raise OperationError(f"Failed to get client scopes: {e!s}") from e
 
     async def add_client_scope(self, client_id: UUID, scope_id: UUID) -> bool:
         """Associate a scope with a client"""
@@ -313,13 +289,13 @@ class ClientRepository(BaseRepository[OAuthClientModel, UUID]):
             """
 
             async with self.db_connection.cursor() as cur:
-                await cur.execute(query, [client_id, scope_id, datetime.now(timezone.utc)])
+                await cur.execute(query, [client_id, scope_id, datetime.now(UTC)])
                 result = await cur.fetchone()
                 return result is not None
 
         except Exception as e:
             logger.error(f"Error in add_client_scope: {e}")
-            raise OperationError(f"Failed to add client scope: {str(e)}") from e
+            raise OperationError(f"Failed to add client scope: {e!s}") from e
 
     async def remove_client_scope(self, client_id: UUID, scope_id: UUID) -> bool:
         """Remove a scope association from a client"""
@@ -332,9 +308,9 @@ class ClientRepository(BaseRepository[OAuthClientModel, UUID]):
 
         except Exception as e:
             logger.error(f"Error in remove_client_scope: {e}")
-            raise OperationError(f"Failed to remove client scope: {str(e)}") from e
+            raise OperationError(f"Failed to remove client scope: {e!s}") from e
 
-    async def associate_client_scopes(self, client_id: UUID, scope_ids: List[UUID]) -> int:
+    async def associate_client_scopes(self, client_id: UUID, scope_ids: list[UUID]) -> int:
         """Associate multiple scopes with a client"""
         try:
             if not scope_ids:
@@ -342,7 +318,7 @@ class ClientRepository(BaseRepository[OAuthClientModel, UUID]):
 
             # Build bulk insert query
             insert_data = []
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             for scope_id in scope_ids:
                 insert_data.append({"client_id": client_id, "scope_id": scope_id, "created_at": now})
 
@@ -362,4 +338,4 @@ class ClientRepository(BaseRepository[OAuthClientModel, UUID]):
 
         except Exception as e:
             logger.error(f"Error in associate_client_scopes: {e}")
-            raise OperationError(f"Failed to associate client scopes: {str(e)}") from e
+            raise OperationError(f"Failed to associate client scopes: {e!s}") from e

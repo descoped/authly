@@ -4,7 +4,6 @@ import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 from urllib.parse import urlparse
 
 
@@ -41,9 +40,9 @@ class DatabaseConfig:
             if not parsed.hostname:
                 raise ValueError("Database URL must include hostname")
             if not parsed.path or parsed.path == "/":
-                raise ValueError("Database URL must include database name")
+                raise ValueError("Database URL must include database name") from None
         except Exception as e:
-            raise ValueError(f"Invalid database URL format: {e}")
+            raise ValueError(f"Invalid database URL format: {e}") from e
 
 
 class DatabaseProvider(ABC):
@@ -108,7 +107,7 @@ class FileDatabaseProvider(DatabaseProvider):
 class EnvDatabaseProvider(DatabaseProvider):
     """Environment variable database configuration provider with library-appropriate defaults."""
 
-    def __init__(self, default_url: Optional[str] = None):
+    def __init__(self, default_url: str | None = None):
         """Initialize with optional default database URL.
 
         Args:

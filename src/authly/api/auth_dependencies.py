@@ -2,13 +2,21 @@ import base64
 import logging
 from asyncio import Lock
 from dataclasses import dataclass
-from typing import Final, Optional, Tuple
+from typing import Final
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPBasic, HTTPBasicCredentials, OAuth2PasswordBearer
 
 from authly.api.rate_limiter import RateLimiter
+from authly.config import AuthlyConfig
 from authly.core.dependencies import get_config, get_database_connection
+from authly.oauth.authorization_code_repository import AuthorizationCodeRepository
+from authly.oauth.authorization_service import AuthorizationService
+from authly.oauth.client_repository import ClientRepository
+from authly.oauth.client_service import ClientService
+from authly.oauth.models import OAuthClientModel
+from authly.oauth.scope_repository import ScopeRepository
+from authly.tokens.service import TokenService
 
 logger = logging.getLogger(__name__)
 
@@ -31,9 +39,9 @@ class OAuth2State:
 
 class DeferredOAuth2PasswordBearer:
     def __init__(self):
-        self._state: Optional[OAuth2State] = None
+        self._state: OAuth2State | None = None
         self._lock = Lock()
-        self._init_error: Optional[Exception] = None
+        self._init_error: Exception | None = None
 
     def get_token_url(self, request: Request = None) -> str:
         """Get the token URL."""
@@ -43,13 +51,13 @@ class DeferredOAuth2PasswordBearer:
 
             if _resource_manager_instance is not None:
                 config = _resource_manager_instance.get_config()
-                return f"{config.fastapi_api_version_prefix}/auth/token"
+                return f"{config.fastapi_api_version_prefix}/oauth/token"
             else:
                 # Fallback to direct environment variable reading
                 import os
 
                 api_prefix = os.getenv("AUTHLY_API_VERSION_PREFIX", "/api/v1")
-                return f"{api_prefix}/auth/token"
+                return f"{api_prefix}/oauth/token"
         except Exception as e:
             self._init_error = e
             raise
@@ -67,7 +75,7 @@ class DeferredOAuth2PasswordBearer:
                     self._state = OAuth2State(oauth=oauth, token_url=token_url)
                 except Exception as e:
                     self._init_error = e
-                    raise HTTPException(status_code=503, detail="Authentication service temporarily unavailable")
+                    raise HTTPException(status_code=503, detail="Authentication service temporarily unavailable") from e
 
         return self._state
 
@@ -186,7 +194,7 @@ async def get_token_service_with_client(
     return TokenService(token_repo, config, client_repo)
 
 
-def _parse_basic_auth_header(authorization: str) -> Tuple[str, Optional[str]]:
+def _parse_basic_auth_header(authorization: str) -> tuple[str, str | None]:
     """
     Parse Basic Authentication header.
 
@@ -232,24 +240,24 @@ def _parse_basic_auth_header(authorization: str) -> Tuple[str, Optional[str]]:
         # Return None for empty secret (public clients)
         return client_id, client_secret if client_secret else None
 
-    except UnicodeDecodeError:
+    except UnicodeDecodeError as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials encoding",
             headers={"WWW-Authenticate": "Basic"},
-        )
-    except ValueError:
+        ) from e
+    except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials format",
             headers={"WWW-Authenticate": "Basic"},
-        )
+        ) from e
 
 
 async def get_current_client(
     request: Request,
     client_service: "ClientService" = Depends(get_client_service),
-    basic_credentials: Optional[HTTPBasicCredentials] = Depends(basic_auth_scheme),
+    basic_credentials: HTTPBasicCredentials | None = Depends(basic_auth_scheme),
 ) -> "OAuthClientModel":
     """
     Get the current authenticated OAuth client.
@@ -324,7 +332,7 @@ async def get_current_client(
     if not client_id:
         # Track missing client credentials
         if METRICS_ENABLED and metrics:
-            duration = time.time() - start_time
+            time.time() - start_time
             metrics.track_client_authentication(
                 "unknown", "missing_credentials", auth_method.value if auth_method else "unknown"
             )
@@ -347,7 +355,7 @@ async def get_current_client(
         if not authenticated_client:
             # Track client authentication failure
             if METRICS_ENABLED and metrics:
-                duration = time.time() - start_time
+                time.time() - start_time
                 metrics.track_client_authentication(client_id, "authentication_failed", auth_method.value)
             logger.warning(f"Client authentication failed for client_id: {client_id}")
             raise HTTPException(
@@ -358,7 +366,7 @@ async def get_current_client(
 
         # Track successful client authentication
         if METRICS_ENABLED and metrics:
-            duration = time.time() - start_time
+            time.time() - start_time
             metrics.track_client_authentication(client_id, "success", auth_method.value)
 
         return authenticated_client
@@ -369,11 +377,11 @@ async def get_current_client(
     except Exception as e:
         # Track client authentication error
         if METRICS_ENABLED and metrics:
-            duration = time.time() - start_time
+            time.time() - start_time
             metrics.track_client_authentication(
                 client_id or "unknown", "error", auth_method.value if auth_method else "unknown"
             )
         logger.error(f"Error during client authentication: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Client authentication service error"
-        )
+        ) from None

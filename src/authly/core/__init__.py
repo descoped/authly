@@ -13,12 +13,12 @@ from .dependencies import (
 )
 
 __all__ = [
+    "get_config",
     # Database lifecycle management
     "get_configuration",
+    "get_database_connection",
     "get_database_pool",
+    "get_database_pool_dependency",
     # FastAPI dependencies (modern)
     "get_resource_manager",
-    "get_config",
-    "get_database_pool_dependency",
-    "get_database_connection",
 ]

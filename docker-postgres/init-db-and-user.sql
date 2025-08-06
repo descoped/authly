@@ -135,6 +135,12 @@ CREATE INDEX IF NOT EXISTS idx_users_locale ON users(locale) WHERE locale IS NOT
 CREATE INDEX IF NOT EXISTS idx_users_zoneinfo ON users(zoneinfo) WHERE zoneinfo IS NOT NULL; -- OIDC: Timezone-based filtering
 CREATE INDEX IF NOT EXISTS idx_users_address_gin ON users USING GIN (address) WHERE address IS NOT NULL; -- OIDC: Address search optimization
 
+-- CORE + ADMIN: Admin user management performance indexes (Increment 5.1 - Query Optimization)
+-- Purpose: Optimize admin user listing, filtering, and session management queries
+CREATE INDEX IF NOT EXISTS idx_users_admin_composite ON users(created_at DESC, is_active, is_admin, is_verified); -- ADMIN: Composite index for admin listing with sort and filters
+CREATE INDEX IF NOT EXISTS idx_users_admin_text_search ON users USING gin(to_tsvector('english', COALESCE(username, '') || ' ' || COALESCE(email, '') || ' ' || COALESCE(given_name, '') || ' ' || COALESCE(family_name, ''))); -- ADMIN: Full-text search optimization
+CREATE INDEX IF NOT EXISTS idx_users_admin_dates ON users(created_at, last_login); -- ADMIN: Date range filtering optimization
+
 -- ===========================================================================================================
 -- OAUTH 2.1 DOMAIN - OAuth Clients Table
 -- ===========================================================================================================
@@ -231,6 +237,12 @@ CREATE INDEX IF NOT EXISTS idx_tokens_jti ON tokens(token_jti);       -- OAUTH: 
 CREATE INDEX IF NOT EXISTS idx_tokens_expires_at ON tokens(expires_at); -- OAUTH: Expiration-based cleanup
 CREATE INDEX IF NOT EXISTS idx_tokens_client_id ON tokens(client_id); -- OAUTH: Client token lookup
 CREATE INDEX IF NOT EXISTS idx_tokens_scope ON tokens(scope);         -- OAUTH: Scope-based filtering
+
+-- OAUTH + ADMIN: Token session management performance indexes (Increment 5.1 - Query Optimization)
+-- Purpose: Optimize admin session counting, listing, and revocation queries
+CREATE INDEX IF NOT EXISTS idx_tokens_session_count ON tokens(user_id, token_type, invalidated, expires_at) WHERE token_type = 'access'; -- ADMIN: Active session counting optimization
+CREATE INDEX IF NOT EXISTS idx_tokens_session_listing ON tokens(user_id, created_at DESC, invalidated, expires_at); -- ADMIN: Session listing optimization
+CREATE INDEX IF NOT EXISTS idx_tokens_active_sessions ON tokens(user_id, created_at DESC) WHERE token_type = 'access' AND invalidated = false; -- ADMIN: Active session partial index (without expires_at check for immutability)
 
 -- ===========================================================================================================
 -- OAUTH 2.1 DOMAIN - OAuth Scopes Table

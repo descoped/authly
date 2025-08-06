@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from enum import Enum
 from json import JSONEncoder
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from cryptography.fernet import Fernet, InvalidToken
 
@@ -82,7 +82,7 @@ class SecureSecrets:
     ROTATION_INTERVAL = timedelta(days=30)
     MAX_SECRET_SIZE = 1024 * 1024  # 1MB limit
 
-    def __init__(self, secrets_location: Optional[Path] = None):
+    def __init__(self, secrets_location: Path | None = None):
         """Initialize secure secrets' storage.
 
         Args:
@@ -102,8 +102,8 @@ class SecureSecrets:
 
         self._key = self._get_or_create_key()
         self._fernet = Fernet(self._key)
-        self._secrets: Optional[Dict[str, Any]] = None
-        self._metadata: Dict[str, SecretMetadata] = {}
+        self._secrets: dict[str, Any] | None = None
+        self._metadata: dict[str, SecretMetadata] = {}
 
         self._load_secrets()
         self._check_rotation_schedule()
@@ -202,12 +202,12 @@ class SecureSecrets:
             if len(value.encode()) > self.MAX_SECRET_SIZE:
                 raise ValueError(f"Secret exceeds size limit of {self.MAX_SECRET_SIZE} bytes")
             return SecretValueType.STRING
-        elif isinstance(value, (int, float)):
+        elif isinstance(value, int | float):
             return SecretValueType.NUMBER
         elif isinstance(value, bool):
             return SecretValueType.BOOLEAN
         elif isinstance(value, dict):
-            if not all(isinstance(k, str) for k in value.keys()):
+            if not all(isinstance(k, str) for k in value):
                 raise ValueError("Dict keys must be strings")
             return SecretValueType.DICT
         elif isinstance(value, list):
@@ -251,11 +251,11 @@ class SecureSecrets:
                 except (TypeError, ValueError):
                     return False
             return True
-        except (IOError, OSError, InvalidToken, json.JSONDecodeError, KeyError, AttributeError) as e:
+        except (OSError, InvalidToken, json.JSONDecodeError, KeyError, AttributeError) as e:
             logger.error(f"Store integrity check failed: {e}")
             return False
 
-    def get_secret(self, key: str) -> Optional[Any]:
+    def get_secret(self, key: str) -> Any | None:
         """Retrieve secret by key.
 
         Args:
@@ -370,7 +370,7 @@ class SecureSecrets:
         """Securely clear secrets from memory."""
         if self._secrets is not None:
             for key in self._secrets:
-                if isinstance(self._secrets[key], (str, bytes)):
+                if isinstance(self._secrets[key], str | bytes):
                     self._secure_wipe(self._secrets[key])
                 self._secrets[key] = None
             self._secrets = None
@@ -379,7 +379,7 @@ class SecureSecrets:
             self._secure_wipe(self._key)
             self._key = None
 
-    def _load_secrets(self) -> Dict[str, Any]:
+    def _load_secrets(self) -> dict[str, Any]:
         """Load and decrypt secrets from storage.
 
         Returns:
@@ -419,7 +419,7 @@ class SecureSecrets:
             raise ValueError("Failed to decrypt secrets") from e
         except Exception as e:
             logger.error(f"Unexpected error loading secrets: {e}")
-            raise
+            raise RuntimeError("Failed to load secrets: See logs for details") from None
 
     def restore_backup(self, backup_timestamp: str) -> None:
         """Restore secrets from backup.
@@ -440,7 +440,7 @@ class SecureSecrets:
         self._atomic_write(self._secrets_file, encrypted_data)
         self._load_secrets()
 
-    def list_backups(self) -> List[str]:
+    def list_backups(self) -> list[str]:
         """List available backup timestamps.
 
         Returns:

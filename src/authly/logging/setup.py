@@ -7,15 +7,14 @@ while maintaining compatibility with existing logging configuration.
 
 import logging
 import os
-from typing import Optional
 
 from .formatter import StructuredFormatter
 
 
 def setup_structured_logging(
     service_name: str = "authly",
-    service_version: Optional[str] = None,
-    log_level: Optional[str] = None,
+    service_version: str | None = None,
+    log_level: str | None = None,
     json_format: bool = True,
     include_location: bool = False,
 ) -> None:
@@ -98,7 +97,7 @@ def _configure_logger_levels(log_level: str) -> None:
     logging.getLogger("uvicorn.access").setLevel(getattr(logging, access_log_level))
 
 
-def get_service_version() -> Optional[str]:
+def get_service_version() -> str | None:
     """Get the service version from package metadata."""
     try:
         from importlib.metadata import version

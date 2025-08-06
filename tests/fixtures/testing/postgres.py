@@ -1,5 +1,5 @@
 import logging
-from typing import AsyncGenerator, Awaitable, Callable, Generator, Optional
+from collections.abc import AsyncGenerator, Awaitable, Callable, Generator
 
 import psycopg
 import pytest
@@ -24,7 +24,7 @@ def register_db_init_callback(callback: DBCallback):
 
 
 # Private reference to Database
-_db: Optional[Database] = None
+_db: Database | None = None
 
 
 @pytest.fixture(scope="session")
@@ -54,6 +54,9 @@ def _db_settings(postgres_container: PostgresContainer) -> DatabaseSettings:
         dbname=postgres_container.dbname,
         user=postgres_container.username,
         password=postgres_container.password,
+        # Increase pool size for tests to handle concurrent connections
+        min_pool_size=10,
+        max_pool_size=50,
     )
 
 
@@ -62,6 +65,7 @@ async def _database_instance(_db_settings: DatabaseSettings) -> AsyncGenerator[D
     """Create a Database instance that persists for the entire test session."""
     global _db
     if _db is None:
+        logger.info("Creating new Database instance (first test)")
         _db = Database(settings=_db_settings)
         try:
             await _db.create_pool()
@@ -70,13 +74,20 @@ async def _database_instance(_db_settings: DatabaseSettings) -> AsyncGenerator[D
                 await _db.register_init_callback(callback)
 
             await _db.init_db()
+            logger.info("Database pool initialized successfully")
         except Exception as e:
             await _db.cleanup()
-            raise e
+            raise e from e
+    else:
+        logger.debug("Reusing existing Database instance")
 
     yield _db
 
+    # Clean up after each test to prevent pool exhaustion
     if _db is not None:
+        pool = await _db.get_pool()
+        stats = pool.get_stats()
+        logger.debug(f"Pool stats before cleanup: {stats}")
         await _db.cleanup()
         _db = None
 
@@ -90,9 +101,8 @@ async def db_pool(_database_instance: Database) -> AsyncGenerator[AsyncConnectio
 @pytest.fixture(scope="function")
 async def db_connection(_database_instance: Database) -> AsyncGenerator[AsyncConnection, None]:
     pool = await _database_instance.get_pool()
-    async with pool.connection() as conn:
-        async with conn.cursor() as _:
-            yield conn
+    async with pool.connection() as conn, conn.cursor() as _:
+        yield conn
 
 
 @pytest.fixture(scope="function")
@@ -119,6 +129,5 @@ async def transaction_manager(_database_instance: Database) -> AsyncGenerator[Tr
 @pytest.fixture(scope="function")
 async def transaction(transaction_manager: TransactionManager) -> AsyncGenerator[AsyncTransaction, None]:
     """Get a transaction for each test function."""
-    async with transaction_manager.transaction() as conn:
-        async with conn.transaction() as tx:
-            yield tx
+    async with transaction_manager.transaction() as conn, conn.transaction() as tx:
+        yield tx

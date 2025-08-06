@@ -1,7 +1,6 @@
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 from authly.config.database_providers import DatabaseProvider, EnvDatabaseProvider
 from authly.config.secret_providers import SecretProvider
@@ -54,14 +53,25 @@ class AuthlyConfig:
     _password_min_length: int
     _postgres_port: int
     _bootstrap_dev_mode: bool
-    _redis_url: Optional[str]
+    _redis_url: str | None
     _redis_rate_limit_enabled: bool
     _redis_cache_enabled: bool
     _redis_session_enabled: bool
     _redis_connection_pool_size: int
     _redis_connection_timeout: int
     _redis_socket_keepalive: bool
-    _secrets: Optional[SecureSecrets] = None
+    # Cache TTL configuration
+    _cache_ttl_dashboard_stats: int
+    _cache_ttl_user_listing: int
+    _cache_ttl_user_detail: int
+    _cache_ttl_permission: int
+    # Server configuration
+    _default_host: str
+    _default_port: int
+    # Security configuration
+    _lockout_duration_seconds: int
+    _lockout_max_attempts: int
+    _secrets: SecureSecrets | None = None
 
     def __del__(self):
         """Ensure secure cleanup of secrets."""
@@ -72,8 +82,8 @@ class AuthlyConfig:
     def load(
         cls,
         secret_provider: SecretProvider,
-        database_provider: Optional[DatabaseProvider] = None,
-        secrets_path: Optional[Path] = None,
+        database_provider: DatabaseProvider | None = None,
+        secrets_path: Path | None = None,
     ) -> "AuthlyConfig":
         """Load configuration from environment and secure storage.
 
@@ -126,6 +136,17 @@ class AuthlyConfig:
             _redis_connection_pool_size=int(os.getenv("AUTHLY_REDIS_POOL_SIZE", "10")),
             _redis_connection_timeout=int(os.getenv("AUTHLY_REDIS_TIMEOUT", "5")),
             _redis_socket_keepalive=os.getenv("AUTHLY_REDIS_KEEPALIVE", "true").lower() == "true",
+            # Cache TTL configuration (in seconds)
+            _cache_ttl_dashboard_stats=int(os.getenv("AUTHLY_CACHE_TTL_DASHBOARD_STATS", "60")),
+            _cache_ttl_user_listing=int(os.getenv("AUTHLY_CACHE_TTL_USER_LISTING", "30")),
+            _cache_ttl_user_detail=int(os.getenv("AUTHLY_CACHE_TTL_USER_DETAIL", "60")),
+            _cache_ttl_permission=int(os.getenv("AUTHLY_CACHE_TTL_PERMISSION", "300")),
+            # Server configuration
+            _default_host=os.getenv("AUTHLY_DEFAULT_HOST", "0.0.0.0"),
+            _default_port=int(os.getenv("AUTHLY_DEFAULT_PORT", "8000")),
+            # Security configuration
+            _lockout_duration_seconds=int(os.getenv("AUTHLY_LOCKOUT_DURATION_SECONDS", "300")),
+            _lockout_max_attempts=int(os.getenv("AUTHLY_LOCKOUT_MAX_ATTEMPTS", "5")),
         )
 
         config._secrets = SecureSecrets(secrets_path)
@@ -247,7 +268,7 @@ class AuthlyConfig:
         return self._database_url
 
     @property
-    def redis_url(self) -> Optional[str]:
+    def redis_url(self) -> str | None:
         """Get Redis connection URL (optional)."""
         return self._redis_url
 
@@ -285,6 +306,46 @@ class AuthlyConfig:
     def redis_enabled(self) -> bool:
         """Check if any Redis features are enabled."""
         return self.redis_rate_limit_enabled or self.redis_cache_enabled or self.redis_session_enabled
+
+    @property
+    def cache_ttl_dashboard_stats(self) -> int:
+        """Get cache TTL for dashboard statistics (in seconds)."""
+        return self._cache_ttl_dashboard_stats
+
+    @property
+    def cache_ttl_user_listing(self) -> int:
+        """Get cache TTL for user listings (in seconds)."""
+        return self._cache_ttl_user_listing
+
+    @property
+    def cache_ttl_user_detail(self) -> int:
+        """Get cache TTL for user details (in seconds)."""
+        return self._cache_ttl_user_detail
+
+    @property
+    def cache_ttl_permission(self) -> int:
+        """Get cache TTL for permission checks (in seconds)."""
+        return self._cache_ttl_permission
+
+    @property
+    def default_host(self) -> str:
+        """Get default server host."""
+        return self._default_host
+
+    @property
+    def default_port(self) -> int:
+        """Get default server port."""
+        return self._default_port
+
+    @property
+    def lockout_duration_seconds(self) -> int:
+        """Get lockout duration in seconds."""
+        return self._lockout_duration_seconds
+
+    @property
+    def lockout_max_attempts(self) -> int:
+        """Get maximum login attempts before lockout."""
+        return self._lockout_max_attempts
 
     def get_masked_database_url(self) -> str:
         """Get database URL with password masked for safe logging."""
@@ -380,7 +441,7 @@ class AuthlyConfig:
             raise ValueError("Secrets not initialized")
 
         try:
-            self.secret_key
-            self.refresh_secret_key
+            _ = self.secret_key
+            _ = self.refresh_secret_key
         except Exception as e:
-            raise ValueError(f"Secret validation failed: {e}")
+            raise ValueError(f"Secret validation failed: {e}") from e

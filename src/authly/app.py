@@ -6,8 +6,7 @@ for different deployment scenarios (production, development, embedded).
 """
 
 import os
-from contextlib import asynccontextmanager
-from typing import AsyncGenerator, Optional
+from collections.abc import AsyncGenerator
 
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
@@ -25,13 +24,13 @@ from authly.logging.middleware import LoggingMiddleware
 
 
 def create_app(
-    config: Optional[AuthlyConfig] = None,
+    config: AuthlyConfig | None = None,
     title: str = "Authly Authentication Service",
     version: str = __version__,
     description: str = "Production-ready authentication and authorization service with OAuth 2.1 support",
-    lifespan: Optional[AsyncGenerator] = None,
-    static_path: Optional[str] = None,
-    api_prefix: Optional[str] = None,
+    lifespan: AsyncGenerator | None = None,
+    static_path: str | None = None,
+    api_prefix: str | None = None,
 ) -> FastAPI:
     """
     Create and configure a FastAPI application for Authly.
@@ -75,10 +74,7 @@ def create_app(
 
     # Get API prefix from config, parameter, or environment
     if api_prefix is None:
-        if config:
-            api_prefix = config.fastapi_api_version_prefix
-        else:
-            api_prefix = os.getenv("AUTHLY_API_PREFIX", "/api/v1")
+        api_prefix = config.fastapi_api_version_prefix if config else os.getenv("AUTHLY_API_PREFIX", "/api/v1")
 
     # Include versioned API routers
     app.include_router(auth_router, prefix=api_prefix)

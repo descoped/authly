@@ -1,7 +1,6 @@
 import logging
 import secrets
-from datetime import datetime, timedelta, timezone
-from typing import List, Optional
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from psycopg import AsyncConnection
@@ -43,6 +42,8 @@ class AuthorizationCodeRepository(BaseRepository[OAuthAuthorizationCodeModel, UU
             table_name="oauth_authorization_codes",
             model_class=OAuthAuthorizationCodeModel,
             primary_key="id",
+            # Specify all date/timestamp fields for automatic conversion (v0.2.2)
+            date_fields={"created_at", "expires_at", "used_at"},
         )
 
     async def create_authorization_code(self, code_data: dict) -> OAuthAuthorizationCodeModel:
@@ -53,7 +54,7 @@ class AuthorizationCodeRepository(BaseRepository[OAuthAuthorizationCodeModel, UU
             try:
                 # Set timestamps if not provided
                 insert_data = code_data.copy()
-                now = datetime.now(timezone.utc)
+                now = datetime.now(UTC)
                 if "created_at" not in insert_data:
                     insert_data["created_at"] = now
                 if "is_used" not in insert_data:
@@ -74,18 +75,18 @@ class AuthorizationCodeRepository(BaseRepository[OAuthAuthorizationCodeModel, UU
 
             except Exception as e:
                 logger.error(f"Error in create_authorization_code: {e}")
-                raise OperationError(f"Failed to create authorization code: {str(e)}") from e
+                raise OperationError(f"Failed to create authorization code: {e!s}") from e
 
     async def create_authorization_code_with_params(
         self,
         client_id: UUID,
         user_id: UUID,
         redirect_uri: str,
-        scope: Optional[str],
+        scope: str | None,
         code_challenge: str,
         code_challenge_method: str = "S256",
-        state: Optional[str] = None,
-        nonce: Optional[str] = None,
+        state: str | None = None,
+        nonce: str | None = None,
         expires_in_minutes: int = 10,
     ) -> OAuthAuthorizationCodeModel:
         """
@@ -97,7 +98,7 @@ class AuthorizationCodeRepository(BaseRepository[OAuthAuthorizationCodeModel, UU
             code = secrets.token_urlsafe(32)
 
             # Calculate expiration time
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             expires_at = now + timedelta(minutes=expires_in_minutes)
 
             code_data = {
@@ -120,9 +121,9 @@ class AuthorizationCodeRepository(BaseRepository[OAuthAuthorizationCodeModel, UU
 
         except Exception as e:
             logger.error(f"Error in create_authorization_code_with_params: {e}")
-            raise OperationError(f"Failed to create authorization code: {str(e)}") from e
+            raise OperationError(f"Failed to create authorization code: {e!s}") from e
 
-    async def get_by_code(self, code: str) -> Optional[OAuthAuthorizationCodeModel]:
+    async def get_by_code(self, code: str) -> OAuthAuthorizationCodeModel | None:
         """Get authorization code by code value"""
         with DatabaseTimer("authorization_code_read_by_code"):
             try:
@@ -135,27 +136,27 @@ class AuthorizationCodeRepository(BaseRepository[OAuthAuthorizationCodeModel, UU
                     return OAuthAuthorizationCodeModel(**result) if result else None
             except Exception as e:
                 logger.error(f"Error in get_by_code: {e}")
-                raise OperationError(f"Failed to get authorization code: {str(e)}") from e
+                raise OperationError(f"Failed to get authorization code: {e!s}") from e
 
-    async def consume_authorization_code(self, code: str) -> Optional[OAuthAuthorizationCodeModel]:
+    async def consume_authorization_code(self, code: str) -> OAuthAuthorizationCodeModel | None:
         """
         Mark authorization code as used and return it.
         This operation is atomic to prevent race conditions.
         """
         return await self.use_authorization_code(code)
 
-    async def use_authorization_code(self, code: str) -> Optional[OAuthAuthorizationCodeModel]:
+    async def use_authorization_code(self, code: str) -> OAuthAuthorizationCodeModel | None:
         """
         Mark authorization code as used and return it.
         This operation is atomic to prevent race conditions.
         """
         with DatabaseTimer("authorization_code_consume"):
             try:
-                now = datetime.now(timezone.utc)
+                now = datetime.now(UTC)
 
                 # Update code as used and return the record
                 query = """
-                    UPDATE oauth_authorization_codes 
+                    UPDATE oauth_authorization_codes
                     SET is_used = true, used_at = %s
                     WHERE code = %s AND is_used = false
                     RETURNING *
@@ -168,11 +169,11 @@ class AuthorizationCodeRepository(BaseRepository[OAuthAuthorizationCodeModel, UU
 
             except Exception as e:
                 logger.error(f"Error in use_authorization_code: {e}")
-                raise OperationError(f"Failed to use authorization code: {str(e)}") from e
+                raise OperationError(f"Failed to use authorization code: {e!s}") from e
 
     async def validate_and_consume_code(
         self, code: str, client_id: UUID, redirect_uri: str, code_verifier: str
-    ) -> Optional[OAuthAuthorizationCodeModel]:
+    ) -> OAuthAuthorizationCodeModel | None:
         """
         Validate authorization code with PKCE verification and mark as used.
         This is the main method for OAuth 2.1 token exchange.
@@ -220,7 +221,7 @@ class AuthorizationCodeRepository(BaseRepository[OAuthAuthorizationCodeModel, UU
 
         except Exception as e:
             logger.error(f"Error in validate_and_consume_code: {e}")
-            raise OperationError(f"Failed to validate and consume authorization code: {str(e)}") from e
+            raise OperationError(f"Failed to validate and consume authorization code: {e!s}") from e
 
     async def verify_pkce_challenge(self, code: str, code_verifier: str) -> bool:
         """
@@ -269,10 +270,10 @@ class AuthorizationCodeRepository(BaseRepository[OAuthAuthorizationCodeModel, UU
             logger.error(f"Error in PKCE verification: {e}")
             return False
 
-    async def cleanup_expired_codes(self, before_datetime: Optional[datetime] = None) -> int:
+    async def cleanup_expired_codes(self, before_datetime: datetime | None = None) -> int:
         """Clean up expired authorization codes"""
         if before_datetime is None:
-            before_datetime = datetime.now(timezone.utc)
+            before_datetime = datetime.now(UTC)
 
         with DatabaseTimer("authorization_code_cleanup"):
             try:
@@ -289,16 +290,16 @@ class AuthorizationCodeRepository(BaseRepository[OAuthAuthorizationCodeModel, UU
 
             except Exception as e:
                 logger.error(f"Error in cleanup_expired_codes: {e}")
-                raise OperationError(f"Failed to cleanup expired codes: {str(e)}") from e
+                raise OperationError(f"Failed to cleanup expired codes: {e!s}") from e
 
-    async def get_codes_for_user(self, user_id: UUID, limit: int = 10) -> List[OAuthAuthorizationCodeModel]:
+    async def get_codes_for_user(self, user_id: UUID, limit: int = 10) -> list[OAuthAuthorizationCodeModel]:
         """Get recent authorization codes for a user (for debugging/auditing)"""
         with DatabaseTimer("authorization_code_list_user"):
             try:
                 query = """
-                    SELECT * FROM oauth_authorization_codes 
-                    WHERE user_id = %s 
-                    ORDER BY created_at DESC 
+                    SELECT * FROM oauth_authorization_codes
+                    WHERE user_id = %s
+                    ORDER BY created_at DESC
                     LIMIT %s
                 """
 
@@ -309,16 +310,16 @@ class AuthorizationCodeRepository(BaseRepository[OAuthAuthorizationCodeModel, UU
 
             except Exception as e:
                 logger.error(f"Error in get_codes_for_user: {e}")
-                raise OperationError(f"Failed to get codes for user: {str(e)}") from e
+                raise OperationError(f"Failed to get codes for user: {e!s}") from e
 
-    async def get_codes_for_client(self, client_id: UUID, limit: int = 10) -> List[OAuthAuthorizationCodeModel]:
+    async def get_codes_for_client(self, client_id: UUID, limit: int = 10) -> list[OAuthAuthorizationCodeModel]:
         """Get recent authorization codes for a client (for debugging/auditing)"""
         with DatabaseTimer("authorization_code_list_client"):
             try:
                 query = """
-                    SELECT * FROM oauth_authorization_codes 
-                    WHERE client_id = %s 
-                    ORDER BY created_at DESC 
+                    SELECT * FROM oauth_authorization_codes
+                    WHERE client_id = %s
+                    ORDER BY created_at DESC
                     LIMIT %s
                 """
 
@@ -329,15 +330,15 @@ class AuthorizationCodeRepository(BaseRepository[OAuthAuthorizationCodeModel, UU
 
             except Exception as e:
                 logger.error(f"Error in get_codes_for_client: {e}")
-                raise OperationError(f"Failed to get codes for client: {str(e)}") from e
+                raise OperationError(f"Failed to get codes for client: {e!s}") from e
 
     async def revoke_codes_for_user(self, user_id: UUID) -> int:
         """Revoke all unused authorization codes for a user"""
         with DatabaseTimer("authorization_code_revoke_user"):
             try:
-                now = datetime.now(timezone.utc)
+                now = datetime.now(UTC)
                 query = """
-                    UPDATE oauth_authorization_codes 
+                    UPDATE oauth_authorization_codes
                     SET is_used = true, used_at = %s
                     WHERE user_id = %s AND is_used = false
                 """
@@ -348,15 +349,15 @@ class AuthorizationCodeRepository(BaseRepository[OAuthAuthorizationCodeModel, UU
 
             except Exception as e:
                 logger.error(f"Error in revoke_codes_for_user: {e}")
-                raise OperationError(f"Failed to revoke codes for user: {str(e)}") from e
+                raise OperationError(f"Failed to revoke codes for user: {e!s}") from e
 
     async def revoke_codes_for_client(self, client_id: UUID) -> int:
         """Revoke all unused authorization codes for a client"""
         with DatabaseTimer("authorization_code_revoke_client"):
             try:
-                now = datetime.now(timezone.utc)
+                now = datetime.now(UTC)
                 query = """
-                    UPDATE oauth_authorization_codes 
+                    UPDATE oauth_authorization_codes
                     SET is_used = true, used_at = %s
                     WHERE client_id = %s AND is_used = false
                 """
@@ -367,15 +368,15 @@ class AuthorizationCodeRepository(BaseRepository[OAuthAuthorizationCodeModel, UU
 
             except Exception as e:
                 logger.error(f"Error in revoke_codes_for_client: {e}")
-                raise OperationError(f"Failed to revoke codes for client: {str(e)}") from e
+                raise OperationError(f"Failed to revoke codes for client: {e!s}") from e
 
     async def count_active_codes(self) -> int:
         """Count active (unused and not expired) authorization codes"""
         with DatabaseTimer("authorization_code_count"):
             try:
-                now = datetime.now(timezone.utc)
+                now = datetime.now(UTC)
                 query = """
-                    SELECT COUNT(*) FROM oauth_authorization_codes 
+                    SELECT COUNT(*) FROM oauth_authorization_codes
                     WHERE is_used = false AND expires_at > %s
                 """
 
@@ -386,4 +387,4 @@ class AuthorizationCodeRepository(BaseRepository[OAuthAuthorizationCodeModel, UU
 
             except Exception as e:
                 logger.error(f"Error in count_active_codes: {e}")
-                raise OperationError(f"Failed to count active codes: {str(e)}") from e
+                raise OperationError(f"Failed to count active codes: {e!s}") from e

@@ -4,10 +4,8 @@ import asyncio
 import json
 import os
 import sys
-from typing import Dict, Optional
 
 import click
-from fastapi import HTTPException
 
 from authly.admin.api_client import AdminAPIClient, AdminAPIError
 
@@ -35,7 +33,7 @@ def scope_group():
 @click.option("--default", "is_default", is_flag=True, help="Mark as default scope")
 @click.option("--output", type=click.Choice(["table", "json"]), default="table", help="Output format")
 @click.pass_context
-def create_scope(ctx: click.Context, name: str, description: Optional[str], is_default: bool, output: str):
+def create_scope(ctx: click.Context, name: str, description: str | None, is_default: bool, output: str):
     """Create a new OAuth 2.1 scope."""
     verbose = ctx.obj.get("verbose", False)
     dry_run = ctx.obj.get("dry_run", False)
@@ -202,7 +200,7 @@ def show_scope(ctx: click.Context, scope_name: str, output: str):
 def update_scope(
     ctx: click.Context,
     scope_name: str,
-    description: Optional[str],
+    description: str | None,
     make_default: bool,
     remove_default: bool,
     activate: bool,
@@ -289,10 +287,9 @@ def delete_scope(ctx: click.Context, scope_name: str, confirm: bool):
     if verbose:
         click.echo(f"Deleting scope: {scope_name}")
 
-    if not confirm and not dry_run:
-        if not click.confirm(f"This will deactivate scope '{scope_name}'. Continue?"):
-            click.echo("Operation cancelled.")
-            return
+    if not confirm and not dry_run and not click.confirm(f"This will deactivate scope '{scope_name}'. Continue?"):
+        click.echo("Operation cancelled.")
+        return
 
     if dry_run:
         click.echo("DRY RUN: Would deactivate scope")

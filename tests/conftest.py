@@ -1,20 +1,18 @@
 import tempfile
+from collections.abc import AsyncGenerator
 from pathlib import Path
-from typing import AsyncGenerator, Optional
 
 import pytest
-from psycopg_pool import AsyncConnectionPool
 
 # Legacy Authly import removed - using AuthlyResourceManager
 from authly.config import AuthlyConfig, StaticDatabaseProvider, StaticSecretProvider, find_root_folder
-from authly.core.deployment_modes import DeploymentMode
 from authly.core.resource_manager import AuthlyResourceManager
 
 pytest_plugins = [
     "fixtures.testing",
 ]
 
-_test_config: Optional[AuthlyConfig] = None
+_test_config: AuthlyConfig | None = None
 
 
 @pytest.fixture(scope="session")

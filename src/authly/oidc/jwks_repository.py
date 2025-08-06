@@ -7,8 +7,7 @@ JWKS keys for OpenID Connect ID token signing and verification.
 
 import json
 import logging
-from datetime import datetime, timezone
-from typing import List, Optional
+from datetime import UTC, datetime
 
 from psycopg import AsyncConnection
 from psycopg.rows import dict_row
@@ -60,7 +59,7 @@ class JWKSKeyModel:
         self.algorithm = algorithm
         self.key_use = key_use
         self.is_active = is_active
-        self.created_at = created_at or datetime.now(timezone.utc)
+        self.created_at = created_at or datetime.now(UTC)
         self.expires_at = expires_at
         self.key_size = key_size
         self.curve = curve
@@ -109,9 +108,9 @@ class JWKSRepository:
 
             except Exception as e:
                 logger.error(f"Error storing JWKS key: {e}")
-                raise OperationError(f"Failed to store JWKS key: {str(e)}") from e
+                raise OperationError(f"Failed to store JWKS key: {e!s}") from e
 
-    async def get_key_by_kid(self, kid: str) -> Optional[JWKSKeyModel]:
+    async def get_key_by_kid(self, kid: str) -> JWKSKeyModel | None:
         """
         Retrieve a JWKS key by key ID.
 
@@ -147,9 +146,9 @@ class JWKSRepository:
 
             except Exception as e:
                 logger.error(f"Error retrieving JWKS key by kid {kid}: {e}")
-                raise OperationError(f"Failed to retrieve JWKS key: {str(e)}") from e
+                raise OperationError(f"Failed to retrieve JWKS key: {e!s}") from e
 
-    async def get_active_keys(self) -> List[JWKSKeyModel]:
+    async def get_active_keys(self) -> list[JWKSKeyModel]:
         """
         Retrieve all active JWKS keys.
 
@@ -185,7 +184,7 @@ class JWKSRepository:
 
             except Exception as e:
                 logger.error(f"Error retrieving active JWKS keys: {e}")
-                raise OperationError(f"Failed to retrieve active JWKS keys: {str(e)}") from e
+                raise OperationError(f"Failed to retrieve active JWKS keys: {e!s}") from e
 
     async def deactivate_key(self, kid: str) -> bool:
         """
@@ -209,7 +208,7 @@ class JWKSRepository:
 
             except Exception as e:
                 logger.error(f"Error deactivating JWKS key {kid}: {e}")
-                raise OperationError(f"Failed to deactivate JWKS key: {str(e)}") from e
+                raise OperationError(f"Failed to deactivate JWKS key: {e!s}") from e
 
     async def cleanup_expired_keys(self) -> int:
         """
@@ -223,7 +222,7 @@ class JWKSRepository:
                 query = SQL("DELETE FROM oidc_jwks_keys WHERE expires_at IS NOT NULL AND expires_at < %s")
 
                 async with self.db_connection.cursor() as cur:
-                    await cur.execute(query, (datetime.now(timezone.utc),))
+                    await cur.execute(query, (datetime.now(UTC),))
                     rows_affected = cur.rowcount
 
                 logger.info(f"Cleaned up {rows_affected} expired JWKS keys")
@@ -231,4 +230,4 @@ class JWKSRepository:
 
             except Exception as e:
                 logger.error(f"Error cleaning up expired JWKS keys: {e}")
-                raise OperationError(f"Failed to cleanup expired JWKS keys: {str(e)}") from e
+                raise OperationError(f"Failed to cleanup expired JWKS keys: {e!s}") from e

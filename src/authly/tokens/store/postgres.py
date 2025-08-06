@@ -1,5 +1,4 @@
 from datetime import datetime
-from typing import List, Optional
 from uuid import UUID
 
 from psycopg import AsyncConnection
@@ -27,13 +26,13 @@ class PostgresTokenStore(TokenStore):
         """Store a new token."""
         return await self._repo.store_token(token)
 
-    async def get_token(self, token_jti: str) -> Optional[TokenModel]:
+    async def get_token(self, token_jti: str) -> TokenModel | None:
         """Retrieve a token by its JTI."""
         return await self._repo.get_by_jti(token_jti)
 
     async def get_user_tokens(
-        self, user_id: UUID, token_type: Optional[TokenType] = None, valid_only: bool = True
-    ) -> List[TokenModel]:
+        self, user_id: UUID, token_type: TokenType | None = None, valid_only: bool = True
+    ) -> list[TokenModel]:
         """Get all tokens for a user."""
         return await self._repo.get_user_tokens(user_id, token_type, valid_only)
 
@@ -45,7 +44,7 @@ class PostgresTokenStore(TokenStore):
         except Exception:
             return False
 
-    async def invalidate_user_tokens(self, user_id: UUID, token_type: Optional[TokenType] = None) -> int:
+    async def invalidate_user_tokens(self, user_id: UUID, token_type: TokenType | None = None) -> int:
         """Invalidate all tokens for a user."""
         await self._repo.invalidate_user_tokens(user_id, token_type.value if token_type else None)
         return await self._repo.get_invalidated_token_count(user_id, token_type)
@@ -58,6 +57,6 @@ class PostgresTokenStore(TokenStore):
         """Remove expired tokens from storage."""
         return await self._repo.cleanup_expired_tokens(before_datetime)
 
-    async def count_user_valid_tokens(self, user_id: UUID, token_type: Optional[TokenType] = None) -> int:
+    async def count_user_valid_tokens(self, user_id: UUID, token_type: TokenType | None = None) -> int:
         """Count valid tokens for a user."""
         return await self._repo.count_user_valid_tokens(user_id, token_type)

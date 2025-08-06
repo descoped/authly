@@ -9,9 +9,9 @@ This middleware provides security controls for admin endpoints including:
 
 import logging
 import os
-from typing import Callable
+from collections.abc import Callable
 
-from fastapi import HTTPException, Request, Response, status
+from fastapi import HTTPException, Request, status
 from fastapi.responses import JSONResponse
 
 logger = logging.getLogger(__name__)
@@ -130,10 +130,7 @@ class AdminSecurityMiddleware:
             "host.docker.internal",  # Docker Desktop
         }
 
-        if ip in docker_internal_ips:
-            return True
-
-        return False
+        return ip in docker_internal_ips
 
 
 def setup_admin_middleware(app):
@@ -146,7 +143,7 @@ def setup_admin_middleware(app):
     # Add the admin security middleware
     app.add_middleware(AdminSecurityMiddleware)
 
-    logger.info(f"Admin API middleware configured:")
+    logger.info("Admin API middleware configured:")
     logger.info(f"  - Admin API enabled: {_is_admin_api_enabled()}")
     logger.info(f"  - Localhost only: {_is_admin_api_localhost_only()}")
 

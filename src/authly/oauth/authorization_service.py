@@ -7,21 +7,18 @@ import hashlib
 import logging
 import secrets
 import time
-from datetime import datetime, timedelta, timezone
-from typing import List, Optional, Tuple
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from authly.oauth.authorization_code_repository import AuthorizationCodeRepository
 from authly.oauth.client_repository import ClientRepository
 from authly.oauth.models import (
     AuthorizationError,
-    CodeChallengeMethod,
     OAuthAuthorizationErrorResponse,
     OAuthAuthorizationRequest,
     OAuthAuthorizationResponse,
     OAuthClientModel,
     Prompt,
-    ResponseMode,
     ResponseType,
     UserConsentRequest,
 )
@@ -55,7 +52,7 @@ class AuthorizationService:
 
     async def validate_authorization_request(
         self, request: OAuthAuthorizationRequest
-    ) -> Tuple[bool, Optional[str], Optional[OAuthClientModel]]:
+    ) -> tuple[bool, str | None, OAuthClientModel | None]:
         """
         Validate OAuth 2.1 authorization request with OpenID Connect support.
 
@@ -65,7 +62,7 @@ class AuthorizationService:
         Returns:
             Tuple of (is_valid, error_code, client_model)
         """
-        start_time = time.time()
+        time.time()
         try:
             # Validate response type (OAuth 2.1 only supports 'code')
             if request.response_type != ResponseType.CODE:
@@ -139,7 +136,7 @@ class AuthorizationService:
 
             return False, AuthorizationError.SERVER_ERROR, None
 
-    async def generate_authorization_code(self, consent_request: UserConsentRequest) -> Optional[str]:
+    async def generate_authorization_code(self, consent_request: UserConsentRequest) -> str | None:
         """
         Generate an authorization code after user consent.
 
@@ -158,7 +155,7 @@ class AuthorizationService:
             auth_code = secrets.token_urlsafe(32)
 
             # Calculate expiration (OAuth 2.1 recommends short-lived codes, max 10 minutes)
-            expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
+            expires_at = datetime.now(UTC) + timedelta(minutes=10)
 
             # Determine granted scopes
             granted_scope = None
@@ -198,7 +195,7 @@ class AuthorizationService:
 
                 # Track successful authorization code generation
                 if METRICS_ENABLED and metrics:
-                    duration = time.time() - start_time
+                    time.time() - start_time
                     metrics.track_oauth_authorization_request(
                         client_id=consent_request.client_id, status="code_generated", response_type="code"
                     )
@@ -228,7 +225,7 @@ class AuthorizationService:
 
     async def exchange_authorization_code(
         self, code: str, client_id: str, redirect_uri: str, code_verifier: str
-    ) -> Tuple[bool, Optional[dict], Optional[str]]:
+    ) -> tuple[bool, dict | None, str | None]:
         """
         Exchange authorization code for tokens (token endpoint logic).
 
@@ -302,7 +299,7 @@ class AuthorizationService:
 
             # Track successful authorization code exchange
             if METRICS_ENABLED and metrics:
-                duration = time.time() - start_time
+                time.time() - start_time
                 metrics.track_oauth_authorization_request(
                     client_id=client_id, status="code_exchanged", response_type="code"
                 )
@@ -334,7 +331,7 @@ class AuthorizationService:
             return False, None, "Server error"
 
     async def create_authorization_response(
-        self, request: OAuthAuthorizationRequest, auth_code: Optional[str] = None, error: Optional[str] = None
+        self, request: OAuthAuthorizationRequest, auth_code: str | None = None, error: str | None = None
     ) -> OAuthAuthorizationResponse:
         """
         Create authorization response (success or error).
@@ -357,7 +354,7 @@ class AuthorizationService:
             )
 
     async def create_authorization_error_response(
-        self, error: str, description: Optional[str] = None, state: Optional[str] = None
+        self, error: str, description: str | None = None, state: str | None = None
     ) -> OAuthAuthorizationErrorResponse:
         """
         Create authorization error response.
@@ -374,7 +371,7 @@ class AuthorizationService:
             error=error, error_description=description or self._get_error_description(error), state=state
         )
 
-    async def get_requested_scopes(self, scope_string: Optional[str], client: OAuthClientModel) -> List[str]:
+    async def get_requested_scopes(self, scope_string: str | None, client: OAuthClientModel) -> list[str]:
         """
         Get validated requested scopes.
 
@@ -428,7 +425,7 @@ class AuthorizationService:
             logger.error(f"Error verifying PKCE challenge: {e}")
             return False
 
-    async def _get_client_uuid(self, client_id: str) -> Optional[UUID]:
+    async def _get_client_uuid(self, client_id: str) -> UUID | None:
         """Get client UUID from client_id string."""
         try:
             client = await self.client_repo.get_by_client_id(client_id)
@@ -436,7 +433,7 @@ class AuthorizationService:
         except Exception:
             return None
 
-    def _get_error_description(self, error: Optional[str]) -> str:
+    def _get_error_description(self, error: str | None) -> str:
         """Get human-readable error description."""
         error_descriptions = {
             AuthorizationError.INVALID_REQUEST: "The request is missing a required parameter, includes an invalid parameter value, or is otherwise malformed.",

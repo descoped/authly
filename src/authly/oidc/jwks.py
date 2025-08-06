@@ -21,8 +21,8 @@ Based on:
 import base64
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey, RSAPublicKey
@@ -78,7 +78,7 @@ class JWKSModel(BaseModel):
     available for ID token verification.
     """
 
-    keys: List[JWKModel] = Field(..., description="Array of JWK objects")
+    keys: list[JWKModel] = Field(..., description="Array of JWK objects")
 
 
 class JWKSService:
@@ -89,10 +89,10 @@ class JWKSService:
     functionality for OpenID Connect ID token verification.
     """
 
-    def __init__(self, db_connection: Optional[AsyncConnection] = None):
+    def __init__(self, db_connection: AsyncConnection | None = None):
         """Initialize JWKS service with optional database persistence."""
-        self._key_pairs: Dict[str, RSAKeyPair] = {}
-        self._current_key_id: Optional[str] = None
+        self._key_pairs: dict[str, RSAKeyPair] = {}
+        self._current_key_id: str | None = None
         self._repository = JWKSRepository(db_connection) if db_connection else None
 
     async def load_keys_from_database(self):
@@ -147,7 +147,7 @@ class JWKSService:
             private_key=private_key,
             public_key=public_key,
             key_id=key_id,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
             algorithm=algorithm,
         )
 
@@ -213,7 +213,7 @@ class JWKSService:
             private_key=private_key,
             public_key=public_key,
             key_id=key_id,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
             algorithm=algorithm,
         )
 
@@ -227,7 +227,7 @@ class JWKSService:
         logger.info(f"Generated RSA key pair synchronously with ID: {key_id}")
         return key_pair
 
-    def get_current_key_pair(self) -> Optional[RSAKeyPair]:
+    def get_current_key_pair(self) -> RSAKeyPair | None:
         """
         Get the current active key pair for signing.
 
@@ -238,7 +238,7 @@ class JWKSService:
             return self._key_pairs[self._current_key_id]
         return None
 
-    def get_key_pair(self, key_id: str) -> Optional[RSAKeyPair]:
+    def get_key_pair(self, key_id: str) -> RSAKeyPair | None:
         """
         Get a specific key pair by ID.
 
@@ -250,7 +250,7 @@ class JWKSService:
         """
         return self._key_pairs.get(key_id)
 
-    def get_all_key_pairs(self) -> List[RSAKeyPair]:
+    def get_all_key_pairs(self) -> list[RSAKeyPair]:
         """
         Get all stored key pairs.
 
@@ -357,7 +357,7 @@ class JWKSService:
             Unique key identifier
         """
         # Use timestamp-based key ID with microseconds for uniqueness
-        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S%f")
+        timestamp = datetime.now(UTC).strftime("%Y%m%d%H%M%S%f")
         return f"key_{timestamp}"
 
     def _int_to_base64url(self, value: int) -> str:
@@ -407,7 +407,7 @@ class JWKSManager:
             logger.info("No key pairs found, generating initial key pair")
             self.service._generate_rsa_key_pair_sync()
 
-    def get_jwks_response(self) -> Dict[str, Any]:
+    def get_jwks_response(self) -> dict[str, Any]:
         """
         Get JWKS response for the endpoint.
 
@@ -422,9 +422,9 @@ class JWKSManager:
             logger.error(f"Error generating JWKS response: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unable to generate JWKS response"
-            )
+            ) from None
 
-    def get_signing_key(self) -> Optional[RSAKeyPair]:
+    def get_signing_key(self) -> RSAKeyPair | None:
         """
         Get the current signing key pair.
 
@@ -433,7 +433,7 @@ class JWKSManager:
         """
         return self.service.get_current_key_pair()
 
-    def get_key_for_verification(self, key_id: str) -> Optional[RSAKeyPair]:
+    def get_key_for_verification(self, key_id: str) -> RSAKeyPair | None:
         """
         Get a key pair for verification by key ID.
 
@@ -447,7 +447,7 @@ class JWKSManager:
 
 
 # Global JWKS manager instance
-_jwks_manager: Optional[JWKSManager] = None
+_jwks_manager: JWKSManager | None = None
 
 
 def get_jwks_manager() -> JWKSManager:
@@ -463,7 +463,7 @@ def get_jwks_manager() -> JWKSManager:
     return _jwks_manager
 
 
-def get_jwks_response() -> Dict[str, Any]:
+def get_jwks_response() -> dict[str, Any]:
     """
     Get JWKS response for the endpoint.
 
@@ -474,7 +474,7 @@ def get_jwks_response() -> Dict[str, Any]:
     return manager.get_jwks_response()
 
 
-def get_current_signing_key() -> Optional[RSAKeyPair]:
+def get_current_signing_key() -> RSAKeyPair | None:
     """
     Get the current signing key pair.
 
@@ -485,7 +485,7 @@ def get_current_signing_key() -> Optional[RSAKeyPair]:
     return manager.get_signing_key()
 
 
-def get_key_for_verification(key_id: str) -> Optional[RSAKeyPair]:
+def get_key_for_verification(key_id: str) -> RSAKeyPair | None:
     """
     Get key pair for verification by key ID.
 

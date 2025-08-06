@@ -1,8 +1,8 @@
-from datetime import datetime
-from typing import Any, Dict, Optional
+from datetime import date, datetime
+from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class UserModel(BaseModel):
@@ -13,32 +13,32 @@ class UserModel(BaseModel):
     password_hash: str
     created_at: datetime
     updated_at: datetime
-    last_login: Optional[datetime] = None
+    last_login: datetime | None = None
     is_active: bool = True
     is_verified: bool = False
     is_admin: bool = False
     requires_password_change: bool = False
 
     # OIDC Standard Claims - Profile scope
-    given_name: Optional[str] = Field(None, description="OIDC: Given name (first name)")
-    family_name: Optional[str] = Field(None, description="OIDC: Family name (last name)")
-    middle_name: Optional[str] = Field(None, description="OIDC: Middle name")
-    nickname: Optional[str] = Field(None, description="OIDC: Casual name")
-    preferred_username: Optional[str] = Field(None, description="OIDC: Preferred username for display")
-    profile: Optional[str] = Field(None, description="OIDC: Profile page URL")
-    picture: Optional[str] = Field(None, description="OIDC: Profile picture URL")
-    website: Optional[str] = Field(None, description="OIDC: Personal website URL")
-    gender: Optional[str] = Field(None, description="OIDC: Gender")
-    birthdate: Optional[str] = Field(None, description="OIDC: Birthdate in YYYY-MM-DD format")
-    zoneinfo: Optional[str] = Field(None, description="OIDC: Time zone identifier (e.g., America/New_York)")
-    locale: Optional[str] = Field(None, description="OIDC: Preferred locale (e.g., en-US)")
+    given_name: str | None = Field(None, description="OIDC: Given name (first name)")
+    family_name: str | None = Field(None, description="OIDC: Family name (last name)")
+    middle_name: str | None = Field(None, description="OIDC: Middle name")
+    nickname: str | None = Field(None, description="OIDC: Casual name")
+    preferred_username: str | None = Field(None, description="OIDC: Preferred username for display")
+    profile: str | None = Field(None, description="OIDC: Profile page URL")
+    picture: str | None = Field(None, description="OIDC: Profile picture URL")
+    website: str | None = Field(None, description="OIDC: Personal website URL")
+    gender: str | None = Field(None, description="OIDC: Gender")
+    birthdate: str | None = Field(None, description="OIDC: Birthdate in YYYY-MM-DD format")
+    zoneinfo: str | None = Field(None, description="OIDC: Time zone identifier (e.g., America/New_York)")
+    locale: str | None = Field(None, description="OIDC: Preferred locale (e.g., en-US)")
 
     # OIDC Standard Claims - Phone scope
-    phone_number: Optional[str] = Field(None, description="OIDC: Phone number")
-    phone_number_verified: Optional[bool] = Field(None, description="OIDC: Phone number verification status")
+    phone_number: str | None = Field(None, description="OIDC: Phone number")
+    phone_number_verified: bool | None = Field(None, description="OIDC: Phone number verification status")
 
     # OIDC Standard Claims - Address scope (structured claim)
-    address: Optional[Dict[str, Any]] = Field(None, description="OIDC: Structured address claim")
+    address: dict[str, Any] | None = Field(None, description="OIDC: Structured address claim")
 
     class Config:
         json_schema_extra = {
@@ -78,3 +78,26 @@ class UserModel(BaseModel):
                 },
             }
         }
+
+    @field_validator("birthdate", mode="before")
+    @classmethod
+    def validate_birthdate(cls, v: str | date | None) -> str | None:
+        """
+        Convert birthdate to OIDC-compliant string format.
+
+        Accepts:
+        - None (returns None)
+        - String in YYYY-MM-DD format (returns as-is)
+        - Python date object (converts to YYYY-MM-DD string)
+
+        Returns:
+        - None or string in YYYY-MM-DD format
+        """
+        if v is None:
+            return None
+        if isinstance(v, str):
+            return v
+        if isinstance(v, date):
+            return v.strftime("%Y-%m-%d")
+        # If it's neither string nor date, let Pydantic handle the validation error
+        return v

@@ -8,7 +8,6 @@ including scope validation, parameter validation, and flow validation.
 import logging
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Optional, Set, Tuple
 
 from authly.config.config import AuthlyConfig
 
@@ -55,12 +54,12 @@ class OIDCValidationResult:
 
     is_valid: bool
     is_oidc_request: bool
-    flow_type: Optional[OIDCFlow]
-    validated_scopes: List[str]
-    invalid_scopes: List[str]
-    required_claims: Set[str]
-    errors: List[str]
-    warnings: List[str]
+    flow_type: OIDCFlow | None
+    validated_scopes: list[str]
+    invalid_scopes: list[str]
+    required_claims: set[str]
+    errors: list[str]
+    warnings: list[str]
 
 
 class OIDCValidator:
@@ -72,7 +71,7 @@ class OIDCValidator:
     """
 
     @staticmethod
-    def validate_oidc_scopes(requested_scopes: List[str]) -> OIDCValidationResult:
+    def validate_oidc_scopes(requested_scopes: list[str]) -> OIDCValidationResult:
         """
         Validate OIDC scopes and determine flow type.
 
@@ -142,7 +141,7 @@ class OIDCValidator:
         )
 
     @staticmethod
-    def validate_response_type(response_type: str) -> Tuple[bool, Optional[OIDCFlow], List[str]]:
+    def validate_response_type(response_type: str) -> tuple[bool, OIDCFlow | None, list[str]]:
         """
         Validate OIDC response type and determine flow.
 
@@ -155,14 +154,12 @@ class OIDCValidator:
         errors = []
 
         # Parse response type
-        response_types = response_type.split()
+        response_type.split()
 
         # Validate response type combinations
         if response_type == OIDCResponseType.CODE.value:
             flow_type = OIDCFlow.AUTHORIZATION_CODE
-        elif response_type == OIDCResponseType.ID_TOKEN.value:
-            flow_type = OIDCFlow.IMPLICIT
-        elif response_type == OIDCResponseType.ID_TOKEN_TOKEN.value:
+        elif response_type == OIDCResponseType.ID_TOKEN.value or response_type == OIDCResponseType.ID_TOKEN_TOKEN.value:
             flow_type = OIDCFlow.IMPLICIT
         elif response_type in [
             OIDCResponseType.CODE_ID_TOKEN.value,
@@ -178,7 +175,7 @@ class OIDCValidator:
         return is_valid, flow_type, errors
 
     @staticmethod
-    def validate_nonce(nonce: Optional[str], response_type: str, config: AuthlyConfig) -> List[str]:
+    def validate_nonce(nonce: str | None, response_type: str, config: AuthlyConfig) -> list[str]:
         """
         Validate nonce parameter for OIDC requests.
 
@@ -206,12 +203,12 @@ class OIDCValidator:
 
     @staticmethod
     def validate_oidc_request_parameters(
-        scopes: List[str],
+        scopes: list[str],
         response_type: str,
         config: AuthlyConfig,
-        nonce: Optional[str] = None,
-        max_age: Optional[int] = None,
-        claims: Optional[str] = None,
+        nonce: str | None = None,
+        max_age: int | None = None,
+        claims: str | None = None,
     ) -> OIDCValidationResult:
         """
         Comprehensive validation of OIDC request parameters.
@@ -275,7 +272,7 @@ class OIDCScopeProcessor:
     """
 
     @staticmethod
-    def get_oidc_scope_registration_data() -> List[Dict[str, any]]:
+    def get_oidc_scope_registration_data() -> list[dict[str, any]]:
         """
         Get OIDC scope data for registration in the database.
 
@@ -300,7 +297,7 @@ class OIDCScopeProcessor:
         return scope_data
 
     @staticmethod
-    def merge_oauth_and_oidc_scopes(oauth_scopes: List[str], oidc_scopes: List[str]) -> List[str]:
+    def merge_oauth_and_oidc_scopes(oauth_scopes: list[str], oidc_scopes: list[str]) -> list[str]:
         """
         Merge OAuth 2.1 and OIDC scopes into a single list.
 
@@ -315,7 +312,7 @@ class OIDCScopeProcessor:
         return list(all_scopes)
 
     @staticmethod
-    def separate_oauth_and_oidc_scopes(scopes: List[str]) -> Tuple[List[str], List[str]]:
+    def separate_oauth_and_oidc_scopes(scopes: list[str]) -> tuple[list[str], list[str]]:
         """
         Separate mixed scopes into OAuth and OIDC scopes.
 
@@ -337,7 +334,7 @@ class OIDCScopeProcessor:
         return oauth_scopes, oidc_scopes
 
     @staticmethod
-    def validate_scope_combination(scopes: List[str]) -> Dict[str, any]:
+    def validate_scope_combination(scopes: list[str]) -> dict[str, any]:
         """
         Validate combination of OAuth and OIDC scopes.
 
@@ -407,7 +404,7 @@ def register_oidc_scopes_with_oauth_system():
     return OIDCScopeProcessor.get_oidc_scope_registration_data()
 
 
-def validate_mixed_scopes(scopes: List[str]) -> OIDCValidationResult:
+def validate_mixed_scopes(scopes: list[str]) -> OIDCValidationResult:
     """
     Validate mixed OAuth and OIDC scopes.
 

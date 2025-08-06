@@ -1,8 +1,8 @@
 import logging
 import secrets
 import time
-from datetime import datetime, timezone
-from typing import TYPE_CHECKING, List, Optional
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Optional
 from uuid import UUID, uuid4
 
 if TYPE_CHECKING:
@@ -51,13 +51,13 @@ class TokenService:
         """Create a new token record"""
         return await self._repo.store_token(token)
 
-    async def get_token(self, token_jti: str) -> Optional[TokenModel]:
+    async def get_token(self, token_jti: str) -> TokenModel | None:
         """Get a token by its JTI"""
         return await self._repo.get_by_jti(token_jti)
 
     async def get_user_tokens(
-        self, user_id: UUID, token_type: Optional[TokenType] = None, valid_only: bool = True
-    ) -> List[TokenModel]:
+        self, user_id: UUID, token_type: TokenType | None = None, valid_only: bool = True
+    ) -> list[TokenModel]:
         """Get all tokens for a user"""
         return await self._repo.get_user_tokens(user_id, token_type, valid_only)
 
@@ -69,7 +69,7 @@ class TokenService:
         except Exception:
             return False
 
-    async def invalidate_user_tokens(self, user_id: UUID, token_type: Optional[TokenType] = None) -> int:
+    async def invalidate_user_tokens(self, user_id: UUID, token_type: TokenType | None = None) -> int:
         """Invalidate all tokens for a user"""
         await self._repo.invalidate_user_tokens(user_id, token_type.value if token_type else None)
         return await self._repo.get_invalidated_token_count(user_id, token_type)
@@ -78,13 +78,13 @@ class TokenService:
         """Check if a token is valid"""
         return await self._repo.is_token_valid(token_jti)
 
-    async def cleanup_expired_tokens(self, before_datetime: Optional[datetime] = None) -> int:
+    async def cleanup_expired_tokens(self, before_datetime: datetime | None = None) -> int:
         """Clean up expired tokens"""
         if before_datetime is None:
-            before_datetime = datetime.now(timezone.utc)
+            before_datetime = datetime.now(UTC)
         return await self._repo.cleanup_expired_tokens(before_datetime)
 
-    async def count_user_valid_tokens(self, user_id: UUID, token_type: Optional[TokenType] = None) -> int:
+    async def count_user_valid_tokens(self, user_id: UUID, token_type: TokenType | None = None) -> int:
         """Count valid tokens for a user"""
         return await self._repo.count_user_valid_tokens(user_id, token_type)
 
@@ -100,9 +100,9 @@ class TokenService:
     async def create_token_pair(
         self,
         user: UserModel,
-        scope: Optional[str] = None,
-        client_id: Optional[str] = None,
-        oidc_params: Optional[dict] = None,
+        scope: str | None = None,
+        client_id: str | None = None,
+        oidc_params: dict | None = None,
     ) -> TokenPairResponse:
         """
         Create a new access and refresh token pair for a user, with optional ID token for OIDC flows.
@@ -162,8 +162,8 @@ class TokenService:
                 token_jti=access_jti,
                 token_type=TokenType.ACCESS,
                 token_value=access_token,
-                expires_at=datetime.fromtimestamp(access_payload["exp"], tz=timezone.utc),
-                created_at=datetime.now(timezone.utc),
+                expires_at=datetime.fromtimestamp(access_payload["exp"], tz=UTC),
+                created_at=datetime.now(UTC),
                 scope=scope,  # Store scope for OAuth 2.1 compliance
             )
 
@@ -173,8 +173,8 @@ class TokenService:
                 token_jti=refresh_jti,
                 token_type=TokenType.REFRESH,
                 token_value=refresh_token,
-                expires_at=datetime.fromtimestamp(refresh_payload["exp"], tz=timezone.utc),
-                created_at=datetime.now(timezone.utc),
+                expires_at=datetime.fromtimestamp(refresh_payload["exp"], tz=UTC),
+                created_at=datetime.now(UTC),
                 scope=scope,  # Store scope to preserve during refresh
             )
 
@@ -223,10 +223,10 @@ class TokenService:
             logger.error(f"Error creating token pair for user {user.id}: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not create authentication tokens"
-            )
+            ) from None
 
     async def refresh_token_pair(
-        self, refresh_token: str, user_repo: UserRepository, client_id: Optional[str] = None
+        self, refresh_token: str, user_repo: UserRepository, client_id: str | None = None
     ) -> TokenPairResponse:
         """
         Create a new token pair using a refresh token, invalidating the old refresh token.
@@ -299,7 +299,7 @@ class TokenService:
             # Get the user
             try:
                 user = await user_repo.get_by_id(UUID(user_id))
-            except (ValueError, RecordNotFoundError):
+            except (ValueError, RecordNotFoundError) as e:
                 # Track user not found
                 if METRICS_ENABLED and metrics:
                     duration = time.time() - start_time
@@ -311,7 +311,7 @@ class TokenService:
                         duration=duration,
                         is_oidc=is_oidc,
                     )
-                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found") from e
 
             if not user.is_active:
                 # Track inactive user
@@ -368,8 +368,8 @@ class TokenService:
                 token_jti=new_access_jti,
                 token_type=TokenType.ACCESS,
                 token_value=new_access_token,
-                expires_at=datetime.fromtimestamp(access_payload["exp"], tz=timezone.utc),
-                created_at=datetime.now(timezone.utc),
+                expires_at=datetime.fromtimestamp(access_payload["exp"], tz=UTC),
+                created_at=datetime.now(UTC),
                 scope=original_scope,  # Preserve original scope
             )
 
@@ -379,8 +379,8 @@ class TokenService:
                 token_jti=new_refresh_jti,
                 token_type=TokenType.REFRESH,
                 token_value=new_refresh_token,
-                expires_at=datetime.fromtimestamp(refresh_payload["exp"], tz=timezone.utc),
-                created_at=datetime.now(timezone.utc),
+                expires_at=datetime.fromtimestamp(refresh_payload["exp"], tz=UTC),
+                created_at=datetime.now(UTC),
                 scope=original_scope,  # Preserve original scope
             )
 
@@ -417,7 +417,7 @@ class TokenService:
         except HTTPException:
             # Let HTTPExceptions pass through
             raise
-        except JWTError:
+        except JWTError as e:
             # Track JWT error
             if METRICS_ENABLED and metrics:
                 duration = time.time() - start_time
@@ -428,7 +428,8 @@ class TokenService:
                     token_type="refresh",
                     duration=duration,
                 )
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token") from e
+
         except Exception as e:
             # Track general refresh error
             if METRICS_ENABLED and metrics:
@@ -441,7 +442,9 @@ class TokenService:
                     duration=duration,
                 )
             logger.error(f"Error refreshing token pair: {e}")
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not refresh tokens")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not refresh tokens"
+            ) from None
 
     async def logout_user_session(self, access_token: str, user_id: UUID) -> int:
         """
@@ -471,12 +474,17 @@ class TokenService:
 
             return invalidated_count
 
-        except JWTError:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication credentials")
-        except Exception:
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Logout operation failed")
+        except JWTError as e:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication credentials"
+            ) from e
 
-    async def revoke_token(self, token: str, token_type_hint: Optional[str] = None) -> bool:
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Logout operation failed"
+            ) from e
+
+    async def revoke_token(self, token: str, token_type_hint: str | None = None) -> bool:
         """
         Revoke a token according to RFC 7009 OAuth 2.0 Token Revocation.
 
@@ -642,10 +650,10 @@ class TokenService:
                 )
 
             # Log error but don't raise exception per RFC 7009
-            logger.error(f"Error during token revocation: {str(e)}")
+            logger.error(f"Error during token revocation: {e!s}")
             return False
 
-    def _is_oidc_request(self, scope: Optional[str]) -> bool:
+    def _is_oidc_request(self, scope: str | None) -> bool:
         """
         Check if this is an OpenID Connect request (contains 'openid' scope).
 
@@ -662,8 +670,8 @@ class TokenService:
         return OIDCClaimsMapping.is_oidc_request(scopes)
 
     async def _generate_id_token(
-        self, user: UserModel, scope: str, client_id: str, oidc_params: Optional[dict] = None
-    ) -> Optional[str]:
+        self, user: UserModel, scope: str, client_id: str, oidc_params: dict | None = None
+    ) -> str | None:
         """
         Generate an ID token for OpenID Connect flows.
 
@@ -699,8 +707,8 @@ class TokenService:
 
             # Extract OIDC parameters
             nonce = oidc_params.get("nonce") if oidc_params else None
-            max_age = oidc_params.get("max_age") if oidc_params else None
-            acr_values = oidc_params.get("acr_values") if oidc_params else None
+            oidc_params.get("max_age") if oidc_params else None
+            oidc_params.get("acr_values") if oidc_params else None
 
             # Generate ID token
             id_token = await id_token_service.create_id_token(user=user, client=client, scopes=scopes, nonce=nonce)

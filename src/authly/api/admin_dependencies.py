@@ -8,16 +8,18 @@ implementing the two-layer security model:
 """
 
 import logging
-from typing import Dict, List
+from typing import TYPE_CHECKING
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
-from psycopg import AsyncConnection
 
 from authly.api.users_dependencies import get_current_user
 from authly.core.dependencies import get_config
 from authly.users.models import UserModel
+
+if TYPE_CHECKING:
+    from authly.config import AuthlyConfig
 
 logger = logging.getLogger(__name__)
 
@@ -142,17 +144,17 @@ def require_admin_scope(required_scope: str):
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid authentication token",
                 headers={"WWW-Authenticate": "Bearer"},
-            )
+            ) from None
         except Exception as e:
             logger.error(f"Admin scope validation error: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Admin scope validation failed"
-            )
+            ) from None
 
     return validate_admin_scope
 
 
-async def get_admin_scopes() -> Dict[str, str]:
+async def get_admin_scopes() -> dict[str, str]:
     """
     Get all available admin scopes and their descriptions.
 
@@ -162,7 +164,7 @@ async def get_admin_scopes() -> Dict[str, str]:
     return ADMIN_SCOPES.copy()
 
 
-async def validate_admin_scopes(scopes: List[str]) -> List[str]:
+async def validate_admin_scopes(scopes: list[str]) -> list[str]:
     """
     Validate that the provided scopes are valid admin scopes.
 

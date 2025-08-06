@@ -10,11 +10,9 @@ import logging
 import os
 import secrets
 import string
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 from uuid import uuid4
 
-from fastapi import HTTPException
 from psycopg import AsyncConnection
 
 from authly.api.admin_dependencies import ADMIN_SCOPES
@@ -68,8 +66,8 @@ def generate_secure_password(length: int = 16) -> str:
 
 
 async def bootstrap_admin_user(
-    conn: AsyncConnection, username: Optional[str] = None, email: Optional[str] = None, password: Optional[str] = None
-) -> Optional[UserModel]:
+    conn: AsyncConnection, username: str | None = None, email: str | None = None, password: str | None = None
+) -> UserModel | None:
     """
     Create the initial admin user with intrinsic authority.
 
@@ -155,8 +153,8 @@ async def bootstrap_admin_user(
             username=admin_username,
             email=admin_email,
             password_hash=get_password_hash(admin_password),
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
             is_active=True,
             is_verified=True,
             is_admin=True,  # Intrinsic authority - not an OAuth scope
@@ -170,13 +168,13 @@ async def bootstrap_admin_user(
         )
 
         # Log bootstrap completion
-        logger.info(f"Admin user created with requires_password_change=True. Password must be changed on first login.")
+        logger.info("Admin user created with requires_password_change=True. Password must be changed on first login.")
 
         return created_user
 
     except Exception as e:
         logger.error(f"Failed to bootstrap admin user: {e}")
-        raise
+        raise RuntimeError("Failed to bootstrap admin user: See logs for details") from None
 
 
 async def register_admin_scopes(conn: AsyncConnection) -> int:
@@ -214,12 +212,6 @@ async def register_admin_scopes(conn: AsyncConnection) -> int:
                 continue
 
             # Create new admin scope
-            scope_data = {
-                "scope_name": scope_name,
-                "description": description,
-                "is_default": False,  # Admin scopes are not default user scopes
-                "is_active": True,
-            }
 
             scope = OAuthScopeModel(
                 id=uuid4(),
@@ -227,8 +219,8 @@ async def register_admin_scopes(conn: AsyncConnection) -> int:
                 description=description,
                 is_default=False,
                 is_active=True,
-                created_at=datetime.now(timezone.utc),
-                updated_at=datetime.now(timezone.utc),
+                created_at=datetime.now(UTC),
+                updated_at=datetime.now(UTC),
             )
 
             await scope_repo.create(scope)
@@ -241,7 +233,7 @@ async def register_admin_scopes(conn: AsyncConnection) -> int:
 
     except Exception as e:
         logger.error(f"Failed to register admin scopes: {e}")
-        raise
+        raise RuntimeError("Failed to register admin scopes: See logs for details") from None
 
 
 async def register_oidc_scopes(conn: AsyncConnection) -> int:
@@ -282,12 +274,6 @@ async def register_oidc_scopes(conn: AsyncConnection) -> int:
                 continue
 
             # Create new OIDC scope
-            scope_data = {
-                "scope_name": scope_name,
-                "description": description,
-                "is_default": False,  # OIDC scopes are not default (except openid in some cases)
-                "is_active": True,
-            }
 
             scope = OAuthScopeModel(
                 id=uuid4(),
@@ -295,8 +281,8 @@ async def register_oidc_scopes(conn: AsyncConnection) -> int:
                 description=description,
                 is_default=False,
                 is_active=True,
-                created_at=datetime.now(timezone.utc),
-                updated_at=datetime.now(timezone.utc),
+                created_at=datetime.now(UTC),
+                updated_at=datetime.now(UTC),
             )
 
             await scope_repo.create(scope)
@@ -309,14 +295,14 @@ async def register_oidc_scopes(conn: AsyncConnection) -> int:
 
     except Exception as e:
         logger.error(f"Failed to register OIDC scopes: {e}")
-        raise
+        raise RuntimeError("Failed to register OIDC scopes: See logs for details") from None
 
 
 async def bootstrap_admin_system(
     conn: AsyncConnection,
-    admin_username: Optional[str] = None,
-    admin_email: Optional[str] = None,
-    admin_password: Optional[str] = None,
+    admin_username: str | None = None,
+    admin_email: str | None = None,
+    admin_password: str | None = None,
 ) -> dict:
     """
     Complete admin system bootstrap process.
@@ -383,7 +369,7 @@ async def bootstrap_admin_system(
 
     except Exception as e:
         logger.error(f"Admin system bootstrap failed: {e}")
-        raise
+        raise RuntimeError("An error occurred") from None
 
 
 def get_bootstrap_status() -> dict:

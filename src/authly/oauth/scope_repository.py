@@ -1,6 +1,5 @@
 import logging
-from datetime import datetime, timezone
-from typing import List, Optional, Set
+from datetime import UTC, datetime
 from uuid import UUID
 
 from psycopg import AsyncConnection
@@ -38,10 +37,15 @@ class ScopeRepository(BaseRepository[OAuthScopeModel, UUID]):
 
     def __init__(self, db_connection: AsyncConnection):
         super().__init__(
-            db_connection=db_connection, table_name="oauth_scopes", model_class=OAuthScopeModel, primary_key="id"
+            db_connection=db_connection,
+            table_name="oauth_scopes",
+            model_class=OAuthScopeModel,
+            primary_key="id",
+            # Specify all date/timestamp fields for automatic conversion (v0.2.2)
+            date_fields={"created_at", "updated_at"},
         )
 
-    async def get_by_scope_name(self, scope_name: str) -> Optional[OAuthScopeModel]:
+    async def get_by_scope_name(self, scope_name: str) -> OAuthScopeModel | None:
         """Get scope by scope name"""
         with DatabaseTimer("scope_read_by_name"):
             try:
@@ -54,9 +58,9 @@ class ScopeRepository(BaseRepository[OAuthScopeModel, UUID]):
                     return OAuthScopeModel(**result) if result else None
             except Exception as e:
                 logger.error(f"Error in get_by_scope_name: {e}")
-                raise OperationError(f"Failed to get scope by name: {str(e)}") from e
+                raise OperationError(f"Failed to get scope by name: {e!s}") from e
 
-    async def get_by_scope_names(self, scope_names: List[str]) -> List[OAuthScopeModel]:
+    async def get_by_scope_names(self, scope_names: list[str]) -> list[OAuthScopeModel]:
         """Get multiple scopes by their names"""
         if not scope_names:
             return []
@@ -65,7 +69,7 @@ class ScopeRepository(BaseRepository[OAuthScopeModel, UUID]):
             try:
                 placeholders = ", ".join(["%s"] * len(scope_names))
                 query = f"""
-                    SELECT * FROM oauth_scopes 
+                    SELECT * FROM oauth_scopes
                     WHERE scope_name IN ({placeholders}) AND is_active = true
                     ORDER BY scope_name
                 """
@@ -77,7 +81,7 @@ class ScopeRepository(BaseRepository[OAuthScopeModel, UUID]):
 
             except Exception as e:
                 logger.error(f"Error in get_by_scope_names: {e}")
-                raise OperationError(f"Failed to get scopes by names: {str(e)}") from e
+                raise OperationError(f"Failed to get scopes by names: {e!s}") from e
 
     async def create_scope(self, scope_data: dict) -> OAuthScopeModel:
         """Create a new OAuth scope"""
@@ -85,7 +89,7 @@ class ScopeRepository(BaseRepository[OAuthScopeModel, UUID]):
             try:
                 # Set timestamps
                 insert_data = scope_data.copy()
-                now = datetime.now(timezone.utc)
+                now = datetime.now(UTC)
                 insert_data["created_at"] = now
                 insert_data["updated_at"] = now
 
@@ -102,7 +106,7 @@ class ScopeRepository(BaseRepository[OAuthScopeModel, UUID]):
 
             except Exception as e:
                 logger.error(f"Error in create_scope: {e}")
-                raise OperationError(f"Failed to create scope: {str(e)}") from e
+                raise OperationError(f"Failed to create scope: {e!s}") from e
 
     async def update_scope(self, scope_id: UUID, update_data: dict) -> OAuthScopeModel:
         """Update an existing OAuth scope"""
@@ -110,14 +114,14 @@ class ScopeRepository(BaseRepository[OAuthScopeModel, UUID]):
             try:
                 # Set updated timestamp
                 prepared_data = update_data.copy()
-                prepared_data["updated_at"] = datetime.now(timezone.utc)
+                prepared_data["updated_at"] = datetime.now(UTC)
 
                 # Build update query
                 update_query = PsycopgHelper.build_update_query(
                     table_name="oauth_scopes", data=prepared_data, where_clause={"id": scope_id}
                 )
 
-                values = list(prepared_data.values()) + [scope_id]
+                values = [*list(prepared_data.values()), scope_id]
 
                 async with self.db_connection.cursor(row_factory=dict_row) as cur:
                     await cur.execute(update_query + SQL(" RETURNING *"), values)
@@ -131,13 +135,13 @@ class ScopeRepository(BaseRepository[OAuthScopeModel, UUID]):
                 raise
             except Exception as e:
                 logger.error(f"Error in update_scope: {e}")
-                raise OperationError(f"Failed to update scope: {str(e)}") from e
+                raise OperationError(f"Failed to update scope: {e!s}") from e
 
     async def delete_scope(self, scope_id: UUID) -> bool:
         """Delete an OAuth scope (soft delete by setting is_active=False)"""
         with DatabaseTimer("scope_delete"):
             try:
-                update_data = {"is_active": False, "updated_at": datetime.now(timezone.utc)}
+                update_data = {"is_active": False, "updated_at": datetime.now(UTC)}
 
                 query = PsycopgHelper.build_update_query(
                     table_name="oauth_scopes",
@@ -146,22 +150,22 @@ class ScopeRepository(BaseRepository[OAuthScopeModel, UUID]):
                 )
 
                 async with self.db_connection.cursor() as cur:
-                    result = await cur.execute(query, [False, update_data["updated_at"], scope_id])
+                    await cur.execute(query, [False, update_data["updated_at"], scope_id])
                     # Check if any rows were affected
                     return cur.rowcount > 0
 
             except Exception as e:
                 logger.error(f"Error in delete_scope: {e}")
-                raise OperationError(f"Failed to delete scope: {str(e)}") from e
+                raise OperationError(f"Failed to delete scope: {e!s}") from e
 
-    async def get_active_scopes(self, limit: int = 100, offset: int = 0) -> List[OAuthScopeModel]:
+    async def get_active_scopes(self, limit: int = 100, offset: int = 0) -> list[OAuthScopeModel]:
         """Get all active OAuth scopes with pagination"""
         with DatabaseTimer("scope_list_active"):
             try:
                 query = """
-                    SELECT * FROM oauth_scopes 
-                    WHERE is_active = true 
-                    ORDER BY scope_name 
+                    SELECT * FROM oauth_scopes
+                    WHERE is_active = true
+                    ORDER BY scope_name
                     LIMIT %s OFFSET %s
                 """
 
@@ -172,13 +176,13 @@ class ScopeRepository(BaseRepository[OAuthScopeModel, UUID]):
 
             except Exception as e:
                 logger.error(f"Error in get_active_scopes: {e}")
-                raise OperationError(f"Failed to get active scopes: {str(e)}") from e
+                raise OperationError(f"Failed to get active scopes: {e!s}") from e
 
-    async def get_default_scopes(self) -> List[OAuthScopeModel]:
+    async def get_default_scopes(self) -> list[OAuthScopeModel]:
         """Get all default scopes (granted automatically)"""
         try:
             query = """
-                SELECT * FROM oauth_scopes 
+                SELECT * FROM oauth_scopes
                 WHERE is_default = true AND is_active = true
                 ORDER BY scope_name
             """
@@ -190,7 +194,7 @@ class ScopeRepository(BaseRepository[OAuthScopeModel, UUID]):
 
         except Exception as e:
             logger.error(f"Error in get_default_scopes: {e}")
-            raise OperationError(f"Failed to get default scopes: {str(e)}") from e
+            raise OperationError(f"Failed to get default scopes: {e!s}") from e
 
     async def scope_exists(self, scope_name: str) -> bool:
         """Check if a scope exists by name"""
@@ -204,9 +208,9 @@ class ScopeRepository(BaseRepository[OAuthScopeModel, UUID]):
 
         except Exception as e:
             logger.error(f"Error in scope_exists: {e}")
-            raise OperationError(f"Failed to check scope existence: {str(e)}") from e
+            raise OperationError(f"Failed to check scope existence: {e!s}") from e
 
-    async def validate_scope_names(self, scope_names: List[str]) -> Set[str]:
+    async def validate_scope_names(self, scope_names: list[str]) -> set[str]:
         """Validate scope names and return set of valid ones"""
         if not scope_names:
             return set()
@@ -215,7 +219,7 @@ class ScopeRepository(BaseRepository[OAuthScopeModel, UUID]):
             try:
                 placeholders = ", ".join(["%s"] * len(scope_names))
                 query = f"""
-                    SELECT scope_name FROM oauth_scopes 
+                    SELECT scope_name FROM oauth_scopes
                     WHERE scope_name IN ({placeholders}) AND is_active = true
                 """
 
@@ -226,9 +230,9 @@ class ScopeRepository(BaseRepository[OAuthScopeModel, UUID]):
 
             except Exception as e:
                 logger.error(f"Error in validate_scope_names: {e}")
-                raise OperationError(f"Failed to validate scope names: {str(e)}") from e
+                raise OperationError(f"Failed to validate scope names: {e!s}") from e
 
-    async def get_scopes_for_client(self, client_id: UUID) -> List[OAuthScopeModel]:
+    async def get_scopes_for_client(self, client_id: UUID) -> list[OAuthScopeModel]:
         """Get all scopes associated with a specific client"""
         try:
             query = """
@@ -245,9 +249,9 @@ class ScopeRepository(BaseRepository[OAuthScopeModel, UUID]):
 
         except Exception as e:
             logger.error(f"Error in get_scopes_for_client: {e}")
-            raise OperationError(f"Failed to get scopes for client: {str(e)}") from e
+            raise OperationError(f"Failed to get scopes for client: {e!s}") from e
 
-    async def get_scopes_for_token(self, token_id: UUID) -> List[OAuthScopeModel]:
+    async def get_scopes_for_token(self, token_id: UUID) -> list[OAuthScopeModel]:
         """Get all scopes associated with a specific token"""
         try:
             query = """
@@ -264,15 +268,15 @@ class ScopeRepository(BaseRepository[OAuthScopeModel, UUID]):
 
         except Exception as e:
             logger.error(f"Error in get_scopes_for_token: {e}")
-            raise OperationError(f"Failed to get scopes for token: {str(e)}") from e
+            raise OperationError(f"Failed to get scopes for token: {e!s}") from e
 
-    async def associate_token_scopes(self, token_id: UUID, scope_ids: List[UUID]) -> int:
+    async def associate_token_scopes(self, token_id: UUID, scope_ids: list[UUID]) -> int:
         """Associate multiple scopes with a token"""
         if not scope_ids:
             return 0
 
         try:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             values = []
             placeholders = []
 
@@ -292,7 +296,7 @@ class ScopeRepository(BaseRepository[OAuthScopeModel, UUID]):
 
         except Exception as e:
             logger.error(f"Error in associate_token_scopes: {e}")
-            raise OperationError(f"Failed to associate token scopes: {str(e)}") from e
+            raise OperationError(f"Failed to associate token scopes: {e!s}") from e
 
     async def remove_token_scopes(self, token_id: UUID) -> int:
         """Remove all scope associations for a token"""
@@ -305,7 +309,7 @@ class ScopeRepository(BaseRepository[OAuthScopeModel, UUID]):
 
         except Exception as e:
             logger.error(f"Error in remove_token_scopes: {e}")
-            raise OperationError(f"Failed to remove token scopes: {str(e)}") from e
+            raise OperationError(f"Failed to remove token scopes: {e!s}") from e
 
     async def count_active_scopes(self) -> int:
         """Count the total number of active OAuth scopes"""
@@ -319,4 +323,4 @@ class ScopeRepository(BaseRepository[OAuthScopeModel, UUID]):
 
         except Exception as e:
             logger.error(f"Error in count_active_scopes: {e}")
-            raise OperationError(f"Failed to count active scopes: {str(e)}") from e
+            raise OperationError(f"Failed to count active scopes: {e!s}") from e

@@ -5,9 +5,7 @@ This module provides a comprehensive CLI for managing OAuth 2.1 clients and scop
 
 import asyncio
 import os
-import sys
 from pathlib import Path
-from typing import Optional
 
 import click
 
@@ -34,7 +32,7 @@ def get_api_client() -> AdminAPIClient:
 @click.option("--verbose", "-v", is_flag=True, help="Enable verbose output")
 @click.option("--dry-run", is_flag=True, help="Show what would be done without executing")
 @click.pass_context
-def main(ctx: click.Context, config: Optional[Path], verbose: bool, dry_run: bool):
+def main(ctx: click.Context, config: Path | None, verbose: bool, dry_run: bool):
     """
     Authly Admin CLI - OAuth 2.1 Administration Tool.
 
@@ -55,7 +53,7 @@ def main(ctx: click.Context, config: Optional[Path], verbose: bool, dry_run: boo
     ctx.obj["config_path"] = config
 
     if verbose:
-        click.echo(f"Authly Admin CLI starting...")
+        click.echo("Authly Admin CLI starting...")
         if config:
             click.echo(f"Using config file: {config}")
         if dry_run:
@@ -99,7 +97,7 @@ def status_impl(verbose: bool):
 
                 # Configuration details
                 if verbose:
-                    click.echo(f"\nEnvironment Variables:")
+                    click.echo("\nEnvironment Variables:")
                     env_vars = [
                         (
                             "AUTHLY_API_URL",
@@ -125,7 +123,7 @@ def status_impl(verbose: bool):
                 # Service statistics
                 stats = status.get("statistics", {})
 
-                click.echo(f"\nService Statistics:")
+                click.echo("\nService Statistics:")
                 click.echo(f"  OAuth Clients: {stats.get('oauth_clients', 'Unknown')}")
                 click.echo(f"  OAuth Scopes: {stats.get('oauth_scopes', 'Unknown')}")
 
@@ -154,9 +152,9 @@ def status(ctx: click.Context):
 
 
 # Import command groups after main is defined to avoid circular imports
-from authly.admin.auth_commands import auth_group, login_alias, logout_alias, whoami_alias
-from authly.admin.client_commands import client_group
-from authly.admin.scope_commands import scope_group
+from authly.admin.auth_commands import auth_group, login_alias, logout_alias, whoami_alias  # noqa: E402
+from authly.admin.client_commands import client_group  # noqa: E402
+from authly.admin.scope_commands import scope_group  # noqa: E402
 
 # Add command groups
 main.add_command(auth_group)
