@@ -44,7 +44,7 @@ class TestOIDCAuthorizationCodeFlow:
         # Step 1: Authenticate user
         login_response = await oidc_server.client.post(
             "/api/v1/oauth/token",
-            json={"username": test_user.username, "password": "Test123!", "grant_type": "password"},
+            data={"username": test_user.username, "password": "Test123!", "grant_type": "password"},
         )
         await login_response.expect_status(200)
         login_tokens = await login_response.json()
@@ -201,8 +201,7 @@ class TestOIDCAuthorizationCodeFlow:
             "code_challenge_method": "S256",
         }
 
-        # The authorization endpoint requires user authentication
-        # Without authentication, it should return 401 Unauthorized
+        # The authorization endpoint requires user authentication. Without authentication, it should return 401 Unauthorized
         auth_response = await oidc_server.client.get("/api/v1/oauth/authorize", params=auth_params)
         await auth_response.expect_status(401)
 
@@ -318,8 +317,7 @@ class TestOIDCAuthorizationCodeFlow:
             "code_challenge_method": "S256",
         }
 
-        # The authorization endpoint requires user authentication
-        # Without authentication, it should return 401 Unauthorized
+        # The authorization endpoint requires user authentication. Without authentication, it should return 401 Unauthorized
         auth_response = await oidc_server.client.get("/api/v1/oauth/authorize", params=auth_params)
         await auth_response.expect_status(401)
 
@@ -401,8 +399,7 @@ class TestOIDCAuthorizationCodeFlow:
             "code_challenge_method": "S256",
         }
 
-        # The authorization endpoint requires user authentication
-        # Without authentication, it should return 401 Unauthorized
+        # The authorization endpoint requires user authentication. Without authentication, it should return 401 Unauthorized
         auth_response = await oidc_server.client.get("/api/v1/oauth/authorize", params=auth_params)
         await auth_response.expect_status(401)
 
@@ -467,8 +464,7 @@ class TestOIDCAuthorizationCodeFlow:
             "login_hint": "test@example.com",
         }
 
-        # The authorization endpoint requires user authentication
-        # Without authentication, it should return 401 Unauthorized
+        # The authorization endpoint requires user authentication. Without authentication, it should return 401 Unauthorized
         auth_response = await oidc_server.client.get("/api/v1/oauth/authorize", params=auth_params)
         await auth_response.expect_status(401)
 
@@ -532,8 +528,7 @@ class TestOIDCAuthorizationCodeFlow:
             "code_challenge_method": "S256",
         }
 
-        # The authorization endpoint requires user authentication
-        # Without authentication, it should return 401 Unauthorized
+        # The authorization endpoint requires user authentication. Without authentication, it should return 401 Unauthorized
         auth_response = await oidc_server.client.get("/api/v1/oauth/authorize", params=auth_params)
         await auth_response.expect_status(401)
 
@@ -722,8 +717,7 @@ class TestOIDCFlowIntegration:
             "code_challenge_method": "S256",
         }
 
-        # The authorization endpoint requires user authentication
-        # Without authentication, it should return 401 Unauthorized
+        # The authorization endpoint requires user authentication. Without authentication, it should return 401 Unauthorized
         auth_response = await oidc_server.client.get("/api/v1/oauth/authorize", params=auth_params)
         await auth_response.expect_status(401)
 

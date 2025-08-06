@@ -53,7 +53,7 @@ class TestTokenRevocation:
         """Get valid access and refresh tokens for testing."""
         response = await auth_server.client.post(
             "/api/v1/oauth/token",
-            json={"grant_type": "password", "username": test_user.username, "password": "Test123!"},
+            data={"grant_type": "password", "username": test_user.username, "password": "Test123!"},
         )
         await response.expect_status(200)
         return await response.json()

@@ -97,7 +97,7 @@ async def test_unauthorized_access(auth_server: AsyncTestServer):
 async def test_login_unverified(auth_server: AsyncTestServer, create_unverified_user: UserModel):
     response = await auth_server.client.post(
         "/api/v1/oauth/token",
-        json={"username": create_unverified_user.username, "password": "Test123!", "grant_type": "password"},
+        data={"username": create_unverified_user.username, "password": "Test123!", "grant_type": "password"},
     )
 
     error_response = await response.json()
@@ -127,7 +127,7 @@ async def test_login_success(test_config: AuthlyConfig, auth_server: AsyncTestSe
 async def test_login_invalid_credentials(auth_server: AsyncTestServer):
     response = await auth_server.client.post(
         "/api/v1/oauth/token",
-        json={"username": generate_random_identifier(), "password": "wrongpass", "grant_type": "password"},
+        data={"username": generate_random_identifier(), "password": "wrongpass", "grant_type": "password"},
     )
 
     error_response = await response.json()

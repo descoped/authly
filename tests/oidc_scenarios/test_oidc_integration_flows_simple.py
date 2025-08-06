@@ -31,7 +31,7 @@ class TestOIDCIntegrationFlowsSimple:
         # This tests that the authorization_code grant type is recognized
         token_response = await oidc_server.client.post(
             "/api/v1/oauth/token",
-            json={
+            data={
                 "grant_type": "authorization_code",
                 "code": "invalid_code",
                 "redirect_uri": "https://example.com/callback",
@@ -87,7 +87,7 @@ class TestOIDCIntegrationFlowsSimple:
         # Test password grant (non-OIDC)
         token_response = await oidc_server.client.post(
             "/api/v1/oauth/token",
-            json={"grant_type": "password", "username": "nonexistent_user", "password": "invalid_password"},
+            data={"grant_type": "password", "username": "nonexistent_user", "password": "invalid_password"},
         )
 
         # Should fail with authentication error

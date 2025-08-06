@@ -19,7 +19,7 @@ from authly.api.auth_dependencies import (
     get_scope_repository,
     get_token_service_with_client,
 )
-from authly.api.users_dependencies import get_current_user, get_user_repository
+from authly.api.users_dependencies import get_current_user, get_current_user_optional, get_user_repository
 from authly.auth import verify_password
 from authly.config import AuthlyConfig
 from authly.core.dependencies import get_config
@@ -268,8 +268,8 @@ async def authorize_get(
     id_token_hint: str | None = Query(None, description="ID token hint"),
     login_hint: str | None = Query(None, description="Login hint"),
     acr_values: str | None = Query(None, description="ACR values"),
-    current_user: UserModel | None = None,
     authorization_service: AuthorizationService = Depends(get_authorization_service),
+    current_user: UserModel | None = Depends(get_current_user_optional),
 ):
     """
     OAuth 2.1 Authorization endpoint (GET).
@@ -279,33 +279,6 @@ async def authorize_get(
     """
 
     # Check if user is authenticated
-    try:
-        from authly.api.users_dependencies import get_current_user
-
-        # Try to get current user - this will fail if not authenticated
-        if not current_user:
-            # Import dependencies here to avoid circular imports
-            from fastapi.security import OAuth2PasswordBearer
-
-            oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/oauth/token", auto_error=False)
-            token = await oauth2_scheme(request)
-
-            if token:
-                from authly.api.users_dependencies import get_token_service, get_user_repository
-                from authly.core.dependencies import get_config
-
-                user_repo = get_user_repository()
-                token_service = get_token_service()
-                config = get_config()
-                current_user = await get_current_user(token, user_repo, token_service, config)
-    except Exception:
-        # User is not authenticated - redirect back with error
-        error_params = {"error": "login_required", "error_description": "User authentication required"}
-        if state:
-            error_params["state"] = state
-        error_url = f"{redirect_uri}?{urlencode(error_params)}"
-        return RedirectResponse(url=error_url, status_code=302)
-
     if not current_user:
         # User is not authenticated - redirect back with error
         error_params = {"error": "login_required", "error_description": "User authentication required"}

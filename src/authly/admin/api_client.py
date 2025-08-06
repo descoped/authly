@@ -141,6 +141,7 @@ class AdminAPIClient:
         json_data: dict[str, Any] | None = None,
         params: dict[str, Any] | None = None,
         authenticated: bool = True,
+        form_data: dict[str, Any] | None = None,
     ) -> httpx.Response:
         """
         Make an HTTP request to the API.
@@ -151,6 +152,7 @@ class AdminAPIClient:
             json_data: JSON data for request body
             params: Query parameters
             authenticated: Whether to include authentication header
+            form_data: Form data for request body (for OAuth endpoints)
 
         Returns:
             HTTP response
@@ -164,7 +166,11 @@ class AdminAPIClient:
         if authenticated and self._token_info:
             headers["Authorization"] = f"{self._token_info.token_type} {self._token_info.access_token}"
 
-        response = await self.client.request(method=method, url=url, json=json_data, params=params, headers=headers)
+        # Use form data if provided, otherwise use json data
+        if form_data is not None:
+            response = await self.client.request(method=method, url=url, data=form_data, params=params, headers=headers)
+        else:
+            response = await self.client.request(method=method, url=url, json=json_data, params=params, headers=headers)
 
         # Handle HTTP errors with meaningful messages
         if response.status_code >= 400:
@@ -312,7 +318,7 @@ class AdminAPIClient:
         if scope:
             data["scope"] = scope
 
-        response = await self._request("POST", "/api/v1/oauth/token", json_data=data, authenticated=False)
+        response = await self._request("POST", "/api/v1/oauth/token", form_data=data, authenticated=False)
 
         token_data = response.json()
 

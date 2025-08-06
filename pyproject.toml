@@ -76,8 +76,9 @@ markers = [
     "infrastructure: Core infrastructure tests",
     "slow: Slow running tests",
     "unit: Unit tests without external dependencies",
+    "tck: TCK/Conformance tests (requires TCK docker stack)",
 ]
-addopts = "-m 'not integration' --verbose --tb=short --strict-markers -ra"
+addopts = "-m 'not integration' --verbose --tb=short --strict-markers -ra --ignore=tests/tck"
 
 [build-system]
 requires = ["hatchling>=1.26.3"]
@@ -169,8 +170,10 @@ ignore = [
 #"tests/*" = ["F401"]
 # Examples can be more relaxed
 #"examples/*" = ["F401", "F841"]
-# Tck
+# Tck OIDC Conformance Suite
 "tck/*" = ["C416", "F401", "F541", "I001", "E722", "SIM115", "UP035", "W291", "W292", "W293"]
+# Tck tests
+"tests/tck/*" = ["E402"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["authly"]

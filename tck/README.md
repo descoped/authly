@@ -36,10 +36,15 @@ tck/
 ├── docs/
 │   └── BOUNDARIES.md    # TCK vs Integration tests
 └── conformance-reports/ # Historical reports
+
+tests/tck/                # Pytest conformance tests (excluded from main suite)
+├── __init__.py          # Module marker
+└── test_conformance_fixes.py  # Conformance fix validation tests
 ```
 
 ## Available Commands
 
+### TCK Validation Scripts
 ```bash
 make help          # Show all available commands
 make validate      # Run spec validation (90% compliance)
@@ -48,13 +53,28 @@ make report        # Generate all reports
 make clean         # Clean test artifacts
 ```
 
+### Pytest Conformance Tests
+```bash
+# Run TCK tests (requires TCK docker stack)
+pytest tests/tck/                  # Run all TCK tests
+pytest tests/tck/ -m tck           # Run tests marked as TCK
+pytest tests/tck/ -v               # Verbose output
+
+# Main test suite (TCK tests excluded by default)
+pytest                             # Run main tests only
+pytest tests/                     # Same, TCK excluded via pyproject.toml
+```
+
 ## Understanding Test Boundaries
 
 | Test Type | Purpose | Location | What it Tests |
 |-----------|---------|----------|---------------|
-| **TCK Tests** | OIDC/OAuth spec compliance | `/tck/` | Response formats, required fields |
+| **TCK Scripts** | OIDC/OAuth spec validation | `/tck/scripts/` | Response formats, required fields |
+| **TCK Pytest** | Conformance fix verification | `/tests/tck/` | Specific conformance issues |
 | **Integration Tests** | Business flow validation | `/scripts/integration-tests/` | Complete OAuth flows, user management |
 | **Unit Tests** | Code functionality | `/tests/` | Models, services, utilities |
+
+**Note**: `tests/tck/` tests are excluded from the main test suite and require the TCK docker stack to be running. They test specific conformance requirements that may differ from standard OAuth/OIDC behavior.
 
 For detailed explanation, see [docs/BOUNDARIES.md](docs/BOUNDARIES.md)
 

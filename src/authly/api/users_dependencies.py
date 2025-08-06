@@ -141,6 +141,30 @@ async def get_current_user(
     return await _get_user_by_id(user_repo, user_id)
 
 
+async def get_current_user_optional(
+    token: Annotated[str | None, Depends(oauth2_scheme)],
+    user_repo: UserRepository = Depends(get_user_repository),
+    token_service: TokenService = Depends(get_token_service),
+    config: AuthlyConfig = Depends(get_config),
+) -> UserModel | None:
+    """
+    Get the current authenticated user if available, returns None if not authenticated.
+
+    This is used for endpoints that need to check authentication but don't require it.
+
+    Returns:
+        UserModel | None: The authenticated user or None
+    """
+    if not token:
+        return None
+
+    try:
+        user_id = await _validate_token_and_get_user_id(token, token_service, config)
+        return await _get_user_by_id(user_repo, user_id)
+    except Exception:
+        return None
+
+
 async def get_current_user_no_update(
     token: Annotated[str, Depends(oauth2_scheme)],
     user_repo: UserRepository = Depends(get_user_repository),

@@ -66,7 +66,7 @@ async def admin_access_token(admin_test_server: AsyncTestServer, test_admin_user
     # Login to get admin token
     response = await admin_test_server.client.post(
         "/api/v1/oauth/token",
-        json={
+        data={
             "grant_type": "password",
             "username": test_admin_user.username,
             "password": "AdminTest123!",
@@ -166,7 +166,7 @@ class TestAdminAPIClientIntegration:
         # Test login using fastapi-testing client directly
         response = await admin_test_server.client.post(
             "/api/v1/oauth/token",
-            json={
+            data={
                 "grant_type": "password",
                 "username": test_admin_user.username,
                 "password": "AdminTest123!",
@@ -207,7 +207,7 @@ class TestAdminAPIClientIntegration:
 
         response = await admin_test_server.client.post(
             "/api/v1/oauth/token",
-            json={
+            data={
                 "grant_type": "password",
                 "username": "invalid_user",
                 "password": "invalid_password",
@@ -230,7 +230,7 @@ class TestAdminAPIClientIntegration:
         # First login to get tokens
         response = await admin_test_server.client.post(
             "/api/v1/oauth/token",
-            json={
+            data={
                 "grant_type": "password",
                 "username": test_admin_user.username,
                 "password": "AdminTest123!",

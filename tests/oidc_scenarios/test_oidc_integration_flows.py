@@ -183,8 +183,7 @@ class TestOIDCIntegrationFlows:
             "prompt": "consent",
         }
 
-        # The authorization endpoint requires user authentication
-        # Without authentication, it should return 401 Unauthorized
+        # The authorization endpoint requires user authentication. Without authentication, it should return 401 Unauthorized
         auth_response = await oidc_server.client.get("/api/v1/oauth/authorize", params=auth_params)
         await auth_response.expect_status(401)
 
@@ -272,7 +271,7 @@ class TestOIDCIntegrationFlows:
         # Test password grant (non-OIDC)
         token_response = await oidc_server.client.post(
             "/api/v1/oauth/token",
-            json={"grant_type": "password", "username": test_user.username, "password": "Test123!"},
+            data={"grant_type": "password", "username": test_user.username, "password": "Test123!"},
         )
 
         await token_response.expect_status(200)

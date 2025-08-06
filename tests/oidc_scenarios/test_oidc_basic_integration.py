@@ -148,7 +148,7 @@ class TestOIDCBasicIntegration:
         # Test password grant (non-OIDC)
         token_response = await oidc_server.client.post(
             "/api/v1/oauth/token",
-            json={"grant_type": "password", "username": "nonexistent_user", "password": "invalid_password"},
+            data={"grant_type": "password", "username": "nonexistent_user", "password": "invalid_password"},
         )
 
         # Should fail with authentication error (not server error)
@@ -171,7 +171,7 @@ class TestOIDCBasicIntegration:
 
         auth_response = await oidc_server.client.get("/api/v1/oauth/authorize", params=auth_params)
 
-        # Should be rejected (401 Unauthorized because client doesn't exist)
+        # Should be rejected (401 because authentication is checked before parameter validation)
         await auth_response.expect_status(401)
 
         # Test hybrid flow (not supported)
@@ -179,7 +179,7 @@ class TestOIDCBasicIntegration:
 
         auth_response = await oidc_server.client.get("/api/v1/oauth/authorize", params=auth_params)
 
-        # Should be rejected (401 Unauthorized because client doesn't exist)
+        # Should be rejected (401 because authentication is checked before parameter validation)
         await auth_response.expect_status(401)
 
     @pytest.mark.asyncio
@@ -199,8 +199,8 @@ class TestOIDCBasicIntegration:
             },
         )
 
-        # Should not be "unsupported grant type" error - should be 422 (Unprocessable Entity) for invalid form data
-        await token_response.expect_status(422)
+        # Should not be "unsupported grant type" error - should be 400 (Bad Request) for invalid authorization code
+        await token_response.expect_status(400)
 
         # Should fail with specific authorization code error
         error_text = await token_response.text()
