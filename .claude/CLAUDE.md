@@ -49,6 +49,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Type Safety**: Comprehensive type annotations and Pydantic validation
 - **Security-by-Design**: Enterprise-grade security with encrypted secrets and rate limiting
 
+### Important rules **do not remove**
+- **Test count**: Stop counting tests. When you document test outcomes in .md files. Only state e.g. "Comprehensive test suite with full pass rate"
+- **Git rules**: You may read from git history, but never write to git. The user is always handling this manually. You may provide "semantic git commit messages" when asked.
+
 ## Development Commands
 
 ### Core Development Tasks
