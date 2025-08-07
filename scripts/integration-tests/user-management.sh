@@ -17,11 +17,20 @@ TEST_USER_COUNT=0
 # Function to generate test user data
 generate_test_user_data() {
     local username_suffix="${1:-$(generate_random_string 6)}"
-    local username="${TEST_USER_PREFIX}_${username_suffix}"
+    # Add timestamp to make usernames unique across test runs
+    local timestamp=$(date +%s)
+    local username="${TEST_USER_PREFIX}_${username_suffix}_${timestamp}"
     local email=$(generate_test_email "$username")
-    local password="TestPass123!"
+    local password="TestPass123@"
     
-    printf "$TEST_USER_TEMPLATE" "$username" "$email" "$password"
+    # Use cat with heredoc instead of printf to avoid escaping issues
+    cat <<EOF
+{
+  "username": "$username",
+  "email": "$email",
+  "password": "$password"
+}
+EOF
 }
 
 # Function to create a test user via Admin API
@@ -53,13 +62,13 @@ create_test_user() {
     local body="${response%???}"
     validate_json_response "$response"
     
-    local user_id=$(extract_json_field "$body" "user_id")
+    local user_id=$(extract_json_field "$body" "id")
     local username=$(extract_json_field "$body" "username")
     local email=$(extract_json_field "$body" "email")
     local created_at=$(extract_json_field "$body" "created_at")
     
     if [[ -z "$user_id" ]]; then
-        log_error "Failed to extract user_id from creation response"
+        log_error "Failed to extract id from creation response"
         return 1
     fi
     
@@ -247,11 +256,13 @@ test_user_creation_scenarios() {
     
     # Test 3: Create user with special characters in email
     log_info "Test 3: Creating user with complex email"
+    # Add timestamp to make username unique
+    local timestamp=$(date +%s)
     local complex_email_data=$(cat <<EOF
 {
-  "username": "${TEST_USER_PREFIX}_complex",
+  "username": "${TEST_USER_PREFIX}_complex_${timestamp}",
   "email": "test.user+tag@sub.example.com",
-  "password": "ComplexPass123!",
+  "password": "ComplexPass123@",
   "first_name": "Test",
   "last_name": "User"
 }
@@ -291,7 +302,7 @@ test_user_management_operations() {
     
     # Test user update (if supported)
     log_info "Testing user update"
-    local update_data='{"first_name": "Updated", "last_name": "Name"}'
+    local update_data='{"given_name": "Updated", "family_name": "Name"}'
     if update_test_user "$mgmt_user_id" "$update_data" "name update"; then
         log_success "User update test passed"
     else

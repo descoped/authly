@@ -28,19 +28,8 @@ user_login() {
     
     log_info "Attempting user login for: $username"
     
-    # Prepare login data
-    local login_data=$(cat <<EOF
-{
-  "grant_type": "password",
-  "username": "$username",
-  "password": "$password",
-  "scope": "$scopes"
-}
-EOF
-)
-    
-    # Make authentication request
-    local response=$(post_request "$AUTH_TOKEN_ENDPOINT" "$login_data")
+    # Make authentication request using OAuth token request helper
+    local response=$(oauth_token_request "$AUTH_TOKEN_ENDPOINT" "password" "$username" "$password" "$scopes")
     
     # Check HTTP status
     if ! check_http_status "$response" "200"; then
@@ -106,16 +95,8 @@ user_refresh_token() {
         return 1
     fi
     
-    # Prepare refresh data
-    local refresh_data=$(cat <<EOF
-{
-  "grant_type": "refresh_token",
-  "refresh_token": "$USER_REFRESH_TOKEN"
-}
-EOF
-)
-    
-    local response=$(post_request "$AUTH_TOKEN_ENDPOINT" "$refresh_data")
+    # Make refresh request using OAuth token request helper
+    local response=$(oauth_token_request "$AUTH_TOKEN_ENDPOINT" "refresh_token" "" "" "" "$USER_REFRESH_TOKEN")
     
     if ! check_http_status "$response" "200"; then
         local body="${response%???}"

@@ -67,6 +67,68 @@ put_request() {
     make_request "PUT" "$url" "$data" "$auth_header"
 }
 
+# URL encode function for form data
+urlencode() {
+    local string="${1}"
+    local strlen=${#string}
+    local encoded=""
+    local pos c o
+    
+    for (( pos=0 ; pos<strlen ; pos++ )); do
+        c=${string:$pos:1}
+        case "$c" in
+            [-_.~a-zA-Z0-9] ) o="${c}" ;;
+            * ) printf -v o '%%%02x' "'$c" ;;
+        esac
+        encoded+="${o}"
+    done
+    echo "${encoded}"
+}
+
+# OAuth token request with form-encoded data
+oauth_token_request() {
+    local url="$1"
+    local grant_type="$2"
+    local username="${3:-}"
+    local password="${4:-}"
+    local scope="${5:-}"
+    local refresh_token="${6:-}"
+    local code="${7:-}"
+    local redirect_uri="${8:-}"
+    local code_verifier="${9:-}"
+    
+    # Build form data based on grant type
+    local form_data="grant_type=$(urlencode "$grant_type")"
+    
+    if [ -n "$username" ]; then
+        form_data="${form_data}&username=$(urlencode "$username")"
+    fi
+    if [ -n "$password" ]; then
+        form_data="${form_data}&password=$(urlencode "$password")"
+    fi
+    if [ -n "$scope" ]; then
+        form_data="${form_data}&scope=$(urlencode "$scope")"
+    fi
+    if [ -n "$refresh_token" ]; then
+        form_data="${form_data}&refresh_token=$(urlencode "$refresh_token")"
+    fi
+    if [ -n "$code" ]; then
+        form_data="${form_data}&code=$(urlencode "$code")"
+    fi
+    if [ -n "$redirect_uri" ]; then
+        form_data="${form_data}&redirect_uri=$(urlencode "$redirect_uri")"
+    fi
+    if [ -n "$code_verifier" ]; then
+        form_data="${form_data}&code_verifier=$(urlencode "$code_verifier")"
+    fi
+    
+    # Make request with form-encoded content type
+    curl -s -w "\n%{http_code}" \
+        -X POST "$url" \
+        -H "Content-Type: application/x-www-form-urlencoded" \
+        -d "$form_data"
+}
+
 delete_request() {
     local url="$1"
     local auth_header="${2:-}"
@@ -185,7 +247,7 @@ validate_json_response() {
 
 # Export functions for use in other scripts
 export -f log_info log_success log_warning log_error
-export -f make_request get_request post_request put_request delete_request
+export -f make_request get_request post_request put_request delete_request urlencode oauth_token_request
 export -f extract_json_field check_http_status wait_for_service
 export -f generate_random_string generate_test_email cleanup_on_exit
 export -f check_docker_services validate_required_env validate_json_response

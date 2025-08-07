@@ -184,17 +184,8 @@ test_authorization_code_exchange_mock() {
     # This validates the token endpoint works correctly
     log_info "Getting user token via password grant (to validate token endpoint)"
     
-    local password_token_data=$(cat <<EOF
-{
-  "grant_type": "password",
-  "username": "admin",
-  "password": "$AUTHLY_ADMIN_PASSWORD",
-  "scope": "$OAUTH_SCOPES"
-}
-EOF
-)
-    
-    local token_response=$(post_request "$AUTH_TOKEN_ENDPOINT" "$password_token_data")
+    # Make token request using OAuth helper
+    local token_response=$(oauth_token_request "$AUTH_TOKEN_ENDPOINT" "password" "admin" "$AUTHLY_ADMIN_PASSWORD" "$OAUTH_SCOPES")
     
     if ! check_http_status "$token_response" "200"; then
         local body="${token_response%???}"
@@ -261,15 +252,8 @@ test_refresh_token_flow() {
         return 0
     fi
     
-    local refresh_data=$(cat <<EOF
-{
-  "grant_type": "refresh_token",
-  "refresh_token": "$OAUTH_REFRESH_TOKEN"
-}
-EOF
-)
-    
-    local refresh_response=$(post_request "$AUTH_TOKEN_ENDPOINT" "$refresh_data")
+    # Make refresh request using OAuth helper
+    local refresh_response=$(oauth_token_request "$AUTH_TOKEN_ENDPOINT" "refresh_token" "" "" "" "$OAUTH_REFRESH_TOKEN")
     
     if ! check_http_status "$refresh_response" "200"; then
         local body="${refresh_response%???}"

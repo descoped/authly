@@ -22,19 +22,8 @@ admin_login() {
     
     log_info "Attempting admin login for user: $username"
     
-    # Prepare login request
-    local login_data=$(cat <<EOF
-{
-  "grant_type": "password",
-  "username": "$username",
-  "password": "$password",
-  "scope": "$scopes"
-}
-EOF
-)
-    
-    # Make login request
-    local response=$(post_request "$AUTH_TOKEN_ENDPOINT" "$login_data")
+    # Make login request using OAuth token request helper
+    local response=$(oauth_token_request "$AUTH_TOKEN_ENDPOINT" "password" "$username" "$password" "$scopes")
     
     # Check HTTP status
     if ! check_http_status "$response" "200"; then
@@ -96,15 +85,8 @@ admin_refresh_token() {
         return 1
     fi
     
-    local refresh_data=$(cat <<EOF
-{
-  "grant_type": "refresh_token",
-  "refresh_token": "$ADMIN_REFRESH_TOKEN"
-}
-EOF
-)
-    
-    local response=$(post_request "$AUTH_TOKEN_ENDPOINT" "$refresh_data")
+    # Make refresh request using OAuth token request helper
+    local response=$(oauth_token_request "$AUTH_TOKEN_ENDPOINT" "refresh_token" "" "" "" "$ADMIN_REFRESH_TOKEN")
     
     if ! check_http_status "$response" "200"; then
         local body="${response%???}"
