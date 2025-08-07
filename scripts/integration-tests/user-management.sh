@@ -362,7 +362,13 @@ run_user_management_test() {
     
     # Check if services are ready
     wait_for_service "$HEALTH_ENDPOINT" || return 1
-    check_docker_services || return 1
+    
+    # Skip Docker service checks if SKIP_DOCKER_CHECK is set
+    if [[ "${SKIP_DOCKER_CHECK:-false}" != "true" ]]; then
+        check_docker_services || return 1
+    else
+        log_info "Skipping Docker service checks (SKIP_DOCKER_CHECK=true)"
+    fi
     
     # Ensure admin authentication is available
     if ! load_admin_token || ! is_admin_token_valid; then

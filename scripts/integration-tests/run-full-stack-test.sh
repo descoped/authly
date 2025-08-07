@@ -106,12 +106,16 @@ check_infrastructure() {
     
     local check_start=$(date +%s)
     
-    # Check if Docker services are running
-    if ! check_docker_services; then
-        local check_end=$(date +%s)
-        local duration=$((check_end - check_start))
-        record_test_result "Infrastructure Check" "FAILED" "$duration" "Docker services not healthy"
-        return 1
+    # Check if Docker services are running (skip if SKIP_DOCKER_CHECK is set)
+    if [[ "${SKIP_DOCKER_CHECK:-false}" != "true" ]]; then
+        if ! check_docker_services; then
+            local check_end=$(date +%s)
+            local duration=$((check_end - check_start))
+            record_test_result "Infrastructure Check" "FAILED" "$duration" "Docker services not healthy"
+            return 1
+        fi
+    else
+        log_info "Skipping Docker service checks (SKIP_DOCKER_CHECK=true)"
     fi
     
     # Check if Authly service is responding

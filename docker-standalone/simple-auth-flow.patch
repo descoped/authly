@@ -1,0 +1,49 @@
+#!/bin/bash
+# Patch script for simple-auth-flow.sh to handle different passwords per user
+
+# This script patches simple-auth-flow.sh at runtime to:
+# 1. Use admin password from environment for admin user
+# 2. Keep Test123! for user1
+# 3. Use TestUser123! for newly created users
+
+set -e
+
+INPUT_FILE="$1"
+OUTPUT_FILE="$2"
+ADMIN_PASSWORD="${AUTHLY_ADMIN_PASSWORD:-admin}"
+
+# Copy original file
+cp "$INPUT_FILE" "$OUTPUT_FILE"
+
+# Step 1: Fix password for created users (must be 8+ chars)
+sed -i 's/"password": "Test123!"/"password": "TestUser123!"/g' "$OUTPUT_FILE"
+
+# Step 2: Fix admin-specific login attempts in OAuth token requests
+# Lines where admin specifically logs in
+sed -i "s/grant_type=password&username=admin&password=Test123%21/grant_type=password&username=admin&password=${ADMIN_PASSWORD}/g" "$OUTPUT_FILE"
+
+# Step 3: Create a modified test_login function that checks username
+# First, let's insert a helper function right before test_login
+sed -i '/^test_login() {/i\
+get_user_password() {\
+    local user="$1"\
+    if [ "$user" = "admin" ]; then\
+        echo "'"${ADMIN_PASSWORD}"'"\
+    elif [ "$user" = "user1" ]; then\
+        echo "Test123!"\
+    else\
+        # For created test users\
+        echo "TestUser123!"\
+    fi\
+}' "$OUTPUT_FILE"
+
+# Step 4: Modify the test_login function to use the helper
+sed -i '/data=$(printf.*grant_type=password/c\
+    local user_password=$(get_user_password "$username")\
+    data=$(printf "grant_type=password&username=%s&password=%s&scope=openid%%20profile%%20email" "$username" "${user_password//!/%21}")' "$OUTPUT_FILE"
+
+# Step 5: Fix line 620 where NEW_USER tries to login
+# The NEW_USER is a created user, so it should use TestUser123!
+sed -i '620s/Test123%21/TestUser123%21/' "$OUTPUT_FILE"
+
+echo "Patched $OUTPUT_FILE successfully"

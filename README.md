@@ -148,9 +148,13 @@ uv run pytest
 ### **Docker Installation**
 
 ```bash
-# Using Docker Hub
+# Standard multi-service deployment
 docker pull descoped/authly:latest
 docker run -p 8000:8000 descoped/authly:latest
+
+# All-in-one standalone container (includes PostgreSQL + Redis)
+docker pull descoped/authly-standalone:latest
+docker run -it --rm -p 8000:8000 descoped/authly-standalone:latest
 
 # Using Docker Compose
 docker compose up
@@ -188,6 +192,7 @@ cd tck && make validate
 - **[API Reference](docs/api-reference.md)** - Complete API documentation
 - **[Security Guide](docs/security-guide.md)** - Security features and best practices
 - **[Deployment Guide](docs/deployment-guide.md)** - Deployment instructions
+- **[Docker Standalone Guide](docs/docker-standalone.md)** - All-in-one container documentation
 
 ---
 

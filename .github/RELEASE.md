@@ -79,9 +79,13 @@ The GitHub Action workflow (`.github/workflows/release-pypi.yml`) automatically:
    - Uses `USE_WHEEL=true` for optimized production builds
    - Pushes to Docker Hub with tags:
      - `descoped/authly:0.5.2` (exact version)
-     - `descoped/authly:0.5` (minor version)
+     - `descoped/authly:0.5` (minor version)  
      - `descoped/authly:0` (major version)
      - `descoped/authly:latest` (latest release)
+     - `descoped/authly-standalone:0.5.2` (standalone exact version)
+     - `descoped/authly-standalone:0.5` (standalone minor version)
+     - `descoped/authly-standalone:0` (standalone major version)
+     - `descoped/authly-standalone:latest` (standalone latest)
 
 ## Post-Release Verification
 
@@ -89,8 +93,10 @@ After the workflow completes:
 
 - [ ] Check the [PyPI page](https://pypi.org/project/authly/) for the new version
 - [ ] Check [Docker Hub](https://hub.docker.com/r/descoped/authly) for new image tags
+- [ ] Check [Standalone Docker Hub](https://hub.docker.com/r/descoped/authly-standalone) for new standalone image tags
 - [ ] Test PyPI installation: `uv add authly==0.5.2`
 - [ ] Test Docker image: `docker pull descoped/authly:0.5.2`
+- [ ] Test standalone image: `docker pull descoped/authly-standalone:0.5.2`
 - [ ] Verify the GitHub Action workflow succeeded
 - [ ] Monitor for any issues or bug reports
 
@@ -129,23 +135,42 @@ Use this template for release descriptions:
 # PyPI
 uv add authly==0.5.2
 
-# Docker
+# Standard Docker (requires external PostgreSQL)
 docker pull descoped/authly:0.5.2
 docker run -p 8000:8000 descoped/authly:0.5.2
+
+# Standalone Docker (includes PostgreSQL + Redis)
+docker pull descoped/authly-standalone:0.5.2
+docker run -it --rm -p 8000:8000 descoped/authly-standalone:0.5.2
 ```
 
 ## Docker Usage
 
+### Standard Docker (Multi-service)
 ```bash
-# Production
+# Production with external database
 docker run -d -p 8000:8000 \
   -e DATABASE_URL="postgresql://user:pass@host:5432/authly" \
   -e JWT_SECRET_KEY="your-secret" \
   descoped/authly:0.5.2
 
-# Development
+# Development with embedded PostgreSQL
 docker run -p 8000:8000 descoped/authly:latest serve --embedded --seed
 ```
+
+### Standalone Docker (All-in-one)
+```bash
+# Quick start with interactive shell (includes PostgreSQL + Redis)
+docker run -it --rm -p 8000:8000 descoped/authly-standalone:0.5.2
+
+# Background service with persistent data
+docker run -d -p 8000:8000 -v authly-data:/data \
+  -e JWT_SECRET_KEY="your-secret" \
+  -e AUTHLY_ADMIN_PASSWORD="secure-password" \
+  descoped/authly-standalone:0.5.2
+```
+
+**📚 Documentation**: [Docker Deployment Guide](https://github.com/descoped/authly/blob/master/docs/docker-deployment.md)
 
 ## Troubleshooting
 

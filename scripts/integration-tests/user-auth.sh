@@ -394,7 +394,13 @@ run_user_auth_test() {
     
     # Check if services are ready
     wait_for_service "$HEALTH_ENDPOINT" || return 1
-    check_docker_services || return 1
+    
+    # Skip Docker service checks if SKIP_DOCKER_CHECK is set
+    if [[ "${SKIP_DOCKER_CHECK:-false}" != "true" ]]; then
+        check_docker_services || return 1
+    else
+        log_info "Skipping Docker service checks (SKIP_DOCKER_CHECK=true)"
+    fi
     
     # Test 1: User Login (Password Grant)
     log_info "Test 1: User authentication via password grant"

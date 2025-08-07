@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  authly-standalone:
+    image: descoped/authly-standalone:latest
+    container_name: authly-standalone
+    build:
+      context: .
+      dockerfile: Dockerfile.standalone
+    ports:
+      - "8000:8000"
+    volumes:
+      - authly_standalone_data:/data
+    environment:
+      # Override default secrets for production use
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-your-production-secret-key-must-be-at-least-256-bits-long}
+      JWT_REFRESH_SECRET_KEY: ${JWT_REFRESH_SECRET_KEY:-your-refresh-secret-key-must-be-at-least-256-bits}
+      AUTHLY_ADMIN_PASSWORD: ${AUTHLY_ADMIN_PASSWORD:-changeme}
+      AUTHLY_ADMIN_USERNAME: ${AUTHLY_ADMIN_USERNAME:-admin}
+      AUTHLY_ADMIN_EMAIL: ${AUTHLY_ADMIN_EMAIL:-admin@example.com}
+      # Optional: Increase verbosity for debugging
+      # S6_VERBOSITY: 2
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  authly_standalone_data:
+    driver: local

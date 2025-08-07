@@ -176,6 +176,8 @@ jobs:
         echo "- **Version**: ${{ needs.validate-release.outputs.version }}" >> $GITHUB_STEP_SUMMARY
         echo "- **Git Tag**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
         echo "- **PyPI URL**: https://pypi.org/project/authly/${{ needs.validate-release.outputs.version }}/" >> $GITHUB_STEP_SUMMARY
+        echo "- **Docker Images**: [descoped/authly](https://hub.docker.com/r/descoped/authly), [descoped/authly-standalone](https://hub.docker.com/r/descoped/authly-standalone)" >> $GITHUB_STEP_SUMMARY
+        echo "- **Documentation**: [Docker Deployment Guide](https://github.com/descoped/authly/blob/master/docs/docker-deployment.md)" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "### Installation" >> $GITHUB_STEP_SUMMARY
         echo '```bash' >> $GITHUB_STEP_SUMMARY
@@ -185,6 +187,12 @@ jobs:
         echo "# Install as CLI tool" >> $GITHUB_STEP_SUMMARY
         echo "uvx install authly==${{ needs.validate-release.outputs.version }}" >> $GITHUB_STEP_SUMMARY
         echo "authly --help" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "# Run standalone all-in-one container (includes PostgreSQL + Redis)" >> $GITHUB_STEP_SUMMARY
+        echo "docker run -it --rm -p 8000:8000 descoped/authly-standalone:${{ needs.validate-release.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "# Latest standalone image" >> $GITHUB_STEP_SUMMARY
+        echo "docker run -it --rm -p 8000:8000 descoped/authly-standalone:latest" >> $GITHUB_STEP_SUMMARY
         echo '```' >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "### CLI Usage" >> $GITHUB_STEP_SUMMARY
@@ -267,3 +275,81 @@ jobs:
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "**Docker Hub**: https://hub.docker.com/r/descoped/authly" >> $GITHUB_STEP_SUMMARY
         echo "**Platforms**: linux/amd64, linux/arm64" >> $GITHUB_STEP_SUMMARY
+
+  docker-build-standalone:
+    runs-on: ubuntu-latest
+    needs: [validate-release, lint-and-test]
+    permissions:
+      contents: read
+      packages: write  # For Docker registry push
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    - name: Extract metadata for standalone image
+      id: meta-standalone
+      uses: docker/metadata-action@v5
+      with:
+        images: |
+          descoped/authly-standalone
+        tags: |
+          type=semver,pattern={{version}},value=${{ needs.validate-release.outputs.version }}
+          type=semver,pattern={{major}}.{{minor}},value=${{ needs.validate-release.outputs.version }}
+          type=semver,pattern={{major}},value=${{ needs.validate-release.outputs.version }}
+          type=raw,value=latest
+
+    - name: Build and push standalone Docker image
+      uses: docker/build-push-action@v6
+      with:
+        context: .
+        file: ./Dockerfile.standalone
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: ${{ steps.meta-standalone.outputs.tags }}
+        labels: ${{ steps.meta-standalone.outputs.labels }}
+        cache-from: type=gha,scope=standalone
+        cache-to: type=gha,scope=standalone,mode=max
+
+    - name: Update deployment summary with standalone Docker info
+      run: |
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Standalone Docker Images" >> $GITHUB_STEP_SUMMARY
+        echo '```bash' >> $GITHUB_STEP_SUMMARY
+        echo "# Pull and run standalone image (includes PostgreSQL + Redis)" >> $GITHUB_STEP_SUMMARY
+        echo "docker pull descoped/authly-standalone:${{ needs.validate-release.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+        echo "docker run -it --rm -p 8000:8000 descoped/authly-standalone:${{ needs.validate-release.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "# Interactive shell for development" >> $GITHUB_STEP_SUMMARY
+        echo "docker run -it --rm -p 8000:8000 descoped/authly-standalone:latest" >> $GITHUB_STEP_SUMMARY
+        echo "authly> authly --help" >> $GITHUB_STEP_SUMMARY
+        echo "authly> authly-admin --help" >> $GITHUB_STEP_SUMMARY
+        echo "authly> simple-auth-flow" >> $GITHUB_STEP_SUMMARY
+        echo "authly> run-end-to-end-test comprehensive" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Standalone Docker Hub**: https://hub.docker.com/r/descoped/authly-standalone" >> $GITHUB_STEP_SUMMARY
+        echo "**Documentation**: [Docker Deployment Guide](https://github.com/descoped/authly/blob/master/docs/docker-deployment.md)" >> $GITHUB_STEP_SUMMARY
+        echo "**Features**: All-in-one container with embedded PostgreSQL, Redis, and interactive shell" >> $GITHUB_STEP_SUMMARY
+        echo "**Platforms**: linux/amd64, linux/arm64" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🚀 Quick Start with Standalone" >> $GITHUB_STEP_SUMMARY
+        echo '```bash' >> $GITHUB_STEP_SUMMARY
+        echo "# Run with interactive shell (includes PostgreSQL + Redis)" >> $GITHUB_STEP_SUMMARY
+        echo "docker run -it --rm -p 8000:8000 descoped/authly-standalone:${{ needs.validate-release.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "# Inside container you get:" >> $GITHUB_STEP_SUMMARY
+        echo "# • authly --help                   # Main CLI" >> $GITHUB_STEP_SUMMARY
+        echo "# • authly-admin --help             # Admin shortcuts (admin/admin)" >> $GITHUB_STEP_SUMMARY
+        echo "# • simple-auth-flow                # Full test" >> $GITHUB_STEP_SUMMARY
+        echo "# • run-end-to-end-test comprehensive  # Full tests" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,123 @@
+# Authly Standalone - Ultra-Minimal All-in-One Container
+# Optimized for smallest possible size while maintaining functionality
+# Target: <100MB
+
+# Build stage for Python dependencies
+FROM python:3.12-alpine AS python-builder
+
+# Install build dependencies
+RUN apk add --no-cache gcc musl-dev libffi-dev postgresql16-dev linux-headers
+
+# Install Python packages with optimization
+WORKDIR /build
+COPY pyproject.toml .
+COPY src/authly/_version.py src/authly/_version.py
+
+# Install and strip Python packages aggressively
+RUN pip install --no-cache-dir --no-compile --user . && \
+    find /root/.local -type f -name "*.pyc" -delete && \
+    find /root/.local -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true && \
+    find /root/.local -type d -name "*.dist-info" -exec rm -rf {} + 2>/dev/null || true && \
+    find /root/.local -type d -name "tests" -exec rm -rf {} + 2>/dev/null || true && \
+    find /root/.local -type d -name "test" -exec rm -rf {} + 2>/dev/null || true && \
+    find /root/.local -type f -name "*.pyi" -delete && \
+    find /root/.local -type f -name "*.pyx" -delete && \
+    find /root/.local -name "*.so" -exec strip {} \; 2>/dev/null || true
+
+# Download embedded PostgreSQL binaries
+FROM alpine:3.20 AS postgres-builder
+RUN apk add --no-cache curl tar xz
+WORKDIR /postgres
+# Using embedded postgres binaries (smaller than full package)
+RUN curl -L https://github.com/zonkyio/embedded-postgres-binaries/releases/download/v16.1.0/postgres-linux-x64-alpine_linux.txz | \
+    tar xJ --strip-components=1
+
+# Final ultra-minimal stage
+FROM alpine:3.20
+
+# S6 Overlay version (minimal variant)
+ARG S6_OVERLAY_VERSION=3.2.0.2
+
+# Install s6-overlay (minimal)
+ADD https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz /tmp
+ADD https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-x86_64.tar.xz /tmp
+RUN tar -C / -Jxpf /tmp/s6-overlay-noarch.tar.xz && \
+    tar -C / -Jxpf /tmp/s6-overlay-x86_64.tar.xz && \
+    rm /tmp/*.tar.xz
+
+# Install absolute minimum runtime dependencies
+RUN apk add --no-cache \
+    python3 \
+    libpq \
+    redis \
+    curl \
+    bash \
+    --repository=https://dl-cdn.alpinelinux.org/alpine/v3.20/main && \
+    ln -sf python3 /usr/bin/python && \
+    # Remove APK cache
+    rm -rf /var/cache/apk/* /root/.cache
+
+# Copy embedded PostgreSQL from builder
+COPY --from=postgres-builder /postgres/bin/postgres /usr/local/bin/
+COPY --from=postgres-builder /postgres/bin/initdb /usr/local/bin/
+COPY --from=postgres-builder /postgres/bin/pg_ctl /usr/local/bin/
+COPY --from=postgres-builder /postgres/bin/pg_isready /usr/local/bin/
+COPY --from=postgres-builder /postgres/bin/psql /usr/local/bin/
+COPY --from=postgres-builder /postgres/lib /usr/local/lib/postgresql
+COPY --from=postgres-builder /postgres/share /usr/local/share/postgresql
+
+# Set PostgreSQL library path
+ENV LD_LIBRARY_PATH=/usr/local/lib/postgresql:$LD_LIBRARY_PATH
+
+# Copy Python packages from builder (already optimized)
+COPY --from=python-builder /root/.local/lib /usr/local/lib
+ENV PYTHONPATH=/app:/usr/local/lib/python3.12/site-packages:$PYTHONPATH
+ENV PATH=/usr/local/bin:$PATH
+
+# Create minimal user and directories
+RUN addgroup -g 1000 authly && \
+    adduser -u 1000 -G authly -s /bin/sh -D authly && \
+    mkdir -p /data/postgres /data/redis /data/authly && \
+    chown -R authly:authly /data
+
+# Copy only essential application code
+COPY --chown=authly:authly src/authly /app/authly
+
+# Minimal s6 service setup (inline to save space)
+RUN mkdir -p /etc/s6-overlay/s6-rc.d/user/contents.d \
+    /etc/s6-overlay/s6-rc.d/postgres \
+    /etc/s6-overlay/s6-rc.d/redis \
+    /etc/s6-overlay/s6-rc.d/authly && \
+    touch /etc/s6-overlay/s6-rc.d/user/contents.d/postgres \
+    /etc/s6-overlay/s6-rc.d/user/contents.d/redis \
+    /etc/s6-overlay/s6-rc.d/user/contents.d/authly && \
+    echo "longrun" > /etc/s6-overlay/s6-rc.d/postgres/type && \
+    echo "longrun" > /etc/s6-overlay/s6-rc.d/redis/type && \
+    echo "longrun" > /etc/s6-overlay/s6-rc.d/authly/type
+
+# Ultra-compact service scripts
+RUN printf '#!/command/execlineb -P\nif { test ! -d /data/postgres/base }\nif { s6-setuidgid authly initdb -D /data/postgres --auth=trust }\ns6-setuidgid authly postgres -D /data/postgres' \
+    > /etc/s6-overlay/s6-rc.d/postgres/run && \
+    printf '#!/command/execlineb -P\nredis-server --dir /data/redis --save ""' \
+    > /etc/s6-overlay/s6-rc.d/redis/run && \
+    printf '#!/command/execlineb -P\ncd /app\nforeground { s6-sleep 3 }\ns6-setuidgid authly python -m authly serve --host 0.0.0.0 --port 8000' \
+    > /etc/s6-overlay/s6-rc.d/authly/run && \
+    chmod +x /etc/s6-overlay/s6-rc.d/*/run
+
+# Minimal authly wrapper
+RUN printf '#!/bin/sh\ncd /app && exec python -m authly "$@"' > /usr/local/bin/authly && \
+    chmod +x /usr/local/bin/authly
+
+# Compact environment
+ENV DATABASE_URL=postgresql://authly:authly@localhost/authly \
+    REDIS_URL=redis://localhost:6379 \
+    JWT_SECRET_KEY=dev-secret \
+    JWT_REFRESH_SECRET_KEY=dev-refresh \
+    AUTHLY_BOOTSTRAP_ENABLED=true \
+    AUTHLY_ADMIN_PASSWORD=admin \
+    S6_VERBOSITY=0
+
+VOLUME ["/data"]
+EXPOSE 8000
+HEALTHCHECK CMD curl -f http://localhost:8000/health || exit 1
+ENTRYPOINT ["/init"]

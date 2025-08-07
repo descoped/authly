@@ -196,6 +196,7 @@ Core tables: users, clients, scopes, authorization_codes, tokens, jwks_keys, use
 **📁 `docs/`** - **User Documentation**
 - API references, implementation guides
 - Deployment and security documentation
+- Docker standalone image guide (`docker-standalone.md`)
 
 **📁 `tck/`** - **Test Conformance Kit**
 - OIDC/OAuth conformance testing

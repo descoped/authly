@@ -317,12 +317,13 @@ show_usage() {
     echo "Options:"
     echo "  --help, -h        - Show this help message"
     echo "  --setup-only      - Setup environment and show configuration without running tests"
-    echo "  --no-docker-check - Skip Docker service checks"
+    echo "  --no-docker-check - Skip Docker service checks (for standalone container)"
     echo "  --start-services  - Start services before running tests"
     echo "  --stop-after      - Stop services after running tests"
     echo "  --clean           - Clean postgres volume before starting (fixes auth issues)"
     echo ""
     echo "Environment Variables:"
+    echo "  SKIP_DOCKER_CHECK=true  - Skip Docker service checks (same as --no-docker-check)"
     echo "  AUTHLY_ADMIN_PASSWORD - Admin password (auto-detected if not set)"
     echo "  AUTHLY_BASE_URL      - Base URL (default: http://localhost:8000)"
     echo "  RUN_OAUTH_TESTS      - Enable OAuth tests (default: true)"
@@ -349,7 +350,7 @@ show_usage() {
 main() {
     local test_mode="${1:-comprehensive}"
     local setup_only=false
-    local skip_docker_check=false
+    local skip_docker_check="${SKIP_DOCKER_CHECK:-false}"
     local start_services=false
     local stop_after=false
     local clean_volumes=false
