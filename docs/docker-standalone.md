@@ -26,6 +26,9 @@ docker run -it --rm -p 8000:8000 descoped/authly-standalone
 # Start container and get a shell
 docker run -it --rm -p 8000:8000 descoped/authly-standalone /bin/bash
 
+# Enter Interactive Mode to access Authly Admin CLI
+docker exec -it $(docker ps --filter "ancestor=descoped/authly-standalone" --format "{{.ID}}") /bin/bash
+
 # Inside the container (you'll see the welcome message with command list):
 authly> authly --help                   # Main CLI
 authly> authly-admin --help             # Admin shortcuts  
