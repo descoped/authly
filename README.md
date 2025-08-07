@@ -154,7 +154,7 @@ docker run -p 8000:8000 descoped/authly:latest
 
 # All-in-one standalone container (includes PostgreSQL + Redis)
 docker pull descoped/authly-standalone:latest
-docker run -it --rm -p 8000:8000 descoped/authly-standalone:latest
+docker run --rm -p 8000:8000 descoped/authly-standalone:latest
 
 # Enter Interactive Shell to access Authly Admin CLI + End-2-End Testing tools
 docker exec -it $(docker ps --filter "ancestor=descoped/authly-standalone" --format "{{.ID}}") /bin/bash

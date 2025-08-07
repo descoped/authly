@@ -23,8 +23,8 @@ docker run -it --rm -p 8000:8000 descoped/authly-standalone
 ### Interactive Development
 
 ```bash
-# Start container and get a shell
-docker run -it --rm -p 8000:8000 descoped/authly-standalone /bin/bash
+# Start container
+docker run --rm -p 8000:8000 descoped/authly-standalone /bin/bash
 
 # Enter Interactive Shell to access Authly Admin CLI + End-2-End Testing tools
 docker exec -it $(docker ps --filter "ancestor=descoped/authly-standalone" --format "{{.ID}}") /bin/bash
