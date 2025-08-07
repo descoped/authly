@@ -55,7 +55,7 @@ python scripts/conformance-validator.py
 - **Target**: 90% compliance ✅
 - **Current**: 90% compliance ✅
 - **Ready for**: Development and testing
-- **Not ready for**: Official OIDC certification (needs 100%)
+- **Goal**: Self-certification for OIDC compliance (100%)
 
 ---
 

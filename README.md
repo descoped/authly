@@ -212,7 +212,7 @@ cd tck && make validate
 
 ### **Future Plans**
 - [ ] Achieve 100% OIDC specification compliance
-- [ ] Official OIDC certification
+- [ ] Self-certification for OIDC compliance testing
 - [ ] Argon2 password hashing
 - [ ] Advanced OIDC features (prompt, max_age, ACR)
 - [ ] GDPR compliance features
