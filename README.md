@@ -9,7 +9,17 @@
 [![PyPI - Version](https://img.shields.io/pypi/v/authly?color=blue)](https://pypi.org/project/authly/)
 [![Docker Hub](https://img.shields.io/docker/v/descoped/authly?label=Docker%20Hub&color=blue)](https://hub.docker.com/r/descoped/authly/tags)
 
+## A Modern OAuth 2.1 & OIDC Server Built with AI Collaboration
+
 An **OAuth 2.1 and OpenID Connect authorization server** in active development. Built with FastAPI and PostgreSQL, Authly aims to provide standards-compliant authentication and authorization services.
+
+---
+
+Built through close collaboration between human developers and AI assistants (Claude, Gemini, and OpenAI), this authorization server follows a specification-driven development methodology. RFC standards and OpenID specifications guide our implementation choices, ensuring decisions are grounded in established protocols rather than arbitrary preferences.
+
+The project began with traditional development to establish the foundational architecture. As it evolved, we adopted a hybrid approach where human developers maintain full control – reviewing, testing, and refactoring code in partnership with AI assistants. This collaborative workflow has proven particularly effective for navigating complex specifications and achieving compliance.
+
+Through systematic testing and validation, we've achieved 100% conformance with OIDC Core requirements.
 
 ---
 
