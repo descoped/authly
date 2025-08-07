@@ -11,7 +11,7 @@
 
 ## A Modern OAuth 2.1 & OIDC Server Built with AI Collaboration
 
-An **OAuth 2.1 and OpenID Connect authorization server** in active development. Built with FastAPI and PostgreSQL, Authly aims to provide standards-compliant authentication and authorization services.
+An **OAuth 2.1 and OpenID Connect authorization server** in active development. Built with FastAPI, PostgreSQL and Redis, Authly aims to provide standards-compliant authentication and authorization services.
 
 ---
 
