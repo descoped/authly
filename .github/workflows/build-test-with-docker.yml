@@ -205,16 +205,16 @@ jobs:
         # Test OAuth endpoints are mounted correctly
         echo "Testing OAuth router availability..."
         
-        # Test authorization endpoint returns 401 for unauthenticated request (not 404)
+        # Test authorization endpoint returns 400 for missing parameters (OAuth-compliant)
         RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
           "http://localhost:8000/api/v1/oauth/authorize")
         
-        if [ "$RESPONSE" != "401" ]; then
-          echo "OAuth authorization endpoint failed with status: $RESPONSE (expected 401 for unauthenticated request)"
+        if [ "$RESPONSE" != "400" ]; then
+          echo "OAuth authorization endpoint failed with status: $RESPONSE (expected 400 for missing parameters)"
           exit 1
         fi
         
-        echo "OAuth router availability test passed - endpoint requires authentication as expected"
+        echo "OAuth router availability test passed - endpoint validates parameters as expected"
     
     - name: Run API integration tests
       run: |
