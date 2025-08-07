@@ -302,6 +302,7 @@ show_usage() {
     echo "  clients        - Client and scope management (core admin tests)"
     echo "  userauth       - User authentication and OIDC testing"
     echo "  oauth          - Complete OAuth 2.1 authorization code flow"
+    echo "  oidc-discovery - OIDC Discovery endpoints testing"
     echo "  comprehensive  - All tests including OAuth flow (default)"
     echo "  cleanup        - Manual cleanup of test data"
     echo "  status         - Current system status"
