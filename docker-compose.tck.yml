@@ -10,7 +10,7 @@ services:
   
   # MongoDB for conformance suite storage
   tck-mongodb:
-    image: mongo:6.0.13
+    image: mongo:8.0.12
     container_name: tck-mongodb
     volumes:
       - tck_mongo_data:/data/db
@@ -25,7 +25,7 @@ services:
   # Conformance suite server (option 1: use pre-built JAR if available)
   # For fresh checkout, use: cd tck && make init
   tck-server:
-    image: eclipse-temurin:17-jre
+    image: eclipse-temurin:21.0.8_9-jre
     container_name: tck-server
     ports:
       - "8443:8443"
