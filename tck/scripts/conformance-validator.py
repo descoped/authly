@@ -323,10 +323,22 @@ This tests SPECIFICATION COMPLIANCE only, not business functionality.
             if isinstance(result, bool):
                 category_total += 1
                 total_checks += 1
-                if result:
-                    category_passed += 1
-                    passed_checks += 1
-                status = "✅ PASS" if result else "❌ FAIL"
+
+                # Special case: NOT supporting 'none' algorithm is GOOD (secure)
+                if check == "supports_none_alg":
+                    # Invert the logic for this check - False is PASS, True is FAIL
+                    is_pass = not result
+                    if is_pass:
+                        category_passed += 1
+                        passed_checks += 1
+                    status = "✅ PASS" if is_pass else "❌ FAIL"
+                else:
+                    # Normal logic for all other checks
+                    if result:
+                        category_passed += 1
+                        passed_checks += 1
+                    status = "✅ PASS" if result else "❌ FAIL"
+
                 report += f"| {check.replace('_', ' ').title()} | {result} | {status} |\n"
 
         if category_total > 0:

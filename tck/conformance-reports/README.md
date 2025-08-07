@@ -1,28 +1,17 @@
 # OIDC Conformance Status Reports
 
-This directory contains versioned conformance status reports for tracking OIDC/OAuth compliance progress.
+This directory contains current conformance test results and specifications for tracking OIDC/OAuth compliance.
 
-## Report Naming Convention
-`CONFORMANCE_STATUS_v{version}_{date}_{optional_tag}.md`
+## Historical Reports Migrated
 
-- **version**: Three-digit incremental version (e.g., v001, v002)
-- **date**: YYYYMMDD format
-- **optional_tag**: Additional context (e.g., "initial", "post_fix", "final")
+All historical versioned conformance reports (v000-v007) have been migrated to:
+`.claude/evolution/oidc-conformance-journey/conformance-reports/`
 
-## Version History
+This preserves the complete journey from 0% to 100% compliance while keeping this directory focused on current testing.
 
-| Version | Date | Status | Key Changes | Critical Issues |
-|---------|------|--------|-------------|-----------------|
-| [v000](./CONFORMANCE_STATUS_v000_20250806_initial.md) | 2025-08-06 | ❌ Failed | Initial assessment with old Docker image | Discovery URL, Missing endpoints, Wrong token endpoint in discovery |
-| [v001](./CONFORMANCE_STATUS_v001_20250806.md) | 2025-08-06 | ⚠️ Partial | Rebuilt with latest code | Discovery URL, Token content-type, Error codes |
-| [v002](./CONFORMANCE_STATUS_v002_20250806_post_rebuild.md) | 2025-08-06 | ⚠️ Partial | Automated testing after rebuild | Discovery URL, Token form-encoding, Error codes, Auth redirects |
-| [v003](./CONFORMANCE_STATUS_v003_20250806.md) | 2025-08-06 | ⚠️ Partial | Post initial fixes | 1 critical issue remaining |
-| [v004](./CONFORMANCE_STATUS_v004_20250806_v004_after_fixes.md) | 2025-08-06 | ⚠️ Partial | After implementing fixes | 1 critical issue (Docker not rebuilt) |
-| [v005](./CONFORMANCE_STATUS_v005_20250806_v005_final_fixes.md) | 2025-08-06 | ⚠️ Partial | Final test run | 1 critical issue (Docker not rebuilt) |
-| **[FIX SUMMARY](./FIX_SUMMARY_v005_20250806.md)** | 2025-08-06 | ✅ FIXED | **All 4 critical issues fixed in code** | **0 in code, 1 in Docker** |
-| [v006](./CONFORMANCE_STATUS_v006_20250806_v006_post_docker_rebuild.md) | 2025-08-06 | ✅ SUCCESS | Post-Docker rebuild verification | **All issues fixed!** |
-| **[ACTIONABLE ITEMS](./ACTIONABLE_ITEMS_v006_20250806.md)** | 2025-08-06 | 📋 ACTION | Analysis and next steps | Test script updates needed |
-| **[v007](./CONFORMANCE_STATUS_v007_20250806_v007_fixed_test_script.md)** | 2025-08-06 | ✅ **100% COMPLIANT** | Fixed test script with PKCE | **🎉 FULLY COMPLIANT!** |
+## Current Status: 100% Compliant ✅
+
+As of August 7, 2025, Authly has achieved **100% OIDC/OAuth conformance**.
 
 ## Current Status Summary (v007 - Full Compliance Achieved!)
 

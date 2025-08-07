@@ -1,27 +1,27 @@
 # OIDC/OAuth Test Conformance Kit (TCK)
 
-## 🎯 Quick Start - Achieve 90% Conformance
+## 🎯 Quick Start - Achieve 100% Conformance
 
 ```bash
 # 1. Start Authly
 docker compose up -d
 
-# 2. Run conformance validator (90% compliance)
+# 2. Run conformance validator (100% compliance)
 cd tck && make validate
 
 # 3. View results
 cat reports/latest/SPECIFICATION_CONFORMANCE.md
 ```
 
-## Current Status: 90% Compliant ✅
+## Current Status: 100% Compliant ✅
 
 | Category | Score | Status |
 |----------|-------|--------|
 | Discovery | 100% | ✅ All 22 checks pass |
 | JWKS | 100% | ✅ All 7 checks pass |
-| Endpoints | 50% | ⚠️ Token error format needs fixing |
-| Security | 80% | ✅ PKCE enforced, RS256 supported |
-| **OVERALL** | **90%** | **36/40 checks pass** |
+| Endpoints | 100% | ✅ All 6 checks pass |
+| Security | 100% | ✅ All 5 checks pass |
+| **OVERALL** | **100%** | **40/40 checks pass** |
 
 ## Directory Structure
 
@@ -29,7 +29,7 @@ cat reports/latest/SPECIFICATION_CONFORMANCE.md
 tck/
 ├── Makefile              # Main automation commands
 ├── scripts/
-│   ├── conformance-validator.py  # Core validator (90% compliance)
+│   ├── conformance-validator.py  # Core validator (100% compliance)
 │   └── analyze_openapi_conformance.py  # API matrix analyzer
 ├── reports/              # Test results (gitignored)
 │   └── latest/          # Symlink to most recent run
@@ -47,7 +47,7 @@ tests/tck/                # Pytest conformance tests (excluded from main suite)
 ### TCK Validation Scripts
 ```bash
 make help          # Show all available commands
-make validate      # Run spec validation (90% compliance)
+make validate      # Run spec validation (100% compliance)
 make analyze       # Generate API conformance matrix  
 make report        # Generate all reports
 make clean         # Clean test artifacts

@@ -65,7 +65,8 @@ class TestOAuth21EndToEndFlow:
         # Should fail with 400 Bad Request
         await token_response.expect_status(400)
         error_data = await token_response.json()
-        assert "Invalid authorization code" in error_data["detail"]
+        assert error_data.get("error") == "invalid_grant"
+        assert "Invalid authorization code" in error_data.get("error_description", "")
 
     @pytest.mark.asyncio
     async def test_backward_compatibility_password_grant(self, oauth_server: AsyncTestServer, test_user: UserModel):
@@ -93,7 +94,8 @@ class TestOAuth21EndToEndFlow:
         # Should fail with 400 Bad Request
         await token_response.expect_status(400)
         error_data = await token_response.json()
-        assert "Unsupported grant type" in error_data["detail"]
+        assert error_data.get("error") == "unsupported_grant_type"
+        assert "grant type" in error_data.get("error_description", "").lower()
 
     @pytest.mark.asyncio
     async def test_authorization_code_grant_supported(self, oauth_server: AsyncTestServer):
@@ -112,8 +114,9 @@ class TestOAuth21EndToEndFlow:
         # Should fail with authorization code error, NOT grant type error
         await token_response.expect_status(400)
         error_data = await token_response.json()
-        assert "Invalid authorization code" in error_data["detail"]
-        assert "Unsupported grant type" not in error_data["detail"]
+        assert error_data.get("error") == "invalid_grant"
+        assert "Invalid authorization code" in error_data.get("error_description", "")
+        assert error_data.get("error") != "unsupported_grant_type"
 
     @pytest.mark.asyncio
     async def test_pkce_parameter_validation(self, oauth_server: AsyncTestServer):
@@ -130,4 +133,7 @@ class TestOAuth21EndToEndFlow:
 
         await token_response.expect_status(400)
         error_data = await token_response.json()
-        assert "code, redirect_uri, client_id, and code_verifier are required" in error_data["detail"]
+        assert error_data.get("error") == "invalid_request"
+        assert "code, redirect_uri, client_id, and code_verifier are required" in error_data.get(
+            "error_description", ""
+        )

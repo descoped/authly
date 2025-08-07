@@ -185,18 +185,28 @@ class AdminAPIClient:
         # Try to get error details from response body
         try:
             error_data = response.json()
-            error_message = error_data.get("detail", "")
-            if isinstance(error_message, list) and error_message:
-                # Handle FastAPI validation errors
-                error_message = error_message[0].get("msg", str(error_message[0]))
-            elif not error_message:
-                error_message = error_data.get("message", "")
+            # Check for OAuth error format first (from token endpoint)
+            if "error" in error_data:
+                error_message = error_data.get("error_description", error_data.get("error", ""))
+            else:
+                # Standard FastAPI error format
+                error_message = error_data.get("detail", "")
+                if isinstance(error_message, list) and error_message:
+                    # Handle FastAPI validation errors
+                    error_message = error_message[0].get("msg", str(error_message[0]))
+                elif not error_message:
+                    error_message = error_data.get("message", "")
         except (ValueError, KeyError):
             error_message = response.text or ""
 
         # Provide context-specific error messages
         if status_code == 400:
-            if "scope" in path.lower():
+            # Check if this is an authentication failure from OAuth token endpoint
+            if "oauth/token" in path.lower() and "incorrect username or password" in error_message.lower():
+                raise AdminAPIError(
+                    "Authentication failed. Please login again with 'python -m authly admin login'.", status_code=401
+                )
+            elif "scope" in path.lower():
                 if "already exists" in error_message.lower() or "duplicate" in error_message.lower():
                     # Extract scope name from error or request data
                     scope_name = self._extract_scope_name_from_error(error_message, response)

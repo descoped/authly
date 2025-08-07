@@ -101,8 +101,9 @@ async def test_login_unverified(auth_server: AsyncTestServer, create_unverified_
     )
 
     error_response = await response.json()
-    await response.expect_status(403)
-    assert error_response["detail"] == "Account not verified"
+    await response.expect_status(400)  # OAuth 2.0 returns 400 for grant errors
+    assert error_response["error"] == "invalid_grant"
+    assert "Account not verified" in error_response["error_description"]
 
 
 @pytest.mark.asyncio
@@ -131,8 +132,9 @@ async def test_login_invalid_credentials(auth_server: AsyncTestServer):
     )
 
     error_response = await response.json()
-    await response.expect_status(401)
-    assert error_response["detail"] == "Incorrect username or password"
+    await response.expect_status(400)  # OAuth 2.0 returns 400 for invalid credentials
+    assert error_response["error"] == "invalid_grant"
+    assert "Incorrect username or password" in error_response["error_description"]
 
 
 @pytest.mark.asyncio
@@ -302,6 +304,7 @@ async def test_refresh_token_reuse(auth_server: AsyncTestServer, test_user: User
         "/api/v1/oauth/refresh", json={"refresh_token": old_refresh_token, "grant_type": "refresh_token"}
     )
 
-    await reuse_response.expect_status(401)
+    await reuse_response.expect_status(400)  # OAuth 2.0 returns 400 for invalid grant
     error_response = await reuse_response.json()
-    assert error_response["detail"] == "Token is invalid or expired"
+    assert error_response["error"] == "invalid_grant"
+    assert "Token is invalid or expired" in error_response.get("error_description", "")

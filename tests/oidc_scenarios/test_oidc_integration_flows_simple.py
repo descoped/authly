@@ -46,9 +46,10 @@ class TestOIDCIntegrationFlowsSimple:
         await token_response.expect_status(400)
 
         error_response = await token_response.json()
-        assert "detail" in error_response
-        # Should be an invalid authorization code error, not unsupported grant type
-        assert "authorization code" in error_response.get("detail", "").lower()
+        assert "error" in error_response
+        # Should be an invalid grant error
+        assert error_response["error"] == "invalid_grant"
+        assert "authorization code" in error_response.get("error_description", "").lower()
 
     @pytest.mark.asyncio
     async def test_userinfo_endpoint_authentication_required(self, oidc_server: AsyncTestServer):
@@ -90,5 +91,5 @@ class TestOIDCIntegrationFlowsSimple:
             data={"grant_type": "password", "username": "nonexistent_user", "password": "invalid_password"},
         )
 
-        # Should fail with authentication error
-        await token_response.expect_status(401)
+        # Should fail with authentication error (OAuth 2.0 returns 400 for invalid credentials)
+        await token_response.expect_status(400)

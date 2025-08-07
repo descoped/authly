@@ -368,9 +368,7 @@ class TestOIDCParameterHandling:
 
             # Should handle ui_locales parameter without error
             auth_response = await oidc_server.client.get("/api/v1/oauth/authorize", params=auth_params)
-            await auth_response.expect_status(
-                401
-            )  # The authorization endpoint requires user authentication. Without authentication, it should return 401 Unauthorized
+            await auth_response.expect_status(400)  # OAuth 2.0 returns 400 for invalid request
 
     async def test_login_hint_parameter(self, oidc_server: AsyncTestServer, test_client: OAuthClientModel):
         """Test login_hint parameter handling."""
@@ -396,9 +394,7 @@ class TestOIDCParameterHandling:
 
             # Should handle login_hint parameter without error
             auth_response = await oidc_server.client.get("/api/v1/oauth/authorize", params=auth_params)
-            await auth_response.expect_status(
-                401
-            )  # The authorization endpoint requires user authentication. Without authentication, it should return 401 Unauthorized
+            await auth_response.expect_status(400)  # OAuth 2.0 returns 400 for invalid request
 
     async def test_display_parameter_values(self, oidc_server: AsyncTestServer, test_client: OAuthClientModel):
         """Test display parameter handling."""
@@ -419,9 +415,7 @@ class TestOIDCParameterHandling:
 
             # Should handle display parameter without error
             auth_response = await oidc_server.client.get("/api/v1/oauth/authorize", params=auth_params)
-            await auth_response.expect_status(
-                401
-            )  # The authorization endpoint requires user authentication. Without authentication, it should return 401 Unauthorized
+            await auth_response.expect_status(400)  # OAuth 2.0 returns 400 for invalid request
 
     async def test_acr_values_parameter(self, oidc_server: AsyncTestServer, test_client: OAuthClientModel):
         """Test acr_values parameter handling."""
@@ -447,9 +441,7 @@ class TestOIDCParameterHandling:
 
             # Should handle acr_values parameter without error
             auth_response = await oidc_server.client.get("/api/v1/oauth/authorize", params=auth_params)
-            await auth_response.expect_status(
-                401
-            )  # The authorization endpoint requires user authentication. Without authentication, it should return 401 Unauthorized
+            await auth_response.expect_status(400)  # OAuth 2.0 returns 400 for invalid request
 
 
 class TestOIDCTokenValidation:

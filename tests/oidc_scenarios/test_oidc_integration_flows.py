@@ -183,9 +183,11 @@ class TestOIDCIntegrationFlows:
             "prompt": "consent",
         }
 
-        # The authorization endpoint requires user authentication. Without authentication, it should return 401 Unauthorized
-        auth_response = await oidc_server.client.get("/api/v1/oauth/authorize", params=auth_params)
-        await auth_response.expect_status(401)
+        # OAuth 2.0 redirects with error when not authenticated
+        auth_response = await oidc_server.client.get(
+            "/api/v1/oauth/authorize", params=auth_params, follow_redirects=False
+        )
+        await auth_response.expect_status(302)
 
     @pytest.mark.asyncio
     async def test_token_endpoint_includes_id_token(

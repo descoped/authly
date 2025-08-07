@@ -200,8 +200,11 @@ class TestTokenRevocation:
             "/api/v1/oauth/refresh", json={"refresh_token": new_refresh_token, "grant_type": "refresh_token"}
         )
 
-        # Should fail with 401 Unauthorized
-        await refresh_response.expect_status(401)
+        # Should fail with 400 Bad Request (OAuth 2.0 returns 400 for invalid grant)
+        await refresh_response.expect_status(400)
+        error_data = await refresh_response.json()
+        assert error_data.get("error") == "invalid_grant"
+        assert "invalid or expired" in error_data.get("error_description", "").lower()
 
     @pytest.mark.asyncio
     async def test_invalid_token_type_hint(self, auth_server: AsyncTestServer, valid_tokens: dict):

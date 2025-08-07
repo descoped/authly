@@ -548,9 +548,7 @@ class TestOIDCErrorHandling:
         }
 
         auth_response = await oidc_server.client.get("/api/v1/oauth/authorize", params=auth_params)
-        await auth_response.expect_status(
-            401
-        )  # The authorization endpoint requires user authentication. Without authentication, it should return 401 Unauthorized
+        await auth_response.expect_status(400)  # OAuth 2.0 returns 400 for invalid request
 
     async def test_invalid_nonce_parameter(self, oidc_server: AsyncTestServer, test_client: OAuthClientModel):
         """Test error handling for invalid nonce parameters."""
@@ -566,9 +564,7 @@ class TestOIDCErrorHandling:
         }
 
         auth_response = await oidc_server.client.get("/api/v1/oauth/authorize", params=auth_params)
-        await auth_response.expect_status(
-            401
-        )  # The authorization endpoint requires user authentication. Without authentication, it should return 401 Unauthorized
+        await auth_response.expect_status(400)  # OAuth 2.0 returns 400 for invalid request
 
     async def test_invalid_max_age_parameter(self, oidc_server: AsyncTestServer, test_client: OAuthClientModel):
         """Test error handling for invalid max_age parameters."""
@@ -584,9 +580,7 @@ class TestOIDCErrorHandling:
         }
 
         auth_response = await oidc_server.client.get("/api/v1/oauth/authorize", params=auth_params)
-        await auth_response.expect_status(
-            401
-        )  # The authorization endpoint requires user authentication. Without authentication, it should return 401 Unauthorized
+        await auth_response.expect_status(400)  # OAuth 2.0 returns 400 for invalid request
 
     async def test_userinfo_endpoint_error_scenarios(self, oidc_server: AsyncTestServer):
         """Test UserInfo endpoint error handling."""

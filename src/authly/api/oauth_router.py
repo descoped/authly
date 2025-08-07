@@ -6,10 +6,13 @@ Provides OAuth 2.1 endpoints including discovery, authorization, and token opera
 import logging
 import os
 from datetime import UTC, datetime, timedelta
+from typing import Annotated
 from urllib.parse import urlencode
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request, status
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.security import OAuth2PasswordBearer
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 
@@ -19,8 +22,8 @@ from authly.api.auth_dependencies import (
     get_scope_repository,
     get_token_service_with_client,
 )
-from authly.api.users_dependencies import get_current_user, get_current_user_optional, get_user_repository
-from authly.auth import verify_password
+from authly.api.users_dependencies import get_current_user, get_user_repository
+from authly.auth import decode_token, verify_password
 from authly.config import AuthlyConfig
 from authly.core.dependencies import get_config
 from authly.oauth.authorization_service import AuthorizationService
@@ -40,6 +43,28 @@ from authly.tokens import TokenService, get_token_service
 from authly.users import UserModel, UserRepository
 
 logger = logging.getLogger(__name__)
+
+# OAuth2 scheme that doesn't auto-error for authorization endpoint
+oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl="/api/v1/oauth/token", auto_error=False)
+
+
+def oauth_error_response(error: str, error_description: str = None, status_code: int = 400) -> JSONResponse:
+    """
+    Create an OAuth 2.0 compliant error response.
+
+    Args:
+        error: OAuth 2.0 error code (e.g., 'invalid_request', 'invalid_grant')
+        error_description: Optional human-readable error description
+        status_code: HTTP status code (default 400)
+
+    Returns:
+        JSONResponse with OAuth-compliant error format
+    """
+    content = {"error": error}
+    if error_description:
+        content["error_description"] = error_description
+    return JSONResponse(content=content, status_code=status_code)
+
 
 # Import authentication metrics tracking
 try:
@@ -251,10 +276,10 @@ def _build_issuer_url(request: Request) -> str:
 )
 async def authorize_get(
     request: Request,
-    response_type: str = Query(..., description="Must be 'code'"),
-    client_id: str = Query(..., description="Client identifier"),
-    redirect_uri: str = Query(..., description="Client redirect URI"),
-    code_challenge: str = Query(..., description="PKCE code challenge"),
+    response_type: str | None = Query(None, description="Must be 'code'"),
+    client_id: str | None = Query(None, description="Client identifier"),
+    redirect_uri: str | None = Query(None, description="Client redirect URI"),
+    code_challenge: str | None = Query(None, description="PKCE code challenge"),
     scope: str | None = Query(None, description="Requested scopes"),
     state: str | None = Query(None, description="CSRF protection parameter"),
     code_challenge_method: str = Query("S256", description="PKCE challenge method"),
@@ -269,7 +294,11 @@ async def authorize_get(
     login_hint: str | None = Query(None, description="Login hint"),
     acr_values: str | None = Query(None, description="ACR values"),
     authorization_service: AuthorizationService = Depends(get_authorization_service),
-    current_user: UserModel | None = Depends(get_current_user_optional),
+    # Authentication dependencies - using non-auto-error scheme for parameter validation
+    token: Annotated[str | None, Depends(oauth2_scheme_optional)] = None,
+    user_repo: UserRepository = Depends(get_user_repository),
+    token_service: TokenService = Depends(get_token_service),
+    config: AuthlyConfig = Depends(get_config),
 ):
     """
     OAuth 2.1 Authorization endpoint (GET).
@@ -277,6 +306,53 @@ async def authorize_get(
     Validates the authorization request and displays a consent form.
     If user is not authenticated, redirects back to client with login_required error.
     """
+
+    # CRITICAL: Validate required parameters FIRST (before authentication check)
+    # Check basic required parameters
+    if not response_type or not client_id or not redirect_uri:
+        return JSONResponse(
+            content={
+                "error": "invalid_request",
+                "error_description": "Missing required parameters: response_type, client_id, and redirect_uri are required",
+            },
+            status_code=400,
+        )
+
+    # This ensures PKCE is validated regardless of authentication status
+    if not code_challenge:
+        # PKCE is required for OAuth 2.1
+        return JSONResponse(
+            content={"error": "invalid_request", "error_description": "code_challenge is required (PKCE)"},
+            status_code=400,
+        )
+
+    if response_type != "code":
+        # Only authorization code flow is supported
+        return JSONResponse(
+            content={
+                "error": "unsupported_response_type",
+                "error_description": "Only 'code' response type is supported",
+            },
+            status_code=400,
+        )
+
+    # NOW check authentication manually after parameter validation
+    current_user = None
+    if token:
+        try:
+            payload = decode_token(token, config.secret_key, config.algorithm)
+            user_id_str = payload.get("sub")
+            jti = payload.get("jti")
+
+            # Check if token has valid user and hasn't been revoked
+            if user_id_str and (jti is None or await token_service.is_token_valid(jti)):
+                user_id = UUID(user_id_str)
+                current_user = await user_repo.get_by_id(user_id)
+                if current_user and not current_user.is_active:
+                    current_user = None
+        except Exception:
+            # Invalid token, treat as not authenticated
+            pass
 
     # Check if user is authenticated
     if not current_user:
@@ -355,7 +431,7 @@ async def authorize_get(
     except ValueError as e:
         # Invalid enum values
         logger.warning(f"Invalid parameter in authorization request: {e}")
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid request parameters") from None
+        return oauth_error_response("invalid_request", "Invalid request parameters")
 
     except Exception as e:
         logger.error(f"Error in authorization endpoint: {e}")
@@ -380,6 +456,7 @@ async def authorize_get(
 )
 async def authorize_post(
     request: Request,
+    response_type: str = Form("code"),  # OAuth requires this parameter
     client_id: str = Form(...),
     redirect_uri: str = Form(...),
     scope: str | None = Form(None),
@@ -405,6 +482,24 @@ async def authorize_post(
 
     Handles user consent and generates authorization code.
     """
+    # Validate required parameters first
+    if not code_challenge:
+        # PKCE is required for OAuth 2.1
+        return JSONResponse(
+            content={"error": "invalid_request", "error_description": "code_challenge is required (PKCE)"},
+            status_code=400,
+        )
+
+    if response_type != "code":
+        # Only authorization code flow is supported
+        return JSONResponse(
+            content={
+                "error": "unsupported_response_type",
+                "error_description": "Only 'code' response type is supported",
+            },
+            status_code=400,
+        )
+
     try:
         # Use the authenticated user ID from the JWT token
         authenticated_user_id = current_user.id
@@ -490,7 +585,7 @@ async def authorize_post(
             ) from e
 
 
-@oauth_router.post("/token", response_model=TokenResponse)
+@oauth_router.post("/token")
 async def get_access_token(
     grant_type: str = Form(..., description="The grant type"),
     username: str | None = Form(None, description="Username for password grant"),
@@ -540,8 +635,8 @@ async def get_access_token(
     elif request.grant_type == "refresh_token":
         return await _handle_refresh_token_grant(request, user_repo, token_service)
     else:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=f"Unsupported grant type: {request.grant_type}"
+        return oauth_error_response(
+            "unsupported_grant_type", f"The authorization grant type '{request.grant_type}' is not supported"
         )
 
 
@@ -562,9 +657,7 @@ async def _handle_password_grant(
         # Track validation error
         if METRICS_ENABLED and metrics:
             metrics.track_oauth_token_request("password", "unknown", "validation_error", 0.0)
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Username and password are required for password grant"
-        )
+        return oauth_error_response("invalid_request", "Username and password are required for password grant")
 
     # Rate limiting check
     await rate_limiter.check_rate_limit(f"login:{request.username}")
@@ -576,9 +669,8 @@ async def _handle_password_grant(
             duration = time.time() - start_time
             metrics.track_oauth_token_request("password", request.username, "rate_limited", duration)
             metrics.track_rate_limit_hit(request.username, "password_grant")
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Too many failed attempts. Account temporarily locked.",
+        return oauth_error_response(
+            "invalid_grant", "Too many failed attempts. Account temporarily locked.", status_code=429
         )
 
     # Validate user
@@ -589,25 +681,21 @@ async def _handle_password_grant(
             duration = time.time() - start_time
             metrics.track_oauth_token_request("password", request.username, "invalid_credentials", duration)
             metrics.track_login_attempt("failed", "password", request.username)
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        return oauth_error_response("invalid_grant", "Incorrect username or password")
 
     if not user.is_active:
         # Track inactive user attempt
         if METRICS_ENABLED and metrics:
             duration = time.time() - start_time
             metrics.track_oauth_token_request("password", request.username, "user_inactive", duration)
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is deactivated")
+        return oauth_error_response("invalid_grant", "Account is deactivated")
 
     if not user.is_verified:
         # Track unverified user attempt
         if METRICS_ENABLED and metrics:
             duration = time.time() - start_time
             metrics.track_oauth_token_request("password", request.username, "user_unverified", duration)
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account not verified")
+        return oauth_error_response("invalid_grant", "Account not verified")
 
     try:
         # Create token pair using TokenService
@@ -643,14 +731,12 @@ async def _handle_password_grant(
     except HTTPException:
         # Let HTTPExceptions from TokenService pass through
         raise
-    except Exception as e:
+    except Exception:
         # Track general authentication error
         if METRICS_ENABLED and metrics:
             duration = time.time() - start_time
             metrics.track_oauth_token_request("password", request.username, "error", duration)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not create authentication tokens"
-        ) from e
+        return oauth_error_response("invalid_grant", "Could not create authentication tokens")
 
 
 async def _handle_authorization_code_grant(
@@ -671,9 +757,9 @@ async def _handle_authorization_code_grant(
             metrics.track_oauth_token_request(
                 "authorization_code", request.client_id or "unknown", "validation_error", 0.0
             )
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="code, redirect_uri, client_id, and code_verifier are required for authorization_code grant",
+        return oauth_error_response(
+            "invalid_request",
+            "code, redirect_uri, client_id, and code_verifier are required for authorization_code grant",
         )
 
     try:
@@ -693,9 +779,7 @@ async def _handle_authorization_code_grant(
                     "authorization_code", request.client_id, "invalid_authorization_code", duration
                 )
             logger.warning(f"Authorization code exchange failed: {error_msg}")
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, detail=error_msg or "Invalid authorization code"
-            )
+            return oauth_error_response("invalid_grant", error_msg or "Invalid authorization code")
 
         # Get user for token generation
         user = await user_repo.get_by_id(code_data["user_id"])
@@ -705,21 +789,23 @@ async def _handle_authorization_code_grant(
                 duration = time.time() - start_time
                 metrics.track_oauth_token_request("authorization_code", request.client_id, "user_not_found", duration)
             logger.error(f"User not found for authorization code: {code_data['user_id']}")
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid authorization code")
+            return oauth_error_response(
+                "invalid_grant", "The provided authorization grant is invalid, expired, or revoked"
+            )
 
         if not user.is_active:
             # Track inactive user attempt
             if METRICS_ENABLED and metrics:
                 duration = time.time() - start_time
                 metrics.track_oauth_token_request("authorization_code", request.client_id, "user_inactive", duration)
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is deactivated")
+            return oauth_error_response("invalid_grant", "Account is deactivated")
 
         if not user.is_verified:
             # Track unverified user attempt
             if METRICS_ENABLED and metrics:
                 duration = time.time() - start_time
                 metrics.track_oauth_token_request("authorization_code", request.client_id, "user_unverified", duration)
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account not verified")
+            return oauth_error_response("invalid_grant", "Account not verified")
 
         # Extract OIDC parameters from authorization code data for ID token generation
         oidc_params = None
@@ -763,9 +849,7 @@ async def _handle_authorization_code_grant(
             duration = time.time() - start_time
             metrics.track_oauth_token_request("authorization_code", request.client_id or "unknown", "error", duration)
         logger.error(f"Error handling authorization code grant: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not process authorization code"
-        ) from None
+        return oauth_error_response("invalid_grant", "Could not process authorization code")
 
 
 async def _handle_refresh_token_grant(
@@ -783,9 +867,7 @@ async def _handle_refresh_token_grant(
         # Track validation error
         if METRICS_ENABLED and metrics:
             metrics.track_oauth_token_request("refresh_token", request.client_id or "unknown", "validation_error", 0.0)
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="refresh_token is required for refresh_token grant"
-        )
+        return oauth_error_response("invalid_request", "refresh_token is required for refresh_token grant")
 
     try:
         # Refresh token pair - client_id lookup will be handled by token service
@@ -807,18 +889,29 @@ async def _handle_refresh_token_grant(
             id_token=token_response.id_token,
         )
 
-    except HTTPException:
-        # Re-raise HTTPExceptions (like invalid refresh token) as-is
-        raise
+    except HTTPException as he:
+        # Convert HTTPExceptions to OAuth error responses
+        # Track refresh token grant error
+        if METRICS_ENABLED and metrics:
+            duration = time.time() - start_time
+            metrics.track_oauth_token_request(
+                "refresh_token", request.client_id or "unknown", "invalid_grant", duration
+            )
+
+        # Map HTTP status codes to OAuth errors
+        if he.status_code == status.HTTP_401_UNAUTHORIZED:
+            return oauth_error_response("invalid_grant", he.detail)
+        elif he.status_code == status.HTTP_400_BAD_REQUEST:
+            return oauth_error_response("invalid_request", he.detail)
+        else:
+            return oauth_error_response("invalid_grant", he.detail)
     except Exception as e:
         # Track general refresh token grant error
         if METRICS_ENABLED and metrics:
             duration = time.time() - start_time
             metrics.track_oauth_token_request("refresh_token", request.client_id or "unknown", "error", duration)
         logger.error(f"Error handling refresh token grant: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not process refresh token"
-        ) from None
+        return oauth_error_response("invalid_grant", "Could not process refresh token")
 
 
 @oauth_router.post("/revoke", status_code=status.HTTP_200_OK)
@@ -892,7 +985,7 @@ async def refresh_access_token(
         # Track invalid grant type
         if METRICS_ENABLED and metrics:
             metrics.track_oauth_token_request("refresh_token", "unknown", "invalid_grant_type", 0.0)
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid grant type")
+        return oauth_error_response("unsupported_grant_type", "The authorization grant type is not supported")
 
     try:
         # Refresh token pair using TokenService
@@ -911,14 +1004,23 @@ async def refresh_access_token(
             id_token=token_response.id_token,
         )
 
-    except HTTPException:
-        # Let HTTPExceptions from TokenService pass through
-        raise
+    except HTTPException as he:
+        # Convert HTTPExceptions to OAuth error responses
+        # Track token refresh error
+        if METRICS_ENABLED and metrics:
+            duration = time.time() - start_time
+            metrics.track_oauth_token_request("refresh_token", "unknown", "invalid_grant", duration)
+
+        # Map HTTP status codes to OAuth errors
+        if he.status_code == status.HTTP_401_UNAUTHORIZED:
+            return oauth_error_response("invalid_grant", he.detail)
+        elif he.status_code == status.HTTP_400_BAD_REQUEST:
+            return oauth_error_response("invalid_request", he.detail)
+        else:
+            return oauth_error_response("invalid_grant", he.detail)
     except Exception:
         # Track token refresh error
         if METRICS_ENABLED and metrics:
             duration = time.time() - start_time
             metrics.track_oauth_token_request("refresh_token", "unknown", "error", duration)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not refresh tokens"
-        ) from None
+        return oauth_error_response("invalid_grant", "Could not refresh tokens")

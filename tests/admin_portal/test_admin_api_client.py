@@ -215,9 +215,10 @@ class TestAdminAPIClientIntegration:
             },
         )
 
-        await response.expect_status(401)
+        await response.expect_status(400)  # OAuth 2.0 returns 400 for invalid credentials
         error_data = await response.json()
-        assert "Incorrect username or password" in error_data["detail"]
+        assert error_data.get("error") == "invalid_grant"
+        assert "Incorrect username or password" in error_data.get("error_description", "")
 
         # Test AdminAPIClient initialization (client not authenticated)
         base_url = f"http://{admin_test_server._host}:{admin_test_server._port}"

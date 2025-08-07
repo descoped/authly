@@ -152,8 +152,8 @@ class TestOIDCBasicIntegration:
         )
 
         # Should fail with authentication error (not server error)
-        # The token response should be 401 (Unauthorized) since the username doesn't exist
-        await token_response.expect_status(401)
+        # OAuth 2.0 returns 400 for invalid credentials
+        await token_response.expect_status(400)
 
     @pytest.mark.asyncio
     async def test_unsupported_response_types_rejected(self, oidc_server: AsyncTestServer):
@@ -171,16 +171,16 @@ class TestOIDCBasicIntegration:
 
         auth_response = await oidc_server.client.get("/api/v1/oauth/authorize", params=auth_params)
 
-        # Should be rejected (401 because authentication is checked before parameter validation)
-        await auth_response.expect_status(401)
+        # Should be rejected with 400 (OAuth compliant error)
+        await auth_response.expect_status(400)
 
         # Test hybrid flow (not supported)
         auth_params["response_type"] = "code id_token"
 
         auth_response = await oidc_server.client.get("/api/v1/oauth/authorize", params=auth_params)
 
-        # Should be rejected (401 because authentication is checked before parameter validation)
-        await auth_response.expect_status(401)
+        # Should be rejected with 400 (OAuth compliant error)
+        await auth_response.expect_status(400)
 
     @pytest.mark.asyncio
     async def test_authorization_code_grant_recognized(self, oidc_server: AsyncTestServer):
@@ -202,9 +202,10 @@ class TestOIDCBasicIntegration:
         # Should not be "unsupported grant type" error - should be 400 (Bad Request) for invalid authorization code
         await token_response.expect_status(400)
 
-        # Should fail with specific authorization code error
-        error_text = await token_response.text()
-        assert "authorization code" in error_text.lower() or "invalid" in error_text.lower()
+        # Should fail with OAuth error format
+        error_data = await token_response.json()
+        assert error_data.get("error") in ["invalid_grant", "invalid_request"]
+        assert "error_description" in error_data
 
     @pytest.mark.asyncio
     async def test_endpoint_integration_consistency(self, oidc_server: AsyncTestServer):

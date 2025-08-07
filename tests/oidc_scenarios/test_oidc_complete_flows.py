@@ -201,9 +201,11 @@ class TestOIDCAuthorizationCodeFlow:
             "code_challenge_method": "S256",
         }
 
-        # The authorization endpoint requires user authentication. Without authentication, it should return 401 Unauthorized
-        auth_response = await oidc_server.client.get("/api/v1/oauth/authorize", params=auth_params)
-        await auth_response.expect_status(401)
+        # The authorization endpoint redirects with error when not authenticated
+        auth_response = await oidc_server.client.get(
+            "/api/v1/oauth/authorize", params=auth_params, follow_redirects=False
+        )
+        await auth_response.expect_status(302)  # OAuth 2.0 redirects with error
 
         # Step 2: Get authorization code through proper OAuth flow
         auth_code = await self._get_authorization_code_through_proper_flow(
@@ -317,9 +319,11 @@ class TestOIDCAuthorizationCodeFlow:
             "code_challenge_method": "S256",
         }
 
-        # The authorization endpoint requires user authentication. Without authentication, it should return 401 Unauthorized
-        auth_response = await oidc_server.client.get("/api/v1/oauth/authorize", params=auth_params)
-        await auth_response.expect_status(401)
+        # The authorization endpoint redirects with error when not authenticated
+        auth_response = await oidc_server.client.get(
+            "/api/v1/oauth/authorize", params=auth_params, follow_redirects=False
+        )
+        await auth_response.expect_status(302)  # OAuth 2.0 redirects with error
 
         # Step 2: Get authorization code through proper OAuth flow
         auth_code = await self._get_authorization_code_through_proper_flow(
@@ -399,9 +403,11 @@ class TestOIDCAuthorizationCodeFlow:
             "code_challenge_method": "S256",
         }
 
-        # The authorization endpoint requires user authentication. Without authentication, it should return 401 Unauthorized
-        auth_response = await oidc_server.client.get("/api/v1/oauth/authorize", params=auth_params)
-        await auth_response.expect_status(401)
+        # The authorization endpoint redirects with error when not authenticated
+        auth_response = await oidc_server.client.get(
+            "/api/v1/oauth/authorize", params=auth_params, follow_redirects=False
+        )
+        await auth_response.expect_status(302)  # OAuth 2.0 redirects with error
 
         # Step 2: Get authorization code through proper OAuth flow
         auth_code = await self._get_authorization_code_through_proper_flow(
@@ -464,9 +470,11 @@ class TestOIDCAuthorizationCodeFlow:
             "login_hint": "test@example.com",
         }
 
-        # The authorization endpoint requires user authentication. Without authentication, it should return 401 Unauthorized
-        auth_response = await oidc_server.client.get("/api/v1/oauth/authorize", params=auth_params)
-        await auth_response.expect_status(401)
+        # The authorization endpoint redirects with error when not authenticated
+        auth_response = await oidc_server.client.get(
+            "/api/v1/oauth/authorize", params=auth_params, follow_redirects=False
+        )
+        await auth_response.expect_status(302)  # OAuth 2.0 redirects with error
 
         # Step 2: Get authorization code through proper OAuth flow
         auth_code = await self._get_authorization_code_through_proper_flow(
@@ -528,9 +536,11 @@ class TestOIDCAuthorizationCodeFlow:
             "code_challenge_method": "S256",
         }
 
-        # The authorization endpoint requires user authentication. Without authentication, it should return 401 Unauthorized
-        auth_response = await oidc_server.client.get("/api/v1/oauth/authorize", params=auth_params)
-        await auth_response.expect_status(401)
+        # The authorization endpoint redirects with error when not authenticated
+        auth_response = await oidc_server.client.get(
+            "/api/v1/oauth/authorize", params=auth_params, follow_redirects=False
+        )
+        await auth_response.expect_status(302)  # OAuth 2.0 redirects with error
 
         # Step 2: Get authorization code through proper OAuth flow
         auth_code = await self._get_authorization_code_through_proper_flow(
@@ -717,9 +727,11 @@ class TestOIDCFlowIntegration:
             "code_challenge_method": "S256",
         }
 
-        # The authorization endpoint requires user authentication. Without authentication, it should return 401 Unauthorized
-        auth_response = await oidc_server.client.get("/api/v1/oauth/authorize", params=auth_params)
-        await auth_response.expect_status(401)
+        # The authorization endpoint redirects with error when not authenticated
+        auth_response = await oidc_server.client.get(
+            "/api/v1/oauth/authorize", params=auth_params, follow_redirects=False
+        )
+        await auth_response.expect_status(302)  # OAuth 2.0 redirects with error
 
         # Step 2: Get authorization code through proper OAuth flow
         # Note: This test is in TestOIDCFlowIntegration, so we need to add the helper method
