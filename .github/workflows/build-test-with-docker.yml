@@ -112,7 +112,7 @@ jobs:
         curl -f http://localhost:8000/.well-known/oauth-authorization-server || exit 1
         
         # Test OIDC discovery endpoint
-        curl -f http://localhost:8000/.well-known/openid_configuration || exit 1
+        curl -f http://localhost:8000/.well-known/openid-configuration || exit 1
         
         # Test JWKS endpoint
         curl -f http://localhost:8000/.well-known/jwks.json || exit 1
@@ -222,7 +222,7 @@ jobs:
         endpoints=(
           "/health"
           "/.well-known/oauth-authorization-server"
-          "/.well-known/openid_configuration"
+          "/.well-known/openid-configuration"
           "/.well-known/jwks.json"
           "/api/v1/oauth/authorize"
         )
