@@ -60,11 +60,11 @@ This tests SPECIFICATION COMPLIANCE only, not business functionality.
 | Token Error Status | True | ✅ PASS |
 | Token Error Format | False | ❌ FAIL |
 | Token Error Code Valid | False | ❌ FAIL |
-| Auth Error Handling | False | ❌ FAIL |
+| Auth Error Handling | True | ✅ PASS |
 | Userinfo Requires Auth | True | ✅ PASS |
 | Userinfo Www Authenticate | True | ✅ PASS |
 
-**Category Score: 3/6 (50%)**
+**Category Score: 4/6 (67%)**
 
 ### Security
 
@@ -72,11 +72,11 @@ This tests SPECIFICATION COMPLIANCE only, not business functionality.
 |-------|--------|--------|
 | Pkce Enforced | True | ✅ PASS |
 | Pkce S256 Available | True | ✅ PASS |
-| Auth Validates Params | True | ✅ PASS |
+| Auth Validates Params | False | ❌ FAIL |
 | Supports Rs256 | True | ✅ PASS |
 | Supports None Alg | False | ❌ FAIL |
 
-**Category Score: 4/5 (80%)**
+**Category Score: 3/5 (60%)**
 
 
 ## Overall Conformance Score

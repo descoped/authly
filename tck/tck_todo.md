@@ -1,9 +1,9 @@
 # OIDC TCK Task List
 
 **Created**: 2025-08-06  
-**Updated**: 2025-08-06 (v002)  
+**Updated**: 2025-08-07 (v003)  
 **Purpose**: Track OIDC conformance testing tasks and implementation requirements  
-**Status**: 🚧 In Progress
+**Status**: 🚧 Working towards 100% compliance
 
 ---
 
@@ -11,14 +11,16 @@
 
 - [x] **Phase 1**: Infrastructure Setup ✅ COMPLETED
 - [x] **Phase 2**: Basic Conformance Testing ✅ COMPLETED
-- [ ] **Phase 3**: Full Conformance Suite (IN PROGRESS)
-- [ ] **Phase 4**: Fix Identified Issues
+- [x] **Phase 3**: CI/CD Integration ✅ COMPLETED
+- [ ] **Phase 4**: Fix Identified Issues (IN PROGRESS - 90% → 100%)
 - [ ] **Phase 5**: Official Certification
 
-## 🎯 Compliance Scores (v002)
-- **OIDC Core**: 87% compliant ↑
-- **OAuth 2.0**: 25% compliant ↓
-- **OAuth 2.1**: 100% compliant ✅
+## 🎯 Compliance Scores (v003 - Latest Report)
+- **Discovery**: 100% compliant (22/22) ✅
+- **JWKS**: 100% compliant (7/7) ✅
+- **Endpoints**: 67% compliant (4/6) ⚠️
+- **Security**: 60% compliant (3/5) ⚠️
+- **OVERALL**: 90% compliant (36/40) 🎯
 
 ---
 
@@ -91,29 +93,33 @@
   - [ ] Run conformance tests
   - [ ] Document results
 
-### Known Issues to Fix (4 Critical for Certification)
+### 🔥 Current Issues to Fix (90% → 100% Compliance)
 
-#### 🚨 Critical Endpoint Issues
-- [ ] **Discovery endpoint URL violation**
-  - Current: `/.well-known/openid_configuration` (underscore)
-  - Required: `/.well-known/openid-configuration` (hyphen)
-  - File: `/src/authly/api/oidc_router.py` line 55
-  - Impact: BLOCKS CERTIFICATION
+Based on the latest conformance report, we have **4 failing checks** to address:
+
+#### Issue 1: Token Endpoint Error Response Format ❌ (2 failures)
+- [ ] **Change HTTPException to return OAuth-compliant JSON**
+  - Current: `HTTPException(detail="Invalid authorization code")` returns `{"detail": "..."}`
+  - Required: Must return `{"error": "invalid_grant", "error_description": "Invalid authorization code"}`
+  - Files to fix: `/src/authly/api/oauth_router.py` (lines 358, 708, 895)
+  - OAuth error codes needed: 
+    - Line 358: `invalid_request`
+    - Line 708: `invalid_grant` 
+    - Line 895: `unsupported_grant_type`
   
-- [ ] **Token endpoint content-type**
-  - Current: Only accepts `application/json`
-  - Required: Must accept `application/x-www-form-urlencoded`
-  - Impact: BLOCKS CERTIFICATION
-  
-- [ ] **Token endpoint error codes**
-  - Current: Returns 422 for malformed requests
-  - Expected: Return 400 Bad Request per OAuth spec
-  - Solution: Adjust validation error response codes
-  
-- [ ] **Authorization endpoint authentication**
-  - Current: Returns 401 Unauthorized for unauthenticated requests
-  - Expected: Redirect to login page (302/303) with error parameters
-  - Note: This is API-first behavior, needs adjustment for OAuth flows
+#### Issue 2: Authorization Endpoint Parameter Validation ❌ (1 failure)
+- [ ] **Add comprehensive parameter validation**
+  - Current: Basic validation only
+  - Required: Validate all OAuth required parameters before processing
+  - Files to fix: `/src/authly/api/oauth_router.py` (authorize endpoint ~line 300)
+  - Must validate: `response_type`, `client_id`, `redirect_uri` match, `scope` format
+
+#### Issue 3: Security - 'none' Algorithm Check ❌ (1 false positive in validator)
+- [ ] **Fix validator logic bug**
+  - Current: `Supports None Alg: False → ❌ FAIL` (incorrect logic)
+  - Expected: NOT supporting 'none' should show as `✅ PASS`
+  - File to fix: `/tck/scripts/conformance-validator.py`
+  - This is a validator bug, Authly correctly rejects 'none' algorithm
 
 #### Working Features ✅
 - [x] PKCE is properly enforced (returns 401 without PKCE)
@@ -143,59 +149,76 @@
 
 ---
 
-## 🎯 Next Immediate Actions
+## 🎯 Development Workflow (90% → 100% Compliance)
 
-1. **Fix Critical OIDC Spec Violations** (BLOCKS CERTIFICATION)
-   ```bash
-   # Fix discovery endpoint URL in /src/authly/api/oidc_router.py
-   # Change: /.well-known/openid_configuration
-   # To:     /.well-known/openid-configuration
-   ```
+### Step 1: Understand Existing Test Coverage
+```bash
+# Review existing TCK tests that already check for these issues
+cat tests/tck/test_conformance_fixes.py
 
-2. **Fix Token Endpoint Content-Type**
-   ```bash
-   # Update token endpoint to accept form-encoded data
-   # Currently only accepts application/json
-   # Must accept: application/x-www-form-urlencoded
-   ```
+# Check existing OAuth flow tests
+grep -r "error" tests/oauth_flows/
+grep -r "token.*error" tests/
 
-3. **Generate New Conformance Report After Fixes**
-   ```bash
-   cd tck
-   python scripts/generate-conformance-report.py post_fixes
-   ```
+# Run existing TCK tests to see current state
+pytest tests/tck/ -v
+```
 
-4. **Access Conformance Suite Web UI**
-   ```bash
-   # Open in browser
-   open https://localhost:9443
-   # Or use curl to test
-   curl -k https://localhost:9443
-   ```
+### Step 2: Fix Token Endpoint Error Responses
+```python
+# In /src/authly/api/oauth_router.py
+# Update error responses to return proper OAuth format:
+# {"error": "invalid_grant", "error_description": "The provided authorization grant is invalid"}
+# Standard error codes: invalid_request, invalid_client, invalid_grant, 
+#                      unauthorized_client, unsupported_grant_type
+```
 
-3. **Create Test User via Database**
-   ```sql
-   INSERT INTO users (username, email, password_hash, is_active)
-   VALUES ('test_user', 'test@example.com', 
-           '$2b$12$...', true);
-   ```
+### Step 3: Validate Code Quality & Run Tests
+```bash
+# Check code quality with ruff
+ruff check src/authly/api/oauth_router.py
 
-3. **Test Login Endpoint**
-   ```bash
-   curl -X POST http://localhost:8000/api/v1/auth/login \
-     -H "Content-Type: application/json" \
-     -d '{"username":"test_user","password":"test123"}'
-   ```
+# Run existing TCK conformance tests
+pytest tests/tck/test_conformance_fixes.py -v
 
-4. **Fix Critical Issues**
-   - Implement user registration endpoint or document workaround
-   - Adjust token endpoint error codes (422 → 400)
-   - Consider adding redirect-based authorization flow
+# Run OAuth flow tests
+pytest tests/oauth_flows/ -v
 
-5. **Run Updated Tests**
-   ```bash
-   pytest tck/tests/ -v --tb=short
-   ```
+# No need to write new tests - use existing ones
+```
+
+### Step 4: Rebuild and Test Conformance
+```bash
+# Rebuild Docker image with fixes
+docker compose build authly
+docker compose up -d
+
+# Run conformance validator
+cd tck && make validate
+
+# Check if we reached 100%
+cat reports/latest/SPECIFICATION_CONFORMANCE.md
+```
+
+### Step 5: Review With Tech Lead
+- Share the updated conformance report
+- Review code changes together
+- Ensure existing tests still pass
+- Validate error handling matches OAuth 2.0 spec
+
+### Step 6: Final Validation
+```bash
+# Run full test suite to ensure no regressions
+pytest tests/ -v
+
+# Clean rebuild and final conformance check
+docker compose down -v
+docker compose build authly --no-cache
+docker compose up -d
+cd tck && make validate
+
+# Should show 40/40 checks passed (100%)
+```
 
 ---
 

@@ -38,14 +38,14 @@
     "token_error_status": true,
     "token_error_format": false,
     "token_error_code_valid": false,
-    "auth_error_handling": false,
+    "auth_error_handling": true,
     "userinfo_requires_auth": true,
     "userinfo_www_authenticate": true
   },
   "security": {
     "pkce_enforced": true,
     "pkce_s256_available": true,
-    "auth_validates_params": true,
+    "auth_validates_params": false,
     "supports_rs256": true,
     "supports_none_alg": false
   }
