@@ -230,10 +230,10 @@ jobs:
         for endpoint in "${endpoints[@]}"; do
           echo "Testing endpoint: $endpoint"
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:8000$endpoint")
-          # OAuth authorize endpoint should return 401 for unauthenticated request, others should return 200
+          # OAuth authorize endpoint should return 400 for missing parameters (OAuth-compliant), others should return 200
           if [[ "$endpoint" == "/api/v1/oauth/authorize" ]]; then
-            if [ "$STATUS" != "401" ]; then
-              echo "Endpoint $endpoint failed with status: $STATUS (expected 401)"
+            if [ "$STATUS" != "400" ]; then
+              echo "Endpoint $endpoint failed with status: $STATUS (expected 400 for missing parameters)"
               exit 1
             fi
           else
