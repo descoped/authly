@@ -3,7 +3,7 @@ version: '3.8'
 services:
   # PostgreSQL for conformance suite data storage
   conformance-db:
-    image: postgres:16-alpine
+    image: postgres:17-alpine
     environment:
       POSTGRES_DB: conformance
       POSTGRES_USER: conformance
@@ -20,7 +20,7 @@ services:
 
   # MongoDB for conformance suite results storage
   conformance-mongo:
-    image: mongo:7
+    image: mongo:8
     environment:
       MONGO_INITDB_ROOT_USERNAME: admin
       MONGO_INITDB_ROOT_PASSWORD: admin
@@ -111,7 +111,7 @@ services:
 
   # PostgreSQL for Authly (when running in Docker)
   authly-db:
-    image: postgres:16-alpine
+    image: postgres:17-alpine
     environment:
       POSTGRES_DB: authly
       POSTGRES_USER: authly
