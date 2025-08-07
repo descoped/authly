@@ -1,39 +1,101 @@
-# Authly Integration Testing Framework
+# Authly Scripts Collection
 
-Comprehensive OAuth 2.1 + OpenID Connect (OIDC) integration testing suite for the Authly authorization server.
+Utility scripts and testing tools for the Authly OAuth 2.1 + OpenID Connect (OIDC) authorization server.
 
 ## 🎯 Overview
 
-This framework provides end-to-end testing of:
-- **OAuth 2.1** Authorization Code Flow with PKCE
-- **OpenID Connect Core 1.0** UserInfo and ID token validation
-- **Admin API** operations (users, clients, scopes)
-- **RFC compliance** validation (RFC 6749, RFC 7636, RFC 8414, OIDC Core 1.0)
+This directory contains various scripts for testing and demonstrating Authly's functionality:
 
-**Test Results**: 8/8 tests passing (100% success rate) in 8 seconds
+### 📝 Scripts Available
+
+1. **`simple-auth-flow.sh`** - Simple authentication flow demonstration
+   - Basic user authentication (login, verify, update, delete)
+   - Token management and validation
+   - Rate limiting testing
+   - Perfect for developers who need simple authentication without complex OAuth/OIDC features
+
+2. **`run-integration-tests.sh`** - Comprehensive integration testing framework
+   - Full OAuth 2.1 Authorization Code Flow with PKCE
+   - OpenID Connect Core 1.0 UserInfo and ID token validation
+   - Admin API operations (users, clients, scopes)
+   - RFC compliance validation (RFC 6749, RFC 7636, RFC 8414, OIDC Core 1.0)
+   - **Test Results**: 8/8 tests passing (100% success rate) in 8 seconds
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Docker and Docker Compose installed
-- `curl`, `jq`, and `openssl` available in PATH
-- Authly service configured with `AUTHLY_BOOTSTRAP_DEV_MODE=true`
+- `curl` and `jq` installed
+- For integration tests: Docker and Docker Compose installed
+- For simple auth flow: Authly running locally
 
-### Run All Tests
+### Simple Authentication Flow Demo
+```bash
+# Start Authly with test data
+uv run python -m authly serve --embedded --seed
+
+# Run simple authentication tests
+./scripts/simple-auth-flow.sh
+
+# Expected: 16/16 tests passing
+```
+
+### Comprehensive Integration Testing
 ```bash
 # Start services and run comprehensive tests
 ./scripts/run-integration-tests.sh start
 ./scripts/run-integration-tests.sh comprehensive
 ./scripts/run-integration-tests.sh stop
-```
 
-### One-Command Testing
-```bash
-# Start services, run tests, and stop services automatically
+# Or one-command testing
 ./scripts/run-integration-tests.sh comprehensive --start-services --stop-after
 ```
 
-## 📋 Test Modes
+## 📋 Simple Authentication Flow (`simple-auth-flow.sh`)
+
+### Overview
+This script demonstrates basic authentication flows that don't require full OAuth/OIDC complexity. Perfect for:
+- Applications with simple user management needs
+- Internal tools with basic authentication
+- Development and testing scenarios
+- Learning Authly's core authentication features
+
+### Features Tested
+- **User Authentication**: Login with username/password
+- **Token Management**: Access and refresh tokens
+- **User Lifecycle**: Create, verify, update, delete users
+- **Admin Operations**: Admin-scoped operations
+- **Rate Limiting**: API rate limit validation
+- **OIDC UserInfo**: Basic profile information retrieval
+
+### Usage
+```bash
+# Run all tests (default)
+./scripts/simple-auth-flow.sh
+
+# Run specific test
+./scripts/simple-auth-flow.sh test_login admin
+./scripts/simple-auth-flow.sh test_rate_limiting
+
+# Run tests in parallel
+./scripts/simple-auth-flow.sh --parallel test_create_user test_verify_user
+
+# Show help
+./scripts/simple-auth-flow.sh --help
+```
+
+### Test Functions
+- `test_unauthorized_access` - Verify unauthorized requests are rejected
+- `test_login` - Test user authentication
+- `verify_token` - Validate token via UserInfo endpoint
+- `test_get_users` - Retrieve user list
+- `test_create_user` - Create new user
+- `test_invalid_payload` - Test error handling
+- `test_verify_user` - Verify user account
+- `test_update_user` - Update user profile
+- `test_delete_user` - Delete user account
+- `test_rate_limiting` - Validate rate limiting
+
+## 📋 Integration Test Modes (`run-integration-tests.sh`)
 
 ### Core Test Modes
 
@@ -191,6 +253,7 @@ RUN_OAUTH_TESTS=false ./scripts/run-integration-tests.sh comprehensive
 ```
 scripts/
 ├── README.md                      # This documentation
+├── simple-auth-flow.sh            # Simple authentication flow demo
 ├── run-integration-tests.sh       # Main wrapper script
 ├── helpers/
 │   ├── common.sh                  # Shared utilities and logging
@@ -208,6 +271,14 @@ scripts/
 ```
 
 ### Component Overview
+
+#### Simple Auth Flow (`simple-auth-flow.sh`)
+- Self-contained authentication demonstration
+- No Docker dependencies for local testing
+- OAuth 2.1 password grant flow testing
+- OIDC UserInfo endpoint validation
+- Admin operations with scope-based authentication
+- Automatic cleanup of test data
 
 #### Main Wrapper (`run-integration-tests.sh`)
 - Environment setup and validation

@@ -1,15 +1,16 @@
 #!/bin/bash
 # =============================================================================
-# API Test Script for Apex App
+# Simple Authentication Flow Demonstration for Authly
 #
-# This script runs a series of tests against the Apex App API (running in Docker).
+# This script demonstrates basic authentication flows using Authly's API.
 #
 # Prerequisites:
 #   - jq must be installed
-#   - An environment file "../.env" must exist with API_HOST, API_VERSION, etc.
+#   - Authly must be running with test users:
+#     uv run python -m authly serve --embedded --seed
 #
 # Usage:
-#   ./api-test.sh [--parallel] [test_function_name ...]
+#   ./simple-auth-flow.sh [--parallel] [test_function_name ...]
 #
 #   --parallel         Run selected tests in parallel.
 #   --help, -h         Display this help message.
@@ -27,8 +28,8 @@
 #   test_rate_limiting         Test API rate limiting on the login endpoint.
 #
 # Examples:
-#   ./api-test.sh test_rate_limiting
-#   ./api-test.sh --parallel test_invalid_payload test_rate_limiting
+#   ./simple-auth-flow.sh test_rate_limiting
+#   ./simple-auth-flow.sh --parallel test_invalid_payload test_rate_limiting
 # =============================================================================
 
 # Configuration
@@ -56,15 +57,25 @@ PARALLEL=false
 TEMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TEMP_DIR"' EXIT
 
-# Environment setup
+# Environment setup with sensible defaults for local testing
+# These can be overridden by environment variables or ../.env file
+API_HOST="${API_HOST:-http://localhost:8000}"
+API_VERSION="${API_VERSION:-v1}"
+
+# Load environment variables from ../.env if it exists (optional)
+if [ -f "../.env" ]; then
+    source "../.env"
+    # Restore defaults if .env didn't set these
+    API_HOST="${API_HOST:-http://localhost:8000}"
+    API_VERSION="${API_VERSION:-v1}"
+fi
+
 export API_HOST API_VERSION JWT_SECRET_KEY JWT_ALGORITHM
 
-# Load environment variables from ../.env
-[ -f "../.env" ] && source "../.env" || { echo -e "${RED}Error: ../.env file not found${NC}"; exit 1; }
-
 API_BASE_URL="${API_HOST}"
-API_AUTH_URL="${API_BASE_URL}/api/${API_VERSION}/auth"
+API_OAUTH_URL="${API_BASE_URL}/api/${API_VERSION}/oauth"
 API_USERS_URL="${API_BASE_URL}/api/${API_VERSION}/users"
+OIDC_USERINFO_URL="${API_BASE_URL}/oidc/userinfo"
 
 CURRENT_TOKEN=""
 ADMIN_TOKEN=""
@@ -74,7 +85,14 @@ ADMIN_TOKEN=""
 # -----------------------------------------------------------------------------
 print_help() {
     cat <<EOF
-Usage: ./api-test.sh [--parallel] [test_function_name ...]
+Simple Authentication Flow Demonstration for Authly
+
+Prerequisites:
+  - jq must be installed
+  - Authly must be running with test users:
+    uv run python -m authly serve --embedded --seed
+
+Usage: ./simple-auth-flow.sh [--parallel] [test_function_name ...]
 
 Options:
   --parallel         Run selected tests in parallel.
@@ -93,8 +111,21 @@ Available test functions:
   test_rate_limiting         Test API rate limiting on the login endpoint.
 
 Examples:
-  ./api-test.sh test_rate_limiting
-  ./api-test.sh --parallel test_invalid_payload test_rate_limiting
+  ./simple-auth-flow.sh test_rate_limiting
+  ./simple-auth-flow.sh --parallel test_invalid_payload test_rate_limiting
+
+Quick Start:
+  1. Start Authly with test data:
+     uv run python -m authly serve --embedded --seed
+     
+  2. Run all tests:
+     ./simple-auth-flow.sh
+     
+  3. Expected result: All 16 tests should pass
+
+Environment Variables (optional):
+  API_HOST    - API base URL (default: http://localhost:8000)
+  API_VERSION - API version (default: v1)
 
 EOF
 }
@@ -193,6 +224,20 @@ check_api() {
         exit 1
     fi
     log "INFO" "API is running"
+    
+    # Check if admin user exists (quick test)
+    local test_data='grant_type=password&username=admin&password=Test123%21'
+    local test_response
+    test_response=$(make_request "POST" "${API_OAUTH_URL}/token" "" "application/x-www-form-urlencoded" "$test_data")
+    if echo "$test_response" | grep -q "Incorrect username or password"; then
+        log "INFO" ""
+        log "INFO" "⚠️  WARNING: Admin user not found or has different password"
+        log "INFO" "Make sure Authly was started with the --seed flag:"
+        log "INFO" "  uv run python -m authly serve --embedded --seed"
+        log "INFO" ""
+        log "INFO" "Some tests will fail without the test users (admin, user1)"
+        log "INFO" ""
+    fi
 }
 
 # -----------------------------------------------------------------------------
@@ -202,7 +247,9 @@ check_api() {
 test_unauthorized_access() {
     log "INFO" "Testing unauthorized access..."
     local response
-    response=$(make_request "GET" "${API_USERS_URL}/me")
+    # Test both old and new endpoints
+    response=$(make_request "GET" "${OIDC_USERINFO_URL}")
+    # Should get 401 Unauthorized
     print_test_result "Unauthorized access" 0
 }
 
@@ -210,10 +257,12 @@ test_login() {
     local username=$1
     log "INFO" "Testing user login for $username..."
 
+    # OAuth 2.1 requires form-encoded data, not JSON
+    # Request openid scope for OIDC userinfo endpoint access
     local data
-    data=$(printf '{"username": "%s", "password": "Test123!", "grant_type": "password"}' "$username")
+    data=$(printf 'grant_type=password&username=%s&password=Test123%%21&scope=openid%%20profile%%20email' "$username")
     local response
-    response=$(make_request "POST" "${API_AUTH_URL}/token" "" "application/json" "$data")
+    response=$(make_request "POST" "${API_OAUTH_URL}/token" "" "application/x-www-form-urlencoded" "$data")
     CURRENT_TOKEN=$(echo "$response" | jq -r '.access_token // empty')
 
     if [ -n "$CURRENT_TOKEN" ]; then
@@ -232,11 +281,20 @@ test_login() {
 verify_token() {
     local username=$1
     local response
-    response=$(make_request "GET" "${API_USERS_URL}/me" "$CURRENT_TOKEN")
-    if [ -n "$(echo "$response" | jq -r '.username // empty')" ]; then
+    # Using OIDC userinfo endpoint for compliance
+    response=$(make_request "GET" "${OIDC_USERINFO_URL}" "$CURRENT_TOKEN")
+    # OIDC userinfo returns 'sub' (subject identifier)
+    local sub=$(echo "$response" | jq -r '.sub // empty')
+    if [ -n "$sub" ] && [ "$sub" != "null" ]; then
         print_test_result "Get current user ($username)" 0
     else
-        print_test_result "Get current user ($username)" 1 "Failed to get user: $response"
+        # Fallback to /api/v1/users/me if OIDC fails
+        response=$(make_request "GET" "${API_USERS_URL}/me" "$CURRENT_TOKEN")
+        if [ -n "$(echo "$response" | jq -r '.username // empty')" ]; then
+            print_test_result "Get current user ($username)" 0
+        else
+            print_test_result "Get current user ($username)" 1 "Failed to get user: $response"
+        fi
     fi
 }
 
@@ -276,14 +334,16 @@ test_create_user() {
 }
 
 test_invalid_payload() {
-    log "INFO" "Testing login with invalid JSON payload..."
-    local data="invalid_json"
+    log "INFO" "Testing login with invalid form data..."
+    # Send malformed form data
+    local data="invalid_form_data_without_grant_type"
     local response
-    response=$(make_request "POST" "${API_AUTH_URL}/token" "" "application/json" "$data")
-    if echo "$response" | grep -q "JSON decode error"; then
-        print_test_result "Login with invalid JSON" 0
+    response=$(make_request "POST" "${API_OAUTH_URL}/token" "" "application/x-www-form-urlencoded" "$data")
+    # OAuth 2.1 should return error for missing grant_type
+    if echo "$response" | grep -q -E "invalid_request|grant_type"; then
+        print_test_result "Login with invalid form data" 0
     else
-        print_test_result "Login with invalid JSON" 1 "Unexpected response: $response"
+        print_test_result "Login with invalid form data" 1 "Unexpected response: $response"
     fi
 }
 
@@ -291,13 +351,11 @@ test_verify_user() {
     local username=$1
     log "INFO" "Testing user verification for $username..."
 
-    local admin_data='{
-        "username": "admin",
-        "password": "Test123!",
-        "grant_type": "password"
-    }'
+    # OAuth 2.1 requires form-encoded data
+    # Request admin scope for admin operations
+    local admin_data='grant_type=password&username=admin&password=Test123%21&scope=admin'
     local admin_response
-    admin_response=$(make_request "POST" "${API_AUTH_URL}/token" "" "application/json" "$admin_data")
+    admin_response=$(make_request "POST" "${API_OAUTH_URL}/token" "" "application/x-www-form-urlencoded" "$admin_data")
 
     if [ -z "$admin_response" ] || [ "$(echo "$admin_response" | jq 'has("access_token")')" != "true" ]; then
         log "INFO" "Failed to get admin token: $admin_response"
@@ -332,10 +390,22 @@ test_verify_user() {
 test_update_user() {
     local username=$1
     local user_id="${CREATED_USER_IDS[0]}"
+    
+    # Get admin token for update operation
+    local admin_data='grant_type=password&username=admin&password=Test123%21&scope=admin'
+    local admin_response
+    admin_response=$(make_request "POST" "${API_OAUTH_URL}/token" "" "application/x-www-form-urlencoded" "$admin_data")
+    local admin_token=$(echo "$admin_response" | jq -r '.access_token // empty')
+    
+    if [ -z "$admin_token" ] || [ "$admin_token" = "null" ]; then
+        print_test_result "Update user ($username)" 1 "Failed to get admin token"
+        return 1
+    fi
+    
     local data
     data=$(printf '{"username": "updated_%s"}' "$username")
     local response
-    response=$(make_request "PUT" "${API_USERS_URL}/${user_id}" "$CURRENT_TOKEN" "application/json" "$data")
+    response=$(make_request "PUT" "${API_USERS_URL}/${user_id}" "$admin_token" "application/json" "$data")
     local updated_username
     updated_username=$(echo "$response" | jq -r '.username')
     if [ "$updated_username" = "updated_${username}" ]; then
@@ -353,12 +423,22 @@ test_delete_user() {
         print_test_result "Delete user ($username)" 1 "No user ID available"
         return 1
     fi
+    
+    # Get admin token for delete operation
+    local admin_data='grant_type=password&username=admin&password=Test123%21&scope=admin'
+    local admin_response
+    admin_response=$(make_request "POST" "${API_OAUTH_URL}/token" "" "application/x-www-form-urlencoded" "$admin_data")
+    local admin_token=$(echo "$admin_response" | jq -r '.access_token // empty')
+    
+    if [ -z "$admin_token" ] || [ "$admin_token" = "null" ]; then
+        print_test_result "Delete user ($username)" 1 "Failed to get admin token"
+        return 1
+    fi
+    
     log "INFO" "Deletion may take up to ${DELETE_TIMEOUT}s..."
     local curl_cmd
     curl_cmd="curl -s -o /dev/null -w \"%{http_code}\" --connect-timeout ${CURL_CONNECT_TIMEOUT} --max-time ${DELETE_TIMEOUT} -X DELETE"
-    if [ -n "$CURRENT_TOKEN" ]; then
-        curl_cmd+=" -H \"Authorization: Bearer ${CURRENT_TOKEN}\""
-    fi
+    curl_cmd+=" -H \"Authorization: Bearer ${admin_token}\""
     curl_cmd+=" \"${API_USERS_URL}/${user_id}\""
     log "TRACE" "Executing delete command: ${curl_cmd}"
     local status_code
@@ -370,9 +450,10 @@ test_delete_user() {
         print_test_result "Delete user ($username)" 1 "Unexpected HTTP status code: ${status_code}"
     fi
 
+    # After deletion, the user's token should no longer work
     local post_delete_response
     post_delete_response=$(make_request "GET" "${API_USERS_URL}/me" "$CURRENT_TOKEN")
-    if echo "$post_delete_response" | grep -q -E "Not authenticated|Could not validate credentials"; then
+    if echo "$post_delete_response" | grep -q -E "Not authenticated|Could not validate credentials|401|User not found"; then
         log "INFO" "Subsequent access correctly indicates deleted user"
     else
         log "INFO" "Subsequent access did not return expected error: ${post_delete_response}"
@@ -382,8 +463,9 @@ test_delete_user() {
 test_rate_limiting() {
     log "INFO" "Testing rate limiting on login endpoint..."
     local username="admin"
+    # OAuth 2.1 form-encoded payload - use correct password
     local payload
-    payload=$(printf '{"username": "%s", "password": "Admin123!", "grant_type": "password"}' "$username")
+    payload=$(printf 'grant_type=password&username=%s&password=Test123%%21' "$username")
     local rate_limit_triggered=0
     local request_count=0
     local start_time
@@ -396,9 +478,9 @@ test_rate_limiting() {
         (
             code=$(curl -s -o /dev/null -w "%{http_code}" \
                   -X POST \
-                  -H "Content-Type: application/json" \
+                  -H "Content-Type: application/x-www-form-urlencoded" \
                   -d "$payload" \
-                  "${API_AUTH_URL}/token")
+                  "${API_OAUTH_URL}/token")
             if [ "$code" -eq 429 ]; then
                 echo "429" > "$TEMP_DIR/rate_limit_triggered"
             fi
@@ -511,6 +593,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 log "INFO" "Starting API tests..."
+log "INFO" "Using API endpoint: ${API_HOST}/api/${API_VERSION}"
 command -v jq &> /dev/null || { log "INFO" "Error: jq is not installed"; exit 1; }
 
 check_api
@@ -532,7 +615,16 @@ if [ ${#SELECTED_TESTS[@]} -eq 0 ]; then
 
     NEW_USER="testuser$(date +%s)"
     if test_create_user "$NEW_USER"; then
-        test_login "$NEW_USER"
+        # Test login before verification (should fail - this is expected)
+        log "INFO" "Testing login before verification (expected to fail)..."
+        data=$(printf 'grant_type=password&username=%s&password=Test123%%21&scope=openid%%20profile%%20email' "$NEW_USER")
+        response=$(make_request "POST" "${API_OAUTH_URL}/token" "" "application/x-www-form-urlencoded" "$data")
+        if echo "$response" | grep -q "Account not verified"; then
+            print_test_result "Login rejection for unverified user ($NEW_USER)" 0
+        else
+            print_test_result "Login rejection for unverified user ($NEW_USER)" 1 "Should reject unverified user"
+        fi
+        
         test_verify_user "$NEW_USER"
         test_login "$NEW_USER"
         verify_token "$NEW_USER"

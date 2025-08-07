@@ -110,7 +110,7 @@ async def run_embedded_server(host: str = "0.0.0.0", port: int = 8000, seed: boo
 
     # Add volume mapping for SQL initialization scripts
     postgres.with_volume_mapping(
-        str(find_root_folder() / "docker"),
+        str(find_root_folder() / "docker-postgres"),
         "/docker-entrypoint-initdb.d",
     )
 
