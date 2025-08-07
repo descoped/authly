@@ -3,7 +3,7 @@
 # Target: <100MB
 
 # Build stage for Python dependencies
-FROM python:3.12-alpine AS python-builder
+FROM python:3.13-alpine AS python-builder
 
 # Install build dependencies
 RUN apk add --no-cache gcc musl-dev libffi-dev postgresql16-dev linux-headers
@@ -25,7 +25,7 @@ RUN pip install --no-cache-dir --no-compile --user . && \
     find /root/.local -name "*.so" -exec strip {} \; 2>/dev/null || true
 
 # Download embedded PostgreSQL binaries
-FROM alpine:3.20 AS postgres-builder
+FROM alpine:3.22 AS postgres-builder
 RUN apk add --no-cache curl tar xz
 WORKDIR /postgres
 # Using embedded postgres binaries (smaller than full package)
@@ -33,7 +33,7 @@ RUN curl -L https://github.com/zonkyio/embedded-postgres-binaries/releases/downl
     tar xJ --strip-components=1
 
 # Final ultra-minimal stage
-FROM alpine:3.20
+FROM alpine:3.22
 
 # S6 Overlay version (minimal variant)
 ARG S6_OVERLAY_VERSION=3.2.0.2

@@ -12,7 +12,7 @@
 # - Use strong admin passwords
 
 # Build stage for Python dependencies using uv
-FROM python:3.12-alpine AS python-builder
+FROM python:3.13-alpine AS python-builder
 
 # Install build dependencies 
 RUN apk add --no-cache \
@@ -40,7 +40,7 @@ RUN uv sync --all-groups && \
     find .venv -type d -name "tests" -exec rm -rf {} + 2>/dev/null || true
 
 # Final stage - minimal runtime
-FROM alpine:3.20
+FROM alpine:3.22
 
 # S6 Overlay version
 ARG S6_OVERLAY_VERSION=3.2.0.2
