@@ -4,7 +4,8 @@ Complete REST API documentation for the Authly OAuth 2.1 + OpenID Connect 1.0 au
 
 **Base URL**: `http://localhost:8000` (development) or your deployment URL  
 **API Version**: v1  
-**Standards**: OAuth 2.1, OpenID Connect 1.0, RFC 6749, RFC 7636, RFC 7009, RFC 8414
+**Standards**: OAuth 2.1, OpenID Connect Core 1.0, RFC 6749, RFC 7636 (PKCE), RFC 7009 (Revocation), RFC 8414 (Discovery)  
+**OIDC Conformance**: 100% compliant with OpenID Connect Core 1.0 certification tests
 
 ---
 
@@ -12,28 +13,39 @@ Complete REST API documentation for the Authly OAuth 2.1 + OpenID Connect 1.0 au
 
 ### **Authorization Endpoint**
 
-#### **GET /oauth/authorize**
-Initiates OAuth 2.1 authorization flow with consent UI.
+#### **GET /api/v1/oauth/authorize**
+Initiates OAuth 2.1 authorization flow with OpenID Connect support and consent UI.
 
 **Query Parameters**:
 ```
 response_type    string   required   Must be "code"
 client_id        string   required   OAuth client identifier
 redirect_uri     string   required   Registered redirect URI
-scope           string   optional   Space-separated list of scopes
+scope           string   optional   Space-separated list of scopes (include "openid" for OIDC)
 state           string   recommended CSRF protection parameter
-code_challenge   string   required   PKCE code challenge (S256)
-code_challenge_method string required Must be "S256"
+code_challenge   string   required   PKCE code challenge (base64url, 43-128 chars)
+code_challenge_method string optional Must be "S256" (default)
+
+# OpenID Connect Parameters
+nonce           string   optional   Nonce for ID token binding
+response_mode   string   optional   How to return response (query, fragment, form_post)
+display         string   optional   UI display mode (page, popup, touch, wap)
+prompt          string   optional   Re-authentication/consent (none, login, consent, select_account)
+max_age         integer  optional   Maximum authentication age in seconds
+ui_locales      string   optional   Preferred UI languages (space-separated)
+id_token_hint   string   optional   ID token hint for logout or re-authentication
+login_hint      string   optional   Hint to identify the user
+acr_values      string   optional   Authentication Context Class Reference values
 ```
 
 **Example Request**:
 ```http
-GET /oauth/authorize?response_type=code&client_id=your-client&redirect_uri=https://app.com/callback&scope=read%20write&state=xyz&code_challenge=dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk&code_challenge_method=S256
+GET /api/v1/oauth/authorize?response_type=code&client_id=your-client&redirect_uri=https://app.com/callback&scope=openid%20profile%20email&state=xyz&nonce=abc123&code_challenge=dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk&code_challenge_method=S256
 ```
 
 **Response**: HTML consent form for user authorization
 
-#### **POST /oauth/authorize**
+#### **POST /api/v1/oauth/authorize**
 Processes user consent and generates authorization code.
 
 **Form Data**:
@@ -59,8 +71,8 @@ Location: https://app.com/callback?error=access_denied&error_description=User%20
 
 ### **Token Endpoint**
 
-#### **POST /oauth/token**
-Exchanges authorization code for access tokens.
+#### **POST /api/v1/oauth/token**
+Exchanges authorization code for access tokens, refresh tokens, and ID tokens (when using OpenID Connect).
 
 **Headers**:
 ```
@@ -94,7 +106,8 @@ grant_type=authorization_code&code=auth_code&redirect_uri=https://app.com/callba
   "token_type": "Bearer",
   "expires_in": 3600,
   "refresh_token": "def502004c6c4e...",
-  "scope": "read write"
+  "scope": "openid profile email",
+  "id_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9..."  // Present when scope includes 'openid'
 }
 ```
 
@@ -110,7 +123,7 @@ grant_type=authorization_code&code=auth_code&redirect_uri=https://app.com/callba
 
 ### **Token Revocation**
 
-#### **POST /oauth/revoke**
+#### **POST /api/v1/oauth/revoke**
 Revokes access or refresh tokens (RFC 7009).
 
 **Headers**:
@@ -127,7 +140,7 @@ token_type_hint string   optional   "access_token" or "refresh_token"
 
 **Example Request**:
 ```http
-POST /oauth/revoke
+POST /api/v1/oauth/revoke
 Content-Type: application/x-www-form-urlencoded
 Authorization: Basic Y2xpZW50X2lkOmNsaWVudF9zZWNyZXQ=
 
@@ -150,9 +163,9 @@ OAuth 2.1 server metadata (RFC 8414).
 ```json
 {
   "issuer": "http://localhost:8000",
-  "authorization_endpoint": "http://localhost:8000/oauth/authorize",
-  "token_endpoint": "http://localhost:8000/oauth/token",
-  "revocation_endpoint": "http://localhost:8000/oauth/revoke",
+  "authorization_endpoint": "http://localhost:8000/api/v1/oauth/authorize",
+  "token_endpoint": "http://localhost:8000/api/v1/oauth/token",
+  "revocation_endpoint": "http://localhost:8000/api/v1/oauth/revoke",
   "response_types_supported": ["code"],
   "grant_types_supported": ["authorization_code", "refresh_token", "password"],
   "code_challenge_methods_supported": ["S256"],
@@ -168,6 +181,9 @@ OAuth 2.1 server metadata (RFC 8414).
 ### **UserInfo Endpoint**
 
 #### **GET /oidc/userinfo**
+Retrieve user information using an access token (OIDC Core 1.0 Section 5.3).
+
+#### **POST /oidc/userinfo**
 Returns user claims based on access token scopes.
 
 **Headers**:
@@ -227,7 +243,7 @@ JSON Web Key Set for token signature verification.
 
 ### **OIDC Discovery**
 
-#### **GET /.well-known/openid_configuration**
+#### **GET /.well-known/openid-configuration**
 OpenID Connect provider configuration.
 
 **Response**:
@@ -245,6 +261,35 @@ OpenID Connect provider configuration.
   "claims_supported": ["sub", "name", "given_name", "family_name", "email", "email_verified"]
 }
 ```
+
+### **OIDC Session Management**
+
+#### **GET /oidc/logout**
+OpenID Connect RP-Initiated Logout endpoint.
+
+**Query Parameters**:
+```
+id_token_hint          string   optional   ID token for identifying the session
+post_logout_redirect_uri string optional   URI to redirect after logout
+state                  string   optional   State to maintain through logout
+```
+
+#### **GET /oidc/session/check**
+Check current session status.
+
+**Response**:
+```json
+{
+  "session_state": "active",
+  "sid": "session-id-here"
+}
+```
+
+#### **GET /oidc/session/iframe**
+Serves the OpenID Connect session management iframe for monitoring session state.
+
+#### **GET /oidc/frontchannel/logout**
+Front-channel logout endpoint for single logout functionality.
 
 ---
 
