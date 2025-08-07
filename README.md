@@ -27,7 +27,7 @@ Through systematic testing and validation, we've achieved 100% conformance with 
 
 **This project is a work in progress:**
 - Core OAuth 2.1 features are implemented with compliant error handling
-- OpenID Connect support with 100% conformance testing (40/40 checks pass)
+- [OpenID Connect support with 100% conformance testing](https://github.com/descoped/authly/actions/workflows/conformance-tests.yml) (40/40 checks pass)
 - OAuth 2.0 specification-compliant error responses
 - Suitable for development and testing environments
 - NOT recommended for production use without extensive testing and security audit
