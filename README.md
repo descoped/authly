@@ -156,7 +156,7 @@ docker run -p 8000:8000 descoped/authly:latest
 docker pull descoped/authly-standalone:latest
 docker run -it --rm -p 8000:8000 descoped/authly-standalone:latest
 
-# Enter Interactive Mode to access Authly Admin CLI
+# Enter Interactive Shell to access Authly Admin CLI + End-2-End Testing tools
 docker exec -it $(docker ps --filter "ancestor=descoped/authly-standalone" --format "{{.ID}}") /bin/bash
 
 # Using Docker Compose
