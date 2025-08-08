@@ -1,0 +1,168 @@
+name: Build PostgreSQL Cache
+
+on:
+  workflow_dispatch:
+    inputs:
+      pg_version:
+        description: 'PostgreSQL version to build (e.g., 17.2)'
+        required: false
+        default: '17.2'
+      alpine_version:
+        description: 'Alpine version (e.g., 3.22)'
+        required: false
+        default: '3.22'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: descoped/authly-postgres-builder
+
+jobs:
+  build-postgres-native:
+    name: Build PostgreSQL on ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+            arch: amd64
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm64  # Native ARM runner - no QEMU!
+            arch: arm64
+    
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
+    
+    outputs:
+      digest-amd64: ${{ steps.build.outputs.digest }}
+      digest-arm64: ${{ steps.build.outputs.digest }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set PostgreSQL version
+        id: version
+        run: |
+          PG_VERSION="${{ github.event.inputs.pg_version || '17.2' }}"
+          ALPINE_VERSION="${{ github.event.inputs.alpine_version || '3.22' }}"
+          echo "pg_version=${PG_VERSION}" >> $GITHUB_OUTPUT
+          echo "alpine_version=${ALPINE_VERSION}" >> $GITHUB_OUTPUT
+          echo "tag=postgres-builder-${PG_VERSION}-alpine${ALPINE_VERSION}" >> $GITHUB_OUTPUT
+          echo "🔨 Building PostgreSQL ${PG_VERSION} on Alpine ${ALPINE_VERSION} for ${{ matrix.arch }}"
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          # Use docker driver for native builds (no QEMU needed)
+          driver-opts: |
+            image=moby/buildkit:latest
+      
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Build and push PostgreSQL builder
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile.standalone
+          target: postgres-builder-build
+          platforms: ${{ matrix.platform }}
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.tag }}-${{ matrix.arch }}
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache-${{ matrix.arch }}
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache-${{ matrix.arch }},mode=max
+          outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
+      
+      - name: Export digest
+        run: |
+          mkdir -p /tmp/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
+          echo "✅ Built ${{ matrix.arch }}: ${digest}"
+      
+      - name: Upload digest
+        uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ matrix.arch }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  merge-manifests:
+    name: Create Multi-Arch Manifest
+    runs-on: ubuntu-latest
+    needs: build-postgres-native
+    permissions:
+      contents: read
+      packages: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set PostgreSQL version
+        id: version
+        run: |
+          PG_VERSION="${{ github.event.inputs.pg_version || '17.2' }}"
+          ALPINE_VERSION="${{ github.event.inputs.alpine_version || '3.22' }}"
+          echo "pg_version=${PG_VERSION}" >> $GITHUB_OUTPUT
+          echo "alpine_version=${ALPINE_VERSION}" >> $GITHUB_OUTPUT
+          echo "tag=postgres-builder-${PG_VERSION}-alpine${ALPINE_VERSION}" >> $GITHUB_OUTPUT
+      
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: digests-*
+          merge-multiple: true
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Create manifest list and push
+        working-directory: /tmp/digests
+        run: |
+          docker buildx imagetools create \
+            --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.tag }} \
+            --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
+            $(printf '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@sha256:%s ' *)
+      
+      - name: Inspect final image
+        run: |
+          docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.tag }}
+          echo "✅ Multi-arch PostgreSQL builder image created successfully!"
+          echo "📦 Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.tag }}"
+      
+      - name: Summary
+        run: |
+          echo "## PostgreSQL Builder Cache Created 🚀" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version**: PostgreSQL ${{ steps.version.outputs.pg_version }} on Alpine ${{ steps.version.outputs.alpine_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Image**: \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Supported Platforms" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ linux/amd64 (built natively)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ linux/arm64 (built natively on ARM runner)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Performance Benefits" >> $GITHUB_STEP_SUMMARY
+          echo "- 🚀 **5-10x faster** ARM64 builds using native runners" >> $GITHUB_STEP_SUMMARY
+          echo "- 🎯 **No QEMU emulation** overhead" >> $GITHUB_STEP_SUMMARY
+          echo "- 💾 **Cached for future builds** in release workflow" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "This pre-built image will be used automatically in the release workflow." >> $GITHUB_STEP_SUMMARY

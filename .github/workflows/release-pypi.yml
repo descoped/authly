@@ -119,7 +119,7 @@ jobs:
         token: ${{ secrets.CODECOV_TOKEN }}
         slug: descoped/authly
 
-  build-and-publish:
+  build-and-publish-to-pypi:
     runs-on: ubuntu-latest
     needs: [validate-release, lint-and-test]
     environment: pypi
@@ -210,7 +210,7 @@ jobs:
 
   docker-build-production:
     runs-on: ubuntu-latest
-    needs: [validate-release, lint-and-test, build-and-publish]
+    needs: [validate-release, lint-and-test, build-and-publish-to-pypi]
     permissions:
       contents: read
       packages: write  # For Docker registry push
@@ -313,18 +313,26 @@ jobs:
         PG_TAG="postgres-builder-${PG_VERSION}-alpine3.22"
         
         # Try to pull the postgres-builder image from GitHub packages
+        # This image should be pre-built by the build-postgres-cache.yml workflow
+        # using native ARM runners for optimal performance
         if docker pull ghcr.io/descoped/authly-postgres-builder:${PG_TAG} 2>/dev/null; then
           echo "✅ Found cached postgres-builder image: ${PG_TAG}"
+          echo "   (Built with native runners - no QEMU overhead!)"
           echo "exists=true" >> $GITHUB_OUTPUT
           echo "tag=${PG_TAG}" >> $GITHUB_OUTPUT
         else
-          echo "🔨 Need to build postgres-builder image: ${PG_TAG}"
+          echo "⚠️ No pre-built postgres-builder image found: ${PG_TAG}"
+          echo "   Consider running the 'Build PostgreSQL Cache' workflow first for faster builds"
+          echo "   Falling back to QEMU-based build (this will be slow for ARM64)"
           echo "exists=false" >> $GITHUB_OUTPUT
           echo "tag=${PG_TAG}" >> $GITHUB_OUTPUT
         fi
 
     - name: Build and push postgres-builder stage if not cached
       if: steps.check-postgres-builder.outputs.exists != 'true'
+      # NOTE: This fallback uses QEMU emulation for ARM64, which is slow.
+      # For optimal performance, run the 'Build PostgreSQL Cache' workflow first,
+      # which uses native ARM runners for 5-10x faster builds.
       uses: docker/build-push-action@v6
       with:
         context: .
