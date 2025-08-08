@@ -1,15 +1,17 @@
 # Authly Standalone Docker Image
 
-The `descoped/authly-standalone` image is an all-in-one container that includes Authly with embedded PostgreSQL and Redis, perfect for quick testing, development, and small deployments.
+The `descoped/authly-standalone` image is an all-in-one container that includes Authly with embedded PostgreSQL 17 and KeyDB (Redis-compatible), perfect for quick testing, development, and small deployments.
 
 ## Features
 
 - **Zero Dependencies**: Everything needed runs in a single container
-- **Minimal Size**: ~150MB total image size
+- **Optimized Size**: ~426MB total image size
 - **Quick Start**: Running in seconds with no configuration
 - **Developer Friendly**: Direct CLI access with `authly` command
 - **Persistent Data**: Optional volume mounting for data persistence
 - **Multi-Architecture**: Supports both AMD64 and ARM64
+- **Python 3.13**: Latest Python runtime included
+- **KeyDB**: Redis-compatible, multi-threaded cache
 
 ## Quick Start
 
@@ -61,6 +63,10 @@ docker run -d \
 | `AUTHLY_ADMIN_EMAIL` | admin@localhost | Admin email |
 | `DATABASE_URL` | (auto-configured) | PostgreSQL connection string |
 | `REDIS_URL` | (auto-configured) | Redis connection string |
+| `RATE_LIMIT_MAX_REQUESTS` | 100 | Max requests per window for rate limiting |
+| `RATE_LIMIT_WINDOW_SECONDS` | 60 | Time window in seconds for rate limiting |
+| `AUTHLY_LOCKOUT_MAX_ATTEMPTS` | 10 | Max failed login attempts before lockout |
+| `AUTHLY_LOCKOUT_DURATION_SECONDS` | 300 | Lockout duration in seconds (5 minutes) |
 
 ## Docker Compose
 
@@ -104,8 +110,8 @@ docker-compose up -d
 ## Data Persistence
 
 The container stores all data in `/data`:
-- `/data/postgres` - PostgreSQL database files
-- `/data/redis` - Redis persistence (if enabled)
+- `/data/postgres` - PostgreSQL 17 database files
+- `/data/redis` - KeyDB persistence (if enabled)
 - `/data/authly` - Application data
 
 To persist data across container restarts, mount a volume:
@@ -168,7 +174,7 @@ curl http://localhost:8000/health
 
 ### Expose Additional Ports
 
-By default, only port 8000 (Authly API) is exposed. If you need direct access to PostgreSQL or Redis:
+By default, only port 8000 (Authly API) is exposed. If you need direct access to PostgreSQL or KeyDB:
 
 ```bash
 docker run -p 8000:8000 -p 5432:5432 -p 6379:6379 descoped/authly-standalone
@@ -269,16 +275,11 @@ docker run --cpus="1.5" descoped/authly-standalone
 
 ### Optimized Settings
 
-For production workloads, create a custom environment file:
-
-```bash
-# High-performance settings
-docker run \
-  -e POSTGRES_SHARED_BUFFERS=256MB \
-  -e POSTGRES_MAX_CONNECTIONS=200 \
-  -e REDIS_MAXMEMORY=100mb \
-  descoped/authly-standalone
-```
+The standalone image includes optimizations:
+- PostgreSQL 17 with minimal build
+- KeyDB with 2 server threads for better performance
+- Python 3.13 runtime
+- Refactored configuration using modular scripts
 
 ## Security Considerations
 
@@ -315,8 +316,7 @@ docker run --rm -v authly-data:/data -v $(pwd):/backup alpine \
 | Tag | Description |
 |-----|-------------|
 | `latest` | Latest stable release |
-| `minimal` | Size-optimized version |
-| `0.5.6` | Specific version |
+| `0.5.7` | Specific version |
 | `0.5` | Latest patch of 0.5.x |
 
 ## Limitations

@@ -10,12 +10,40 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from urllib.parse import urlparse
 
+import psycopg
 from psycopg_pool import AsyncConnectionPool
 from psycopg_toolkit import Database, DatabaseSettings
 
 from authly.config import AuthlyConfig
 
 logger = logging.getLogger(__name__)
+
+
+def detect_psycopg_driver() -> str:
+    """Detect which psycopg driver implementation is being used.
+
+    Returns:
+        str: Driver implementation type ('binary', 'python', or 'unknown')
+    """
+    try:
+        # Check the implementation type
+        impl = psycopg.pq.__impl__
+
+        # Also check for psycopg_binary module availability
+        import importlib.util
+
+        has_binary = importlib.util.find_spec("psycopg_binary") is not None
+
+        # Log detailed information
+        logger.info(f"psycopg implementation: {impl}")
+        logger.info(f"psycopg version: {psycopg.__version__}")
+        logger.info(f"libpq version: {psycopg.pq.version()}")
+        logger.info(f"psycopg_binary module available: {has_binary}")
+
+        return impl
+    except Exception as e:
+        logger.warning(f"Could not detect psycopg driver: {e}")
+        return "unknown"
 
 
 @asynccontextmanager
@@ -35,6 +63,15 @@ async def get_database(config: AuthlyConfig) -> AsyncGenerator[Database, None]:
         Exception: If database initialization fails
     """
     logger.info("Initializing psycopg-toolkit Database with dependency injection pattern")
+
+    # Detect and log psycopg driver implementation
+    driver_impl = detect_psycopg_driver()
+    if driver_impl == "binary":
+        logger.info("Using psycopg BINARY driver (C extension) - optimal performance")
+    elif driver_impl == "python":
+        logger.warning("Using psycopg PYTHON driver (pure Python) - consider using binary for better performance")
+    else:
+        logger.warning(f"Unknown psycopg driver implementation: {driver_impl}")
 
     # Parse database URL from config
     database_url = config.database_url

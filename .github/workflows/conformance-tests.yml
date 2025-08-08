@@ -19,7 +19,7 @@ on:
 
 jobs:
   conformance-validation:
-    name: OIDC Spec Conformance Check (90% Target)
+    name: OIDC Spec Conformance Check
     runs-on: ubuntu-latest
     timeout-minutes: 15
     

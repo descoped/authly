@@ -13,16 +13,11 @@ echo -e "${GREEN}Building Authly Standalone Docker Image${NC}"
 echo "========================================="
 
 # Parse arguments
-MINIMAL=false
 PUSH=false
 PLATFORM="linux/amd64"
 
 while [[ $# -gt 0 ]]; do
     case $1 in
-        --minimal)
-            MINIMAL=true
-            shift
-            ;;
         --push)
             PUSH=true
             shift
@@ -33,22 +28,16 @@ while [[ $# -gt 0 ]]; do
             ;;
         *)
             echo -e "${RED}Unknown option: $1${NC}"
-            echo "Usage: $0 [--minimal] [--push] [--platform linux/amd64,linux/arm64]"
+            echo "Usage: $0 [--push] [--platform linux/amd64,linux/arm64]"
             exit 1
             ;;
     esac
 done
 
-# Determine which Dockerfile to use
-if [ "$MINIMAL" = true ]; then
-    DOCKERFILE="Dockerfile.standalone.minimal"
-    TAG_SUFFIX="-minimal"
-    echo -e "${YELLOW}Building MINIMAL version for smallest size${NC}"
-else
-    DOCKERFILE="Dockerfile.standalone"
-    TAG_SUFFIX=""
-    echo -e "${YELLOW}Building standard version${NC}"
-fi
+# Use the optimized Dockerfile.standalone
+DOCKERFILE="Dockerfile.standalone"
+TAG_SUFFIX=""
+echo -e "${YELLOW}Building optimized standalone version${NC}"
 
 # Get version from pyproject.toml
 VERSION=$(grep '^version = ' pyproject.toml | cut -d'"' -f2)
@@ -76,6 +65,10 @@ docker images descoped/authly-standalone:latest$TAG_SUFFIX --format "table {{.Re
 
 # Test the image
 echo -e "\n${YELLOW}Testing image...${NC}"
+
+# Clean up any existing test container
+docker rm -f authly-standalone-test 2>/dev/null || true
+
 echo "Starting container..."
 CONTAINER_ID=$(docker run -d \
     --name authly-standalone-test \
@@ -83,24 +76,41 @@ CONTAINER_ID=$(docker run -d \
     -e AUTHLY_ADMIN_PASSWORD=test123 \
     "descoped/authly-standalone:latest$TAG_SUFFIX")
 
-# Wait for services to start
-echo "Waiting for services to initialize (30 seconds)..."
-sleep 30
+# Wait for services to start with retry mechanism
+echo "Waiting for services to initialize..."
+MAX_ATTEMPTS=40
+ATTEMPT=0
+HEALTH_CHECK_PASSED=false
 
-# Check health
-echo -e "\n${YELLOW}Checking health endpoint...${NC}"
-if curl -f http://localhost:8000/health > /dev/null 2>&1; then
-    echo -e "${GREEN}✓ Health check passed${NC}"
+while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+    ATTEMPT=$((ATTEMPT + 1))
+    echo -n "Attempt $ATTEMPT/$MAX_ATTEMPTS: "
     
+    if curl -f http://localhost:8000/health > /dev/null 2>&1; then
+        echo -e "${GREEN}✓ Health check passed${NC}"
+        HEALTH_CHECK_PASSED=true
+        break
+    else
+        echo "Services not ready yet..."
+        sleep 2
+    fi
+done
+
+if [ "$HEALTH_CHECK_PASSED" = true ]; then
     # Try to get API info
     echo -e "\n${YELLOW}Testing API...${NC}"
     curl -s http://localhost:8000/.well-known/openid-configuration | head -5
     echo "..."
     echo -e "${GREEN}✓ API responding${NC}"
 else
-    echo -e "${RED}✗ Health check failed${NC}"
-    echo "Container logs:"
-    docker logs authly-standalone-test
+    echo -e "${RED}✗ Health check failed after $MAX_ATTEMPTS attempts${NC}"
+    echo "Container logs (last 50 lines):"
+    docker logs --tail 50 authly-standalone-test
+    
+    # Still cleanup even if health check failed
+    docker stop authly-standalone-test > /dev/null 2>&1
+    docker rm authly-standalone-test > /dev/null 2>&1
+    exit 1
 fi
 
 # Cleanup

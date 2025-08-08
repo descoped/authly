@@ -208,7 +208,7 @@ jobs:
         echo "authly admin client create --name MyApp --client-type public --redirect-uri http://localhost:3000/callback" >> $GITHUB_STEP_SUMMARY
         echo '```' >> $GITHUB_STEP_SUMMARY
 
-  docker-build-and-push:
+  docker-build-production:
     runs-on: ubuntu-latest
     needs: [validate-release, lint-and-test, build-and-publish]
     permissions:
@@ -246,7 +246,7 @@ jobs:
           type=semver,pattern={{major}},value=${{ needs.validate-release.outputs.version }}
           type=raw,value=latest
 
-    - name: Build and push Docker image
+    - name: Build and push production Docker image
       uses: docker/build-push-action@v6
       with:
         context: .
@@ -259,12 +259,12 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
 
-    - name: Update deployment summary with Docker info
+    - name: Update deployment summary with production Docker info
       run: |
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### Docker Images" >> $GITHUB_STEP_SUMMARY
+        echo "### Production Docker Images" >> $GITHUB_STEP_SUMMARY
         echo '```bash' >> $GITHUB_STEP_SUMMARY
-        echo "# Pull and run Docker image" >> $GITHUB_STEP_SUMMARY
+        echo "# Pull and run production Docker image" >> $GITHUB_STEP_SUMMARY
         echo "docker pull descoped/authly:${{ needs.validate-release.outputs.version }}" >> $GITHUB_STEP_SUMMARY
         echo "docker run -p 8000:8000 descoped/authly:${{ needs.validate-release.outputs.version }}" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
@@ -296,6 +296,48 @@ jobs:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Check for existing postgres-builder image
+      id: check-postgres-builder
+      run: |
+        # PostgreSQL version tag - update this when PostgreSQL version changes
+        # This should match the version in Dockerfile.standalone (line 29)
+        # When updating, also increment to force a rebuild of the cached image
+        PG_VERSION="17.2"
+        PG_TAG="postgres-builder-${PG_VERSION}-alpine3.22"
+        
+        # Try to pull the postgres-builder image from GitHub packages
+        if docker pull ghcr.io/descoped/authly-postgres-builder:${PG_TAG} 2>/dev/null; then
+          echo "✅ Found cached postgres-builder image: ${PG_TAG}"
+          echo "exists=true" >> $GITHUB_OUTPUT
+          echo "tag=${PG_TAG}" >> $GITHUB_OUTPUT
+        else
+          echo "🔨 Need to build postgres-builder image: ${PG_TAG}"
+          echo "exists=false" >> $GITHUB_OUTPUT
+          echo "tag=${PG_TAG}" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Build and push postgres-builder stage if not cached
+      if: steps.check-postgres-builder.outputs.exists != 'true'
+      uses: docker/build-push-action@v6
+      with:
+        context: .
+        file: ./Dockerfile.standalone
+        target: postgres-builder
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: |
+          ghcr.io/descoped/authly-postgres-builder:${{ steps.check-postgres-builder.outputs.tag }}
+          ghcr.io/descoped/authly-postgres-builder:latest
+        cache-from: type=gha,scope=postgres-builder
+        cache-to: type=gha,scope=postgres-builder,mode=max
+
     - name: Extract metadata for standalone image
       id: meta-standalone
       uses: docker/metadata-action@v5
@@ -317,7 +359,11 @@ jobs:
         push: true
         tags: ${{ steps.meta-standalone.outputs.tags }}
         labels: ${{ steps.meta-standalone.outputs.labels }}
-        cache-from: type=gha,scope=standalone
+        build-args: |
+          POSTGRES_BUILDER_IMAGE=ghcr.io/descoped/authly-postgres-builder:${{ steps.check-postgres-builder.outputs.tag }}
+        cache-from: |
+          type=gha,scope=standalone
+          type=registry,ref=ghcr.io/descoped/authly-postgres-builder:${{ steps.check-postgres-builder.outputs.tag }}
         cache-to: type=gha,scope=standalone,mode=max
 
     - name: Update deployment summary with standalone Docker info

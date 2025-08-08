@@ -47,4 +47,19 @@ async def test_health(test_config: AuthlyConfig, test_server: AsyncTestServer):
     # Make your request
     response = await test_server.client.get("/health")
     _, health_response = await asyncio.gather(response.expect_status(200), response.json())
-    assert health_response == {"status": "healthy", "database": "connected"}
+
+    # Check core health fields
+    assert health_response["status"] == "healthy"
+    assert health_response["database"] == "connected"
+
+    # Check version is present
+    assert "version" in health_response
+    assert health_response["version"]  # Should not be empty
+
+    # Check psycopg driver information is present
+    assert "psycopg_driver" in health_response
+    assert "psycopg_version" in health_response
+
+    # Log driver information
+    logger.info(f"Health check - psycopg driver: {health_response.get('psycopg_driver')}")
+    logger.info(f"Health check - psycopg version: {health_response.get('psycopg_version')}")

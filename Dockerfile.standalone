@@ -11,6 +11,62 @@
 # - Provide secure, randomly generated JWT secrets
 # - Use strong admin passwords
 
+# Allow using a pre-built postgres-builder image for caching
+ARG POSTGRES_BUILDER_IMAGE=""
+
+# Build stage for minimal PostgreSQL
+FROM alpine:3.22 AS postgres-builder-build
+
+# Install build dependencies
+RUN apk add --no-cache \
+    alpine-sdk \
+    bison \
+    flex \
+    perl \
+    linux-headers \
+    e2fsprogs-dev
+
+# Download and extract PostgreSQL 17 source
+WORKDIR /build
+RUN wget -q https://ftp.postgresql.org/pub/source/v17.2/postgresql-17.2.tar.gz && \
+    tar -xzf postgresql-17.2.tar.gz && \
+    cd postgresql-17.2 && \
+    ./configure \
+        --prefix=/opt/postgresql \
+        --without-readline \
+        --without-icu \
+        --without-zlib \
+        --without-openssl \
+        --without-ldap \
+        --without-python \
+        --without-perl \
+        --without-tcl \
+        --disable-rpath \
+        --disable-nls \
+        --with-uuid=e2fs && \
+    # Build and install everything, we'll strip it down later
+    make -j$(nproc) world-bin && \
+    make install-world-bin
+
+# Strip debug symbols and remove unnecessary files
+RUN strip /opt/postgresql/bin/* 2>/dev/null || true && \
+    # Remove documentation and headers
+    rm -rf /opt/postgresql/include \
+           /opt/postgresql/share/doc \
+           /opt/postgresql/share/man \
+           /opt/postgresql/lib/*.a && \
+    # Remove any extra binaries that might have been installed
+    cd /opt/postgresql/bin && \
+    find . -type f ! -name 'postgres' ! -name 'initdb' ! -name 'pg_ctl' \
+           ! -name 'psql' ! -name 'createdb' ! -name 'createuser' -delete && \
+    # Keep: postgres, initdb, pg_ctl, psql, createdb, createuser (for scripts)
+    ls -la /opt/postgresql/bin/ && \
+    # Show final size
+    du -sh /opt/postgresql/
+
+# Use either the pre-built postgres-builder image or the one we just built
+FROM ${POSTGRES_BUILDER_IMAGE:-postgres-builder-build} AS postgres-builder
+
 # Build stage for Python dependencies using uv
 FROM python:3.13-alpine AS python-builder
 
@@ -19,7 +75,6 @@ RUN apk add --no-cache \
     gcc \
     musl-dev \
     libffi-dev \
-    postgresql16-dev \
     linux-headers
 
 # Install uv using pip
@@ -32,12 +87,22 @@ COPY README.md .
 COPY uv.lock .
 COPY src src/
 
-# Install all dependencies using uv with modern syntax
-RUN uv sync --all-groups && \
+# Install dependencies using uv (dev group for CLI tools, no test packages)
+RUN uv sync --group dev && \
+    # Remove all cache and unnecessary files
     find .venv -type f -name "*.pyc" -delete && \
+    find .venv -type f -name "*.pyo" -delete && \
     find .venv -type d -name "__pycache__" -delete && \
     find .venv -type d -name "*.dist-info" -exec rm -rf {} + 2>/dev/null || true && \
-    find .venv -type d -name "tests" -exec rm -rf {} + 2>/dev/null || true
+    find .venv -type d -name "tests" -exec rm -rf {} + 2>/dev/null || true && \
+    find .venv -type d -name "test" -exec rm -rf {} + 2>/dev/null || true && \
+    find .venv -type f -name "*.pyi" -delete && \
+    find .venv -type f -name "*.c" -delete && \
+    find .venv -type f -name "*.h" -delete && \
+    # Remove pip cache if any
+    rm -rf /root/.cache/pip && \
+    # Show final venv size
+    du -sh .venv
 
 # Final stage - minimal runtime
 FROM alpine:3.22
@@ -52,44 +117,29 @@ RUN tar -C / -Jxpf /tmp/s6-overlay-noarch.tar.xz && \
     tar -C / -Jxpf /tmp/s6-overlay-x86_64.tar.xz && \
     rm /tmp/*.tar.xz
 
-# Install runtime dependencies
+# Install all runtime dependencies in one layer
 RUN apk add --no-cache \
-    # Python runtime (3.12 is latest in Alpine 3.20, will use venv's python)
-    python3 \
-    # Required libraries for Python packages
     libffi \
-    libpq \
-    # PostgreSQL client libraries
-    postgresql16-client \
-    # System utilities
     bash \
     curl \
-    # Integration test tools
     jq \
     openssl \
-    # Create python symlink to venv python after copying
-    && echo "Python will be provided by venv"
+    tzdata \
+    libuuid && \
+    echo 'https://dl-cdn.alpinelinux.org/alpine/edge/testing' >> /etc/apk/repositories && \
+    apk add --no-cache keydb
 
-# Install embedded PostgreSQL (using Alpine package for now, will optimize later)
-RUN apk add --no-cache postgresql16 postgresql16-contrib && \
-    rm -rf /usr/lib/postgresql16/bin/createdb \
-           /usr/lib/postgresql16/bin/dropdb \
-           /usr/lib/postgresql16/bin/createuser \
-           /usr/lib/postgresql16/bin/dropuser \
-           /usr/lib/postgresql16/bin/pg_dump \
-           /usr/lib/postgresql16/bin/pg_dumpall \
-           /usr/lib/postgresql16/bin/pg_restore \
-           /usr/lib/postgresql16/bin/reindexdb \
-           /usr/lib/postgresql16/bin/vacuumdb
-
-# Install Redis (using Alpine package, very small ~8MB)
-RUN apk add --no-cache redis
-
-# Copy Python packages from builder's virtual environment and uv
+# Copy all binaries and resources from builders
+COPY --from=postgres-builder /opt/postgresql /opt/postgresql
+COPY --from=python-builder /usr/local/bin/python3.13 /usr/local/bin/
+COPY --from=python-builder /usr/local/lib/python3.13 /usr/local/lib/python3.13
+COPY --from=python-builder /usr/local/lib/libpython3.13.so* /usr/local/lib/
 COPY --from=python-builder /build/.venv /opt/venv
 COPY --from=python-builder /usr/local/bin/uv /usr/local/bin/uv
-ENV PATH=/opt/venv/bin:$PATH
-ENV PYTHONPATH=/app:/opt/venv/lib/python3.12/site-packages
+
+# Set environment variables
+ENV PATH=/opt/postgresql/bin:/opt/venv/bin:$PATH
+ENV PYTHONPATH=/app:/opt/venv/lib/python3.13/site-packages
 
 # Create authly user and directories
 RUN addgroup -g 1000 authly && \
@@ -98,328 +148,29 @@ RUN addgroup -g 1000 authly && \
     chown -R authly:authly /data /var/log /run/postgresql && \
     chown -R authly:authly /opt/venv
 
-# Copy application code and project files for installation
+# Copy application code and resources
 COPY --chown=authly:authly src/authly /app/authly
 COPY --chown=authly:authly pyproject.toml /app/
 COPY --chown=authly:authly README.md /app/
-
-# Copy integration test scripts
 COPY --chown=authly:authly scripts /app/scripts
-
-# Create a runtime patched version of simple-auth-flow.sh that uses environment admin password
-RUN cp /app/scripts/simple-auth-flow.sh /app/scripts/simple-auth-flow-original.sh
-
-# Copy database initialization SQL
 COPY docker-postgres/init-db-and-user.sql /docker-entrypoint-initdb.d/init.sql
-
-# Copy standalone init script for secret generation
 COPY docker-standalone/standalone-init.sh /usr/local/bin/standalone-init
-RUN chmod +x /usr/local/bin/standalone-init
+COPY docker-standalone/scripts /tmp/setup-scripts
 
-# Create s6-overlay service directories
-RUN mkdir -p /etc/s6-overlay/s6-rc.d/user/contents.d \
-    /etc/s6-overlay/s6-rc.d/postgres \
-    /etc/s6-overlay/s6-rc.d/redis \
-    /etc/s6-overlay/s6-rc.d/authly-init \
-    /etc/s6-overlay/s6-rc.d/authly
+# Prepare simple-auth-flow script
+RUN cp /app/scripts/simple-auth-flow.sh /app/scripts/simple-auth-flow-original.sh && \
+    chmod +x /usr/local/bin/standalone-init
 
-# Setup user service bundle
-RUN touch /etc/s6-overlay/s6-rc.d/user/contents.d/postgres && \
-    touch /etc/s6-overlay/s6-rc.d/user/contents.d/redis && \
-    touch /etc/s6-overlay/s6-rc.d/user/contents.d/authly-init && \
-    touch /etc/s6-overlay/s6-rc.d/user/contents.d/authly
-
-# PostgreSQL service
-RUN echo "longrun" > /etc/s6-overlay/s6-rc.d/postgres/type && \
-    mkdir -p /etc/s6-overlay/s6-rc.d/postgres/dependencies.d && \
-    touch /etc/s6-overlay/s6-rc.d/postgres/dependencies.d/base
-
-# Redis service  
-RUN echo "longrun" > /etc/s6-overlay/s6-rc.d/redis/type && \
-    mkdir -p /etc/s6-overlay/s6-rc.d/redis/dependencies.d && \
-    touch /etc/s6-overlay/s6-rc.d/redis/dependencies.d/base
-
-# Authly init service (oneshot)
-RUN echo "oneshot" > /etc/s6-overlay/s6-rc.d/authly-init/type && \
-    mkdir -p /etc/s6-overlay/s6-rc.d/authly-init/dependencies.d && \
-    touch /etc/s6-overlay/s6-rc.d/authly-init/dependencies.d/postgres && \
-    touch /etc/s6-overlay/s6-rc.d/authly-init/dependencies.d/redis
-
-# Authly service
-RUN echo "longrun" > /etc/s6-overlay/s6-rc.d/authly/type && \
-    mkdir -p /etc/s6-overlay/s6-rc.d/authly/dependencies.d && \
-    touch /etc/s6-overlay/s6-rc.d/authly/dependencies.d/authly-init
-
-# Create PostgreSQL run script
-RUN cat > /etc/s6-overlay/s6-rc.d/postgres/run << 'EOF'
-#!/command/execlineb -P
-foreground {
-    if { test ! -d /data/postgres/base }
-    if { s6-setuidgid authly mkdir -p /data/postgres }
-    s6-setuidgid authly initdb -D /data/postgres --auth-local=trust --auth-host=trust
-}
-s6-setuidgid authly postgres -D /data/postgres -c listen_addresses=localhost -c shared_buffers=128MB -c max_connections=50 -c unix_socket_directories=/run/postgresql
-EOF
-
-# Create Redis run script
-RUN cat > /etc/s6-overlay/s6-rc.d/redis/run << 'EOF'
-#!/command/execlineb -P
-s6-setuidgid authly
-redis-server --dir /data/redis --bind 127.0.0.1 --port 6379 --save "" --appendonly no --protected-mode no
-EOF
-
-# Create Authly init script
-RUN cat > /etc/s6-overlay/s6-rc.d/authly-init/up << 'EOF'
-#!/command/execlineb -P
-foreground { s6-sleep 3 }
-foreground {
-    s6-setuidgid authly
-    sh -c "
-    # Create database if it doesn't exist
-    createdb -h localhost -U authly authly 2>/dev/null || true
-    # Run the initialization SQL (it has IF NOT EXISTS checks, so safe to run multiple times)
-    psql -h localhost -U authly -d authly -f /docker-entrypoint-initdb.d/init.sql 2>/dev/null || true
-    echo 'Database initialized and schema ready'
-    "
-}
-EOF
-
-# Create Authly run script  
-RUN cat > /etc/s6-overlay/s6-rc.d/authly/run << 'EOF'
-#!/command/execlineb -P
-cd /app
-s6-setuidgid authly
-exec python -m authly serve --host 0.0.0.0 --port 8000
-EOF
-
-# Make all scripts executable
-RUN chmod +x /etc/s6-overlay/s6-rc.d/*/run /etc/s6-overlay/s6-rc.d/*/up
+# Run all configuration in a single layer
+RUN chmod +x /tmp/setup-scripts/*.sh && \
+    /tmp/setup-scripts/configure-all.sh && \
+    rm -rf /tmp/setup-scripts
 
 # Install Authly package as editable to create console scripts
 WORKDIR /app
 ENV PATH=/opt/venv/bin:$PATH
 ENV UV_PROJECT_ENVIRONMENT=/opt/venv
-RUN uv sync --dev
-
-# Create simple auth flow wrapper with runtime password patching
-RUN cat > /usr/local/bin/simple-auth-flow << 'EOF'
-#!/bin/bash
-cd /app
-
-# Ensure LOG_LEVEL is set to avoid integer expression errors
-export LOG_LEVEL="${LOG_LEVEL:-INFO}"
-
-# Create a runtime-patched version of simple-auth-flow.sh
-# The password will be set at runtime
-ADMIN_PASSWORD="${AUTHLY_ADMIN_PASSWORD:-admin}"
-
-# Create temporary patched script
-cp /app/scripts/simple-auth-flow-original.sh /tmp/simple-auth-flow-patched.sh
-
-# Apply comprehensive password fixes
-# 1. Fix password for created users (must be 8+ chars)
-sed -i 's/"password": "Test123!"/"password": "TestUser123!"/g' /tmp/simple-auth-flow-patched.sh
-
-# 2. Fix admin-specific login attempts in OAuth token requests
-sed -i "s/grant_type=password\&username=admin\&password=Test123%21/grant_type=password\&username=admin\&password=${ADMIN_PASSWORD}/g" /tmp/simple-auth-flow-patched.sh
-
-# 3. Add a helper function to get the correct password for each user
-cat > /tmp/patch_test_login.sh << 'PATCH'
-#!/bin/bash
-# Insert helper function before test_login
-sed -i '/^test_login() {/i\
-get_user_password() {\
-    local user="$1"\
-    if [ "$user" = "admin" ]; then\
-        echo "'"${AUTHLY_ADMIN_PASSWORD:-admin}"'"\
-    elif [ "$user" = "user1" ]; then\
-        echo "Test123!"\
-    else\
-        echo "TestUser123!"\
-    fi\
-}' "$1"
-
-# Replace the data line in test_login function ONLY (must be within function scope)
-# Use a more specific pattern that only matches within the test_login function
-sed -i '/^test_login() {/,/^}$/ s|data=$(printf.*grant_type=password.*Test123.*|    local user_password=$(get_user_password "$username")\n    data=$(printf "grant_type=password\&username=%s\&password=%s\&scope=openid%%20profile%%20email" "$username" "${user_password//!/%21}")|' "$1"
-PATCH
-
-chmod +x /tmp/patch_test_login.sh
-/tmp/patch_test_login.sh /tmp/simple-auth-flow-patched.sh
-
-# 4. Fix where NEW_USER tries to login (should use TestUser123!)
-# This is in the main script body, not in a function, around line 620-621
-# Handle both %21 and %%21 escaping patterns
-sed -i '/Testing login before verification/,+3 s/Test123%%21/TestUser123%%21/' /tmp/simple-auth-flow-patched.sh
-
-# 5. Fix the log level comparison to handle empty indices
-# Add a default value to prevent integer expression errors
-sed -i 's/if \[ "\$msg_level_index" -ge "\$current_level_index" \]/if [ "${msg_level_index:-0}" -ge "${current_level_index:-3}" ]/' /tmp/simple-auth-flow-patched.sh
-
-# Run simple SQL-based pre-seed
-/usr/local/bin/pre-seed-sql
-
-# Execute the patched script
-exec /bin/bash /tmp/simple-auth-flow-patched.sh "$@"
-EOF
-RUN chmod +x /usr/local/bin/simple-auth-flow
-
-# Create SQL-based pre-seed script
-RUN cat > /usr/local/bin/pre-seed-sql << 'EOF'
-#!/bin/sh
-
-# Function to check if test users exist
-check_test_users() {
-    # Wait for Authly to be ready
-    timeout 30 sh -c 'until curl -s http://localhost:8000/health >/dev/null 2>&1; do sleep 1; done' || {
-        echo "❌ Authly service not ready after 30 seconds"
-        return 1
-    }
-    
-    # Test admin login with environment password (set at runtime)
-    admin_password=${AUTHLY_ADMIN_PASSWORD:-admin}
-    admin_response=$(curl -s -X POST \
-        -H "Content-Type: application/x-www-form-urlencoded" \
-        -d "grant_type=password&username=admin&password=${admin_password}" \
-        http://localhost:8000/api/v1/oauth/token 2>/dev/null)
-    
-    # Test user1 login with Test123! password
-    user1_response=$(curl -s -X POST \
-        -H "Content-Type: application/x-www-form-urlencoded" \
-        -d "grant_type=password&username=user1&password=Test123%21" \
-        http://localhost:8000/api/v1/oauth/token 2>/dev/null)
-    
-    if echo "$admin_response" | grep -q "access_token" && echo "$user1_response" | grep -q "access_token"; then
-        return 0  # Both users exist with correct passwords
-    else
-        return 1  # Need to seed user1
-    fi
-}
-
-# Function to seed user1 via direct SQL and fix admin for testing
-seed_user1_sql() {
-    echo "🌱 Preparing test users for simple-auth-flow..."
-    
-    # Generate bcrypt hash for "Test123!" password (cost factor 12)
-    USER1_PASSWORD_HASH=$(python3 -c "
-import bcrypt
-print(bcrypt.hashpw(b'Test123!', bcrypt.gensalt()).decode())
-" 2>/dev/null)
-    
-    if [ -z "$USER1_PASSWORD_HASH" ]; then
-        echo "❌ Failed to generate password hash"
-        return 1
-    fi
-    
-    # Fix admin user for testing (remove password change requirement) and create user1
-    PGPASSWORD=authly psql -h localhost -U authly -d authly -q -c "
-        -- Remove password change requirement from admin for testing
-        UPDATE users 
-        SET requires_password_change = false 
-        WHERE username = 'admin';
-        
-        -- Insert user1 
-        INSERT INTO users (
-            id, username, email, password_hash, 
-            created_at, updated_at, 
-            is_active, is_verified, is_admin, requires_password_change
-        ) VALUES (
-            gen_random_uuid(), 'user1', 'user1@example.com', '$USER1_PASSWORD_HASH',
-            CURRENT_TIMESTAMP, CURRENT_TIMESTAMP,
-            true, true, false, false
-        ) 
-        ON CONFLICT (username) DO NOTHING;
-    " >/dev/null 2>&1
-    
-    if [ $? -eq 0 ]; then
-        echo "✅ Test users ready (admin password change requirement removed)"
-        return 0
-    else
-        echo "❌ Failed to prepare test users"
-        return 1
-    fi
-}
-
-# Main logic - Check if help is requested
-for arg in "$@"; do
-    case "$arg" in
-        -h|--help)
-            # Don't interfere with help
-            exit 0
-            ;;
-    esac
-done
-
-# Check if test users exist
-if ! check_test_users; then
-    admin_password=${AUTHLY_ADMIN_PASSWORD:-admin}
-    echo ""
-    echo "⚠️  Simple-auth-flow requires user1 for comprehensive testing"
-    echo ""
-    echo "This will create the following test account:"
-    echo "  • user1 (password: Test123!)"
-    echo "  • admin (password: ${admin_password}) - already exists"
-    echo ""
-    printf "Do you want to create user1? [y/N]: "
-    read -r answer
-    echo ""
-    
-    case "$answer" in
-        [Yy]|[Yy][Ee][Ss])
-            if seed_user1_sql; then
-                echo "✅ Test users are ready!"
-                echo ""
-            else
-                echo "❌ Failed to create user1"
-                echo "Some simple-auth-flow tests may fail"
-                echo ""
-            fi
-            ;;
-        *)
-            echo "⚠️  Continuing without user1"
-            echo "Some simple-auth-flow tests will likely fail"
-            echo ""
-            ;;
-    esac
-fi
-
-exit 0
-EOF
-RUN chmod +x /usr/local/bin/pre-seed-sql
-
-# Create integration test wrapper
-RUN cat > /usr/local/bin/authly-test << 'EOF'
-#!/bin/sh
-cd /app
-exec /app/scripts/run-integration-tests.sh "$@"
-EOF
-RUN chmod +x /usr/local/bin/authly-test
-
-# Create run-end-to-end-test wrapper
-RUN cat > /usr/local/bin/run-end-to-end-test << 'EOF'
-#!/bin/sh
-cd /app
-exec /app/scripts/run-integration-tests.sh "$@"
-EOF
-RUN chmod +x /usr/local/bin/run-end-to-end-test
-
-# Configure shell environment for interactive use
-RUN echo 'export PATH="/opt/venv/bin:/usr/local/bin:$PATH"' >> /home/authly/.bashrc && \
-    echo 'export PYTHONPATH="/app:/opt/venv/lib/python3.12/site-packages"' >> /home/authly/.bashrc && \
-    echo 'export PS1="authly> "' >> /home/authly/.bashrc && \
-    echo 'cd /app' >> /home/authly/.bashrc && \
-    echo 'echo "Welcome to Authly Standalone!"' >> /home/authly/.bashrc && \
-    echo 'echo "⚠️  WARNING: This container uses insecure default secrets for development/testing only!"' >> /home/authly/.bashrc && \
-    echo 'echo "   For production, always provide your own secure JWT_SECRET_KEY and JWT_REFRESH_SECRET_KEY"' >> /home/authly/.bashrc && \
-    echo 'echo ""' >> /home/authly/.bashrc && \
-    echo 'echo "Services: PostgreSQL, Redis, and Authly are running"' >> /home/authly/.bashrc && \
-    echo 'echo ""' >> /home/authly/.bashrc && \
-    echo 'echo "Available commands:"' >> /home/authly/.bashrc && \
-    echo 'echo "  • authly --help                   # Main CLI: authly admin client create --name MyApp"' >> /home/authly/.bashrc && \
-    echo 'echo "  • authly-admin --help             # Admin shortcuts: authly-admin login (admin/admin), authly-admin client list"' >> /home/authly/.bashrc && \
-    echo 'echo "  • simple-auth-flow --help         # Full test: simple-auth-flow"' >> /home/authly/.bashrc && \
-    echo 'echo "  • run-end-to-end-test --help      # Full tests: run-end-to-end-test comprehensive"' >> /home/authly/.bashrc && \
-    echo 'echo ""' >> /home/authly/.bashrc
+RUN uv sync --group dev
 
 # Environment variables
 # WARNING: This container includes development defaults NOT suitable for production!
@@ -439,7 +190,11 @@ ENV DATABASE_URL=postgresql://authly:authly@localhost/authly \
     AUTHLY_STANDALONE=true \
     AUTHLY_ADMIN_PASSWORD=admin \
     JWT_SECRET_KEY=dev-standalone-insecure-key-change-me \
-    JWT_REFRESH_SECRET_KEY=dev-standalone-insecure-refresh-key-change-me
+    JWT_REFRESH_SECRET_KEY=dev-standalone-insecure-refresh-key-change-me \
+    RATE_LIMIT_MAX_REQUESTS=100 \
+    RATE_LIMIT_WINDOW_SECONDS=60 \
+    AUTHLY_LOCKOUT_MAX_ATTEMPTS=10 \
+    AUTHLY_LOCKOUT_DURATION_SECONDS=300
 
 # Volume for persistent data
 VOLUME ["/data"]
