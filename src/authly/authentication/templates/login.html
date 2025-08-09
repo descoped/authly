@@ -1,0 +1,292 @@
+{% extends "base.html" %}
+
+{% block title %}Login - Authly{% endblock %}
+
+{% block extra_head %}
+<style>
+    .login-container {
+        max-width: 400px;
+        margin: 60px auto;
+        padding: 2rem;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+    
+    .login-header {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+    
+    .login-header h2 {
+        color: #333;
+        font-size: 1.75rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .login-header p {
+        color: #6c757d;
+        font-size: 0.95rem;
+    }
+    
+    .form-group {
+        margin-bottom: 1.25rem;
+    }
+    
+    .form-label {
+        display: block;
+        margin-bottom: 0.5rem;
+        color: #495057;
+        font-weight: 500;
+        font-size: 0.95rem;
+    }
+    
+    .form-input {
+        width: 100%;
+        padding: 0.625rem 0.875rem;
+        font-size: 1rem;
+        line-height: 1.5;
+        color: #495057;
+        background-color: #fff;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+    }
+    
+    .form-input:focus {
+        outline: none;
+        border-color: #4CAF50;
+        box-shadow: 0 0 0 0.2rem rgba(76, 175, 80, 0.25);
+    }
+    
+    .form-input.error {
+        border-color: #dc3545;
+    }
+    
+    .form-checkbox {
+        display: flex;
+        align-items: center;
+        margin-bottom: 1.25rem;
+    }
+    
+    .form-checkbox input[type="checkbox"] {
+        margin-right: 0.5rem;
+    }
+    
+    .form-checkbox label {
+        color: #495057;
+        font-size: 0.95rem;
+        cursor: pointer;
+    }
+    
+    .btn-login {
+        width: 100%;
+        padding: 0.75rem;
+        font-size: 1rem;
+        font-weight: 500;
+        color: white;
+        background-color: #4CAF50;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background-color 0.15s ease-in-out;
+    }
+    
+    .btn-login:hover:not(:disabled) {
+        background-color: #45a049;
+    }
+    
+    .btn-login:disabled {
+        opacity: 0.65;
+        cursor: not-allowed;
+    }
+    
+    .btn-login.loading::after {
+        content: '';
+        display: inline-block;
+        width: 1rem;
+        height: 1rem;
+        margin-left: 0.5rem;
+        border: 2px solid #fff;
+        border-top-color: transparent;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+    }
+    
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+    
+    .alert {
+        padding: 0.75rem 1rem;
+        margin-bottom: 1.25rem;
+        border-radius: 4px;
+        font-size: 0.95rem;
+    }
+    
+    .alert-error {
+        background-color: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+    
+    .alert-info {
+        background-color: #d1ecf1;
+        color: #0c5460;
+        border: 1px solid #bee5eb;
+    }
+    
+    .oauth-context {
+        margin-top: 1.5rem;
+        padding: 1rem;
+        background-color: #f8f9fa;
+        border-radius: 4px;
+        font-size: 0.9rem;
+        color: #6c757d;
+    }
+    
+    .oauth-context strong {
+        color: #495057;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="login-container">
+    <div class="login-header">
+        <h2>Sign In</h2>
+        <p>Enter your credentials to continue</p>
+    </div>
+    
+    {% if error %}
+    <div class="alert alert-error" role="alert">
+        {{ error }}
+    </div>
+    {% endif %}
+    
+    {% if message %}
+    <div class="alert alert-info" role="alert">
+        {{ message }}
+    </div>
+    {% endif %}
+    
+    <form id="login-form" method="post" action="/auth/login">
+        <!-- CSRF Token -->
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        
+        <!-- Preserve OAuth flow parameters -->
+        {% if redirect_to %}
+        <input type="hidden" name="redirect_to" value="{{ redirect_to }}">
+        {% endif %}
+        
+        <div class="form-group">
+            <label for="username" class="form-label">Username or Email</label>
+            <input 
+                type="text" 
+                id="username" 
+                name="username" 
+                class="form-input" 
+                value="{{ username or '' }}"
+                required 
+                autocomplete="username"
+                autofocus
+            >
+        </div>
+        
+        <div class="form-group">
+            <label for="password" class="form-label">Password</label>
+            <input 
+                type="password" 
+                id="password" 
+                name="password" 
+                class="form-input" 
+                required 
+                autocomplete="current-password"
+            >
+        </div>
+        
+        <div class="form-checkbox">
+            <input 
+                type="checkbox" 
+                id="remember_me" 
+                name="remember_me" 
+                value="true"
+            >
+            <label for="remember_me">Remember me for 24 hours</label>
+        </div>
+        
+        <button type="submit" class="btn-login" id="login-btn">
+            Sign In
+        </button>
+    </form>
+    
+    {% if oauth_context %}
+    <div class="oauth-context">
+        <strong>OAuth Context:</strong><br>
+        You are signing in to authorize <strong>{{ oauth_context.client_name }}</strong>
+        to access your account.
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('login-form');
+    const loginBtn = document.getElementById('login-btn');
+    const usernameInput = document.getElementById('username');
+    const passwordInput = document.getElementById('password');
+    
+    // Form submission handler
+    form.addEventListener('submit', function(e) {
+        // Clear any previous errors
+        usernameInput.classList.remove('error');
+        passwordInput.classList.remove('error');
+        
+        // Basic validation
+        let hasError = false;
+        
+        if (!usernameInput.value.trim()) {
+            usernameInput.classList.add('error');
+            hasError = true;
+        }
+        
+        if (!passwordInput.value) {
+            passwordInput.classList.add('error');
+            hasError = true;
+        }
+        
+        if (hasError) {
+            e.preventDefault();
+            return;
+        }
+        
+        // Show loading state
+        loginBtn.disabled = true;
+        loginBtn.classList.add('loading');
+        loginBtn.textContent = 'Signing in';
+    });
+    
+    // Enter key handler for better UX
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && e.target.tagName !== 'BUTTON') {
+            const inputs = [usernameInput, passwordInput];
+            const currentIndex = inputs.indexOf(e.target);
+            
+            if (currentIndex > -1 && currentIndex < inputs.length - 1) {
+                e.preventDefault();
+                inputs[currentIndex + 1].focus();
+            }
+        }
+    });
+    
+    // Clear error state on input
+    [usernameInput, passwordInput].forEach(input => {
+        input.addEventListener('input', function() {
+            this.classList.remove('error');
+        });
+    });
+});
+</script>
+{% endblock %}

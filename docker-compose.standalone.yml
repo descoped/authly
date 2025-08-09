@@ -218,6 +218,22 @@ services:
     profiles:
       - authz
 
+  # OAuth/OIDC Tester - Simple, working OAuth and OIDC flow tester
+  oauth-tester:
+    build:
+      context: ./docker-standalone/oauth-tester
+      dockerfile: Dockerfile
+    container_name: authly-oauth-tester
+    ports:
+      - "8085:80"  # Web UI
+    networks:
+      - authly-net
+    depends_on:
+      authly-standalone:
+        condition: service_healthy
+    profiles:
+      - tools
+
 networks:
   authly-net:
     driver: bridge

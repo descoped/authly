@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test OIDC Debugger</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test { margin: 20px 0; padding: 15px; border: 1px solid #ddd; }
+        .button { padding: 10px 20px; background: #4CAF50; color: white; border: none; cursor: pointer; }
+        pre { background: #f4f4f4; padding: 10px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>Test OIDC Debugger with Authly</h1>
+    
+    <div class="test">
+        <h2>Step 1: Set Configuration</h2>
+        <button class="button" onclick="setConfig()">Set Authly Configuration</button>
+        <pre id="config-result"></pre>
+    </div>
+    
+    <div class="test">
+        <h2>Step 2: Test Authorization URL</h2>
+        <button class="button" onclick="testAuth()">Generate Auth URL</button>
+        <pre id="auth-result"></pre>
+    </div>
+    
+    <div class="test">
+        <h2>Step 3: Open Debugger</h2>
+        <button class="button" onclick="window.open('/debugger.html', '_blank')">Open Debugger</button>
+    </div>
+
+    <script>
+        function setConfig() {
+            // Clear and set new config
+            localStorage.clear();
+            
+            const config = {
+                authorization_grant_type: "authorization_code",
+                authorization_endpoint: "http://localhost:8000/api/v1/oauth/authorize",
+                token_endpoint: "http://localhost:8000/api/v1/oauth/token",
+                client_id: "client_q5IkUufL0c6CvzglVVZcIw",
+                redirect_uri: "http://localhost:8083/callback",
+                scope: "openid profile email",
+                use_pkce: "true",
+                yesCheck: true,
+                noCheck: false,
+                initialized: true
+            };
+            
+            Object.keys(config).forEach(key => {
+                localStorage.setItem(key, config[key]);
+            });
+            
+            document.getElementById('config-result').textContent = 
+                'Configuration set:\n' + JSON.stringify(config, null, 2);
+        }
+        
+        function testAuth() {
+            // Generate PKCE values
+            function generateRandomString(length) {
+                const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+                let result = '';
+                const array = new Uint8Array(length);
+                crypto.getRandomValues(array);
+                for (let i = 0; i < length; i++) {
+                    result += chars[array[i] % chars.length];
+                }
+                return result;
+            }
+            
+            async function sha256(plain) {
+                const encoder = new TextEncoder();
+                const data = encoder.encode(plain);
+                const hash = await crypto.subtle.digest('SHA-256', data);
+                return btoa(String.fromCharCode(...new Uint8Array(hash)))
+                    .replace(/\+/g, '-')
+                    .replace(/\//g, '_')
+                    .replace(/=/g, '');
+            }
+            
+            const code_verifier = generateRandomString(128);
+            sha256(code_verifier).then(code_challenge => {
+                const params = new URLSearchParams({
+                    response_type: 'code',
+                    client_id: 'client_q5IkUufL0c6CvzglVVZcIw',
+                    redirect_uri: 'http://localhost:8083/callback',
+                    scope: 'openid profile email',
+                    state: generateRandomString(16),
+                    code_challenge: code_challenge,
+                    code_challenge_method: 'S256'
+                });
+                
+                const authUrl = `http://localhost:8000/api/v1/oauth/authorize?${params}`;
+                
+                document.getElementById('auth-result').textContent = 
+                    `Authorization URL:\n${authUrl}\n\nCode Verifier (save for token exchange):\n${code_verifier}\n\nCode Challenge:\n${code_challenge}`;
+                
+                // Save for later use
+                localStorage.setItem('pkce_code_verifier', code_verifier);
+            });
+        }
+    </script>
+</body>
+</html>

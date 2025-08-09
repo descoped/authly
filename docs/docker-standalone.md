@@ -273,6 +273,13 @@ Adminer is a lightweight database management tool (single PHP file) that has bee
 
 ### How to Use Adminer
 
+#### Development Mode (Auto-login)
+In development, Adminer automatically generates and pre-fills a valid OAuth token:
+1. Navigate to http://localhost:8082
+2. Token is pre-filled in the password field (highlighted in green)
+3. Simply click "Login"
+
+#### Manual Token Entry
 1. **Get an OAuth token from Authly:**
 ```bash
 TOKEN=$(curl -s -X POST http://localhost:8000/api/v1/oauth/token \
@@ -284,22 +291,26 @@ echo $TOKEN
 2. **Access Adminer at http://localhost:8082**
 
 3. **Login with your OAuth token:**
-   - The username field is hidden (it uses "token" internally)
+   - Pre-populated fields: PostgreSQL, server, username, database
    - Paste your OAuth bearer token in the password field
    - Click Login
 
 ### Features
-- **Lightweight**: Single PHP file, minimal resource usage
+- **Auto-fill in Development**: Token automatically generated and pre-filled
+- **Pre-populated Form**: Server, database, and username fields are pre-configured
 - **OAuth Secured**: Uses Authly's token introspection endpoint
 - **Scope Validation**: Requires `database:read` and `database:write` scopes
-- **Token Caching**: Validated tokens are cached for 5 minutes
-- **User Display**: Shows authenticated user and granted scopes
+- **Session Persistence**: Stay logged in until you explicitly log out
+- **Visual Feedback**: Success banner auto-fades after 3 seconds
 
 ### Why Use Adminer?
+- **One-click login** in development mode
 - **Simpler UI** than pgAdmin for quick database operations
 - **OAuth-native** authentication (no database passwords)
 - **Lightweight** - uses minimal resources
 - **Fast** - loads instantly compared to heavier tools
+
+For detailed documentation, see [docker-standalone/adminer/README.md](../docker-standalone/adminer/README.md)
 
 ## OAuth Authorization for Databases (Experimental)
 

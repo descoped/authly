@@ -33,6 +33,10 @@ class BackendFactory:
         """
         self.resource_manager = resource_manager
         self.config = resource_manager.get_config()
+        # Cache backend instances to ensure they're shared
+        self._rate_limit_backend = None
+        self._cache_backend = None
+        self._session_backend = None
 
     async def create_rate_limit_backend(self) -> RateLimitBackend:
         """Create rate limiting backend.
@@ -40,20 +44,26 @@ class BackendFactory:
         Returns:
             RateLimitBackend implementation (Redis or memory)
         """
+        # Return cached instance if available
+        if self._rate_limit_backend is not None:
+            return self._rate_limit_backend
+
         if self.config.redis_rate_limit_enabled and self.resource_manager.redis_available:
             try:
                 from authly.core.backends import RedisRateLimitBackend
 
                 redis_client = self.resource_manager.get_redis_client()
                 logger.info("Using Redis rate limiting backend")
-                return RedisRateLimitBackend(redis_client)
+                self._rate_limit_backend = RedisRateLimitBackend(redis_client)
+                return self._rate_limit_backend
             except ImportError:
                 logger.warning("Redis rate limiting requested but Redis not available, falling back to memory")
             except Exception as e:
                 logger.error(f"Failed to create Redis rate limit backend: {e}, falling back to memory")
 
         logger.info("Using memory rate limiting backend")
-        return MemoryRateLimitBackend()
+        self._rate_limit_backend = MemoryRateLimitBackend()
+        return self._rate_limit_backend
 
     async def create_cache_backend(self) -> CacheBackend:
         """Create caching backend.
@@ -61,20 +71,26 @@ class BackendFactory:
         Returns:
             CacheBackend implementation (Redis or memory)
         """
+        # Return cached instance if available
+        if self._cache_backend is not None:
+            return self._cache_backend
+
         if self.config.redis_cache_enabled and self.resource_manager.redis_available:
             try:
                 from authly.core.backends import RedisCacheBackend
 
                 redis_client = self.resource_manager.get_redis_client()
                 logger.info("Using Redis caching backend")
-                return RedisCacheBackend(redis_client)
+                self._cache_backend = RedisCacheBackend(redis_client)
+                return self._cache_backend
             except ImportError:
                 logger.warning("Redis caching requested but Redis not available, falling back to memory")
             except Exception as e:
                 logger.error(f"Failed to create Redis cache backend: {e}, falling back to memory")
 
         logger.info("Using memory caching backend")
-        return MemoryCacheBackend()
+        self._cache_backend = MemoryCacheBackend()
+        return self._cache_backend
 
     async def create_session_backend(self) -> SessionBackend:
         """Create session storage backend.
@@ -82,20 +98,26 @@ class BackendFactory:
         Returns:
             SessionBackend implementation (Redis or memory)
         """
+        # Return cached instance if available
+        if self._session_backend is not None:
+            return self._session_backend
+
         if self.config.redis_session_enabled and self.resource_manager.redis_available:
             try:
                 from authly.core.backends import RedisSessionBackend
 
                 redis_client = self.resource_manager.get_redis_client()
                 logger.info("Using Redis session backend")
-                return RedisSessionBackend(redis_client)
+                self._session_backend = RedisSessionBackend(redis_client)
+                return self._session_backend
             except ImportError:
                 logger.warning("Redis sessions requested but Redis not available, falling back to memory")
             except Exception as e:
                 logger.error(f"Failed to create Redis session backend: {e}, falling back to memory")
 
         logger.info("Using memory session backend")
-        return MemorySessionBackend()
+        self._session_backend = MemorySessionBackend()
+        return self._session_backend
 
 
 # Global factory instance (will be initialized by dependency injection)

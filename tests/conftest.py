@@ -51,6 +51,11 @@ async def test_resource_manager(
 
     initialize_backend_factory(resource_manager)
 
+    # Set up the global resource manager for dependencies
+    from authly.core.dependencies import create_resource_manager_provider
+
+    create_resource_manager_provider(resource_manager)
+
     yield resource_manager
 
     # No cleanup needed - Database lifecycle is managed by _database_instance fixture
@@ -75,6 +80,11 @@ async def initialize_authly(
     from authly.core.backend_factory import initialize_backend_factory
 
     initialize_backend_factory(resource_manager)
+
+    # Set up the global resource manager for dependencies
+    from authly.core.dependencies import create_resource_manager_provider
+
+    create_resource_manager_provider(resource_manager)
 
     yield resource_manager
 

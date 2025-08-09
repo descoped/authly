@@ -147,7 +147,7 @@ class TestOAuthTemplates:
         """Test that templates include proper security elements."""
         # Read the authorization template file directly to verify security features
         project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-        template_path = os.path.join(project_root, "src", "authly", "templates", "oauth", "authorize.html")
+        template_path = os.path.join(project_root, "src", "authly", "oauth", "templates", "authorize.html")
 
         with open(template_path) as f:
             content = f.read()
@@ -162,7 +162,7 @@ class TestOAuthTemplates:
     async def test_javascript_functionality(self, template_server: AsyncTestServer):
         """Test that JavaScript functionality is included in templates."""
         project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-        template_path = os.path.join(project_root, "src", "authly", "templates", "oauth", "authorize.html")
+        template_path = os.path.join(project_root, "src", "authly", "oauth", "templates", "authorize.html")
 
         with open(template_path) as f:
             content = f.read()
@@ -178,7 +178,7 @@ class TestOAuthTemplates:
     async def test_template_accessibility_features(self, template_server: AsyncTestServer):
         """Test accessibility features in templates."""
         project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-        template_path = os.path.join(project_root, "src", "authly", "templates", "oauth", "authorize.html")
+        template_path = os.path.join(project_root, "src", "authly", "oauth", "templates", "authorize.html")
 
         with open(template_path) as f:
             content = f.read()
@@ -193,7 +193,7 @@ class TestOAuthTemplates:
     async def test_template_structure_validation(self, template_server: AsyncTestServer):
         """Test that templates have proper structure and template variables."""
         project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-        template_path = os.path.join(project_root, "src", "authly", "templates", "oauth", "authorize.html")
+        template_path = os.path.join(project_root, "src", "authly", "oauth", "templates", "authorize.html")
 
         with open(template_path) as f:
             content = f.read()
@@ -213,7 +213,7 @@ class TestOAuthTemplates:
         # For now, we verify the error template file exists and has proper structure
 
         project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-        error_template_path = os.path.join(project_root, "src", "authly", "templates", "oauth", "error.html")
+        error_template_path = os.path.join(project_root, "src", "authly", "oauth", "templates", "error.html")
 
         assert os.path.exists(error_template_path), "Error template should exist"
 
@@ -231,9 +231,9 @@ class TestOAuthTemplates:
     async def test_template_inheritance(self, template_server: AsyncTestServer):
         """Test that templates properly inherit from base template."""
         project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-        base_template_path = os.path.join(project_root, "src", "authly", "templates", "base.html")
+        base_template_path = os.path.join(project_root, "src", "authly", "core", "templates", "base.html")
 
-        authorize_template_path = os.path.join(project_root, "src", "authly", "templates", "oauth", "authorize.html")
+        authorize_template_path = os.path.join(project_root, "src", "authly", "oauth", "templates", "authorize.html")
 
         assert os.path.exists(base_template_path), "Base template should exist"
         assert os.path.exists(authorize_template_path), "Authorize template should exist"

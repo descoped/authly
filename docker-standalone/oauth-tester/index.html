@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Authly OAuth/OIDC Tester</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        .card h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .step-number {
+            background: #667eea;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9em;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #555;
+        }
+        input[type="text"], select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 5px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        input[type="text"]:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 15px 0;
+        }
+        .checkbox-group input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+        }
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #5a67d8;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .success {
+            background: #10b981;
+            color: white;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+        }
+        .error {
+            background: #ef4444;
+            color: white;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+        }
+        .info {
+            background: #3b82f6;
+            color: white;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+        }
+        .code-block {
+            background: #f3f4f6;
+            border: 1px solid #e5e7eb;
+            border-radius: 5px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+        .token-display {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 5px;
+            padding: 10px;
+            word-break: break-all;
+            font-family: monospace;
+            font-size: 12px;
+            margin: 10px 0;
+        }
+        .hidden {
+            display: none;
+        }
+        .url-display {
+            background: #f3f4f6;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            word-break: break-all;
+            font-size: 14px;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin: 15px 0;
+        }
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #e5e7eb;
+        }
+        .tab {
+            padding: 10px 20px;
+            background: none;
+            border: none;
+            color: #666;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+        }
+        .tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+        .status-indicator.success { background: #10b981; }
+        .status-indicator.error { background: #ef4444; }
+        .status-indicator.pending { background: #f59e0b; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔐 Authly OAuth/OIDC Tester</h1>
+            <p>Test OAuth 2.0 and OpenID Connect flows with Authly</p>
+        </div>
+
+        <!-- Configuration -->
+        <div class="card">
+            <h2><span class="step-number">1</span> Configuration</h2>
+            
+            <div class="form-group">
+                <label>Flow Type</label>
+                <select id="flow-type" onchange="updateFlowSettings()">
+                    <option value="password">Resource Owner Password (Works with Authly)</option>
+                    <option value="authorization_code">Authorization Code with PKCE (Now Works! ✅)</option>
+                    <option value="implicit">Implicit (deprecated)</option>
+                    <option value="client_credentials">Client Credentials</option>
+                    <option value="refresh">Refresh Token</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Client ID</label>
+                <input type="text" id="client-id" placeholder="e.g., client_xxxxx">
+            </div>
+
+            <div id="client-secret-group" class="form-group hidden">
+                <label>Client Secret (for confidential clients)</label>
+                <input type="text" id="client-secret" placeholder="Optional for public clients">
+            </div>
+
+            <div class="form-group">
+                <label>Scopes</label>
+                <input type="text" id="scopes" value="openid profile email">
+            </div>
+
+            <div class="checkbox-group">
+                <input type="checkbox" id="use-pkce" checked>
+                <label for="use-pkce">Use PKCE (required for public clients)</label>
+            </div>
+
+            <button onclick="saveConfig()">💾 Save Configuration</button>
+            <button onclick="loadDefaults()">🔄 Load Defaults</button>
+        </div>
+
+        <!-- Flow Execution -->
+        <div class="card" id="flow-card">
+            <h2><span class="step-number">2</span> Execute Flow</h2>
+            
+            <div id="auth-code-flow" class="flow-section">
+                <div class="error" id="auth-code-warning" style="display:none;">
+                    <strong>⚠️ This won't work with Authly!</strong><br>
+                    Authly is an API-only OAuth server without a login UI. 
+                    The Authorization Code flow requires a login page that Authly doesn't provide.
+                    You'll get a "login_required" error. Use Password Grant instead!
+                </div>
+                <button onclick="startAuthCodeFlow()" id="start-flow-btn">🚀 Start Authorization (Will Fail)</button>
+                <div id="auth-status"></div>
+            </div>
+
+            <div id="password-flow" class="flow-section hidden">
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" id="username" value="admin">
+                </div>
+                <div class="form-group">
+                    <label>Password (default: ci_admin_test_password)</label>
+                    <input type="password" id="password" placeholder="ci_admin_test_password">
+                </div>
+                <button onclick="executePasswordFlow()">🔐 Get Tokens</button>
+                <div class="info" style="margin-top: 10px;">
+                    <small>Default password: <code>ci_admin_test_password</code></small>
+                </div>
+            </div>
+
+            <div id="client-creds-flow" class="flow-section hidden">
+                <button onclick="executeClientCredsFlow()">🔑 Get Access Token</button>
+            </div>
+
+            <div id="refresh-flow" class="flow-section hidden">
+                <div class="form-group">
+                    <label>Refresh Token</label>
+                    <input type="text" id="refresh-token" placeholder="Paste refresh token here">
+                </div>
+                <button onclick="executeRefreshFlow()">🔄 Refresh Tokens</button>
+            </div>
+        </div>
+
+        <!-- Results -->
+        <div class="card" id="results-card" class="hidden">
+            <h2><span class="step-number">3</span> Results</h2>
+            
+            <div class="tabs">
+                <button class="tab active" onclick="showTab('tokens')">Tokens</button>
+                <button class="tab" onclick="showTab('decoded')">Decoded</button>
+                <button class="tab" onclick="showTab('userinfo')">UserInfo</button>
+                <button class="tab" onclick="showTab('introspect')">Introspect</button>
+            </div>
+
+            <div id="tokens-tab" class="tab-content active">
+                <div id="token-results"></div>
+            </div>
+
+            <div id="decoded-tab" class="tab-content">
+                <div id="decoded-results"></div>
+            </div>
+
+            <div id="userinfo-tab" class="tab-content">
+                <button onclick="fetchUserInfo()">Fetch UserInfo</button>
+                <div id="userinfo-results"></div>
+            </div>
+
+            <div id="introspect-tab" class="tab-content">
+                <button onclick="introspectToken()">Introspect Access Token</button>
+                <div id="introspect-results"></div>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="card">
+            <h2>⚡ Quick Actions</h2>
+            <div class="button-group">
+                <button onclick="createTestClient()">Create Test Client</button>
+                <button onclick="checkEndpoints()">Check Endpoints</button>
+                <button onclick="clearAll()">Clear All Data</button>
+            </div>
+            <div id="quick-actions-results"></div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const CONFIG = {
+            authorizationEndpoint: 'http://localhost:8000/api/v1/oauth/authorize',
+            tokenEndpoint: '/proxy/token',  // Use proxy to avoid CORS
+            userinfoEndpoint: '/proxy/userinfo',  // Use proxy to avoid CORS
+            introspectEndpoint: '/proxy/introspect',  // Use proxy to avoid CORS
+            redirectUri: 'http://localhost:8085/callback',
+            discoveryEndpoint: 'http://localhost:8000/.well-known/openid-configuration'
+        };
+
+        // State management
+        let state = {};
+        let tokens = {};
+
+        // Initialize
+        window.addEventListener('load', () => {
+            loadDefaults();
+            handleCallback();
+            // Default to authorization code flow (it now works!)
+            document.getElementById('flow-type').value = 'authorization_code';
+            updateFlowSettings();
+        });
+
+        function loadDefaults() {
+            const savedClientId = localStorage.getItem('client_id');
+            if (savedClientId) {
+                document.getElementById('client-id').value = savedClientId;
+            }
+            document.getElementById('scopes').value = 'openid profile email';
+            document.getElementById('use-pkce').checked = true;
+        }
+
+        function saveConfig() {
+            const clientId = document.getElementById('client-id').value;
+            localStorage.setItem('client_id', clientId);
+            showMessage('Configuration saved!', 'success');
+        }
+
+        function updateFlowSettings() {
+            const flowType = document.getElementById('flow-type').value;
+            
+            // Hide all flow sections
+            document.querySelectorAll('.flow-section').forEach(el => el.classList.add('hidden'));
+            
+            // Show relevant section
+            switch(flowType) {
+                case 'authorization_code':
+                case 'implicit':
+                    document.getElementById('auth-code-flow').classList.remove('hidden');
+                    document.getElementById('auth-code-warning').style.display = 'block';
+                    document.getElementById('use-pkce').checked = true;
+                    break;
+                case 'password':
+                    document.getElementById('password-flow').classList.remove('hidden');
+                    break;
+                case 'client_credentials':
+                    document.getElementById('client-creds-flow').classList.remove('hidden');
+                    document.getElementById('client-secret-group').classList.remove('hidden');
+                    break;
+                case 'refresh':
+                    document.getElementById('refresh-flow').classList.remove('hidden');
+                    break;
+            }
+        }
+
+        async function startAuthCodeFlow() {
+            const clientId = document.getElementById('client-id').value;
+            const scopes = document.getElementById('scopes').value;
+            const usePkce = document.getElementById('use-pkce').checked;
+            
+            if (!clientId) {
+                showMessage('Please enter a Client ID', 'error');
+                return;
+            }
+
+            // Generate state
+            state.state = generateRandomString(16);
+            state.nonce = generateRandomString(16);
+            state.clientId = clientId;
+            
+            let params = {
+                response_type: 'code',
+                client_id: clientId,
+                redirect_uri: CONFIG.redirectUri,
+                scope: scopes,
+                state: state.state,
+                nonce: state.nonce
+            };
+
+            // Add PKCE if enabled
+            if (usePkce) {
+                state.codeVerifier = generateRandomString(128);
+                const codeChallenge = await sha256(state.codeVerifier);
+                params.code_challenge = codeChallenge;
+                params.code_challenge_method = 'S256';
+                
+                console.log('PKCE Debug:', {
+                    verifier: state.codeVerifier,
+                    challenge: codeChallenge
+                });
+            }
+
+            // Save state
+            sessionStorage.setItem('oauth_state', JSON.stringify(state));
+            localStorage.setItem('last_client_id', clientId);
+
+            // Build and redirect to auth URL
+            const authUrl = CONFIG.authorizationEndpoint + '?' + new URLSearchParams(params);
+            
+            console.log('Starting OAuth Flow:', {
+                endpoint: CONFIG.authorizationEndpoint,
+                params: params,
+                full_url: authUrl
+            });
+            
+            document.getElementById('auth-status').innerHTML = `
+                <div class="info">
+                    <strong>Redirecting to authorization...</strong>
+                    <div class="url-display">${authUrl}</div>
+                    <br>
+                    <strong>Debug Info:</strong><br>
+                    State: ${state.state}<br>
+                    Nonce: ${state.nonce}<br>
+                    PKCE: ${usePkce ? 'Enabled' : 'Disabled'}<br>
+                </div>
+            `;
+
+            setTimeout(() => {
+                window.location.href = authUrl;
+            }, 1000);
+        }
+        
+        function retryAuth() {
+            // Restore client ID and try again
+            const lastClientId = localStorage.getItem('last_client_id');
+            if (lastClientId) {
+                document.getElementById('client-id').value = lastClientId;
+            }
+            startAuthCodeFlow();
+        }
+        
+        function showLoginForm() {
+            document.getElementById('flow-card').innerHTML = `
+                <h2><span class="step-number">2</span> Direct Login to Authly</h2>
+                <div class="info">
+                    <p>⚠️ This is a workaround. Normally, Authly should show its own login page.</p>
+                </div>
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" id="direct-username" value="admin">
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="direct-password">
+                </div>
+                <button onclick="directLogin()">Login to Authly</button>
+                <button onclick="location.reload()">Start Over</button>
+            `;
+        }
+        
+        async function directLogin() {
+            const username = document.getElementById('direct-username').value;
+            const password = document.getElementById('direct-password').value;
+            
+            // This would need to be implemented based on Authly's session/login endpoint
+            showMessage('Direct login needs to be implemented based on Authly login endpoint', 'info');
+        }
+
+        async function handleCallback() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const code = urlParams.get('code');
+            const returnedState = urlParams.get('state');
+            const error = urlParams.get('error');
+
+            if (error) {
+                const errorDesc = urlParams.get('error_description');
+                const errorUri = urlParams.get('error_uri');
+                
+                // Special handling for login_required
+                if (error === 'login_required') {
+                    document.getElementById('flow-card').innerHTML = `
+                        <h2><span class="step-number">2</span> Authentication Required</h2>
+                        <div class="info">
+                            <strong>🔐 Login Required</strong><br>
+                            ${errorDesc || 'You need to login to Authly first.'}
+                            <br><br>
+                            <strong>What's happening?</strong><br>
+                            1. OAuth detected you're not logged in<br>
+                            2. You need to authenticate with Authly<br>
+                            3. Then you'll be redirected back here<br>
+                            <br>
+                            <strong>Debug Info:</strong><br>
+                            Error: ${error}<br>
+                            Description: ${errorDesc}<br>
+                            State: ${urlParams.get('state')}<br>
+                            ${errorUri ? `Error URI: ${errorUri}<br>` : ''}
+                            <br>
+                            <button onclick="retryAuth()">🔄 Try Again</button>
+                            <button onclick="showLoginForm()">📝 Login Here</button>
+                        </div>
+                    `;
+                } else {
+                    showMessage(`Authorization Error: ${error} - ${errorDesc}`, 'error');
+                }
+                
+                // Show debug info in console
+                console.log('OAuth Error Details:', {
+                    error: error,
+                    error_description: errorDesc,
+                    error_uri: errorUri,
+                    state: urlParams.get('state'),
+                    full_url: window.location.href
+                });
+                
+                return;
+            }
+
+            if (code) {
+                // Restore state
+                const savedState = JSON.parse(sessionStorage.getItem('oauth_state') || '{}');
+                
+                // Verify state
+                if (returnedState !== savedState.state) {
+                    showMessage('State mismatch! Possible CSRF attack.', 'error');
+                    return;
+                }
+
+                // Exchange code for tokens
+                await exchangeCodeForTokens(code, savedState);
+            }
+        }
+
+        async function exchangeCodeForTokens(code, savedState) {
+            const clientId = localStorage.getItem('client_id');
+            
+            const params = new URLSearchParams({
+                grant_type: 'authorization_code',
+                code: code,
+                client_id: clientId,
+                redirect_uri: CONFIG.redirectUri
+            });
+
+            // Add PKCE verifier if present
+            if (savedState.codeVerifier) {
+                params.append('code_verifier', savedState.codeVerifier);
+            }
+
+            try {
+                const response = await fetch(CONFIG.tokenEndpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: params
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    tokens = data;
+                    displayTokens(data);
+                    sessionStorage.removeItem('oauth_state');
+                    // Clear URL params
+                    window.history.replaceState({}, document.title, '/');
+                } else {
+                    showMessage(`Token Error: ${JSON.stringify(data)}`, 'error');
+                }
+            } catch (err) {
+                showMessage(`Request failed: ${err.message}`, 'error');
+            }
+        }
+
+        async function executePasswordFlow() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const clientId = document.getElementById('client-id').value;
+            const scopes = document.getElementById('scopes').value;
+
+            const params = new URLSearchParams({
+                grant_type: 'password',
+                username: username,
+                password: password,
+                client_id: clientId,
+                scope: scopes
+            });
+
+            try {
+                const response = await fetch(CONFIG.tokenEndpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: params
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    tokens = data;
+                    displayTokens(data);
+                } else {
+                    showMessage(`Error: ${JSON.stringify(data)}`, 'error');
+                }
+            } catch (err) {
+                showMessage(`Request failed: ${err.message}`, 'error');
+            }
+        }
+
+        async function fetchUserInfo() {
+            if (!tokens.access_token) {
+                showMessage('No access token available', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(CONFIG.userinfoEndpoint, {
+                    headers: {
+                        'Authorization': `Bearer ${tokens.access_token}`
+                    }
+                });
+
+                const data = await response.json();
+                
+                document.getElementById('userinfo-results').innerHTML = `
+                    <div class="success">
+                        <strong>UserInfo Response:</strong>
+                        <pre class="code-block">${JSON.stringify(data, null, 2)}</pre>
+                    </div>
+                `;
+            } catch (err) {
+                showMessage(`UserInfo failed: ${err.message}`, 'error');
+            }
+        }
+
+        async function introspectToken() {
+            if (!tokens.access_token) {
+                showMessage('No access token available', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(CONFIG.introspectEndpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: new URLSearchParams({
+                        token: tokens.access_token,
+                        token_type_hint: 'access_token'
+                    })
+                });
+
+                const data = await response.json();
+                
+                document.getElementById('introspect-results').innerHTML = `
+                    <div class="success">
+                        <strong>Token Introspection:</strong>
+                        <pre class="code-block">${JSON.stringify(data, null, 2)}</pre>
+                    </div>
+                `;
+            } catch (err) {
+                showMessage(`Introspection failed: ${err.message}`, 'error');
+            }
+        }
+
+        function displayTokens(data) {
+            document.getElementById('results-card').classList.remove('hidden');
+            
+            let html = '<div class="success"><strong>Tokens Received!</strong></div>';
+            
+            if (data.access_token) {
+                html += `
+                    <div>
+                        <strong>Access Token:</strong>
+                        <div class="token-display">${data.access_token}</div>
+                    </div>
+                `;
+            }
+            
+            if (data.id_token) {
+                html += `
+                    <div>
+                        <strong>ID Token:</strong>
+                        <div class="token-display">${data.id_token}</div>
+                    </div>
+                `;
+                
+                // Decode ID token
+                try {
+                    const parts = data.id_token.split('.');
+                    const header = JSON.parse(atob(parts[0]));
+                    const payload = JSON.parse(atob(parts[1]));
+                    
+                    document.getElementById('decoded-results').innerHTML = `
+                        <div>
+                            <strong>ID Token Header:</strong>
+                            <pre class="code-block">${JSON.stringify(header, null, 2)}</pre>
+                            <strong>ID Token Payload:</strong>
+                            <pre class="code-block">${JSON.stringify(payload, null, 2)}</pre>
+                        </div>
+                    `;
+                } catch (e) {
+                    console.error('Failed to decode ID token:', e);
+                }
+            }
+            
+            if (data.refresh_token) {
+                html += `
+                    <div>
+                        <strong>Refresh Token:</strong>
+                        <div class="token-display">${data.refresh_token}</div>
+                    </div>
+                `;
+            }
+            
+            html += `
+                <div>
+                    <strong>Token Type:</strong> ${data.token_type}<br>
+                    <strong>Expires In:</strong> ${data.expires_in} seconds<br>
+                    <strong>Scope:</strong> ${data.scope || 'N/A'}
+                </div>
+            `;
+            
+            document.getElementById('token-results').innerHTML = html;
+        }
+
+        async function checkEndpoints() {
+            const endpoints = [
+                { name: 'Discovery', url: CONFIG.discoveryEndpoint },
+                { name: 'Authorization', url: CONFIG.authorizationEndpoint },
+                { name: 'Token', url: CONFIG.tokenEndpoint },
+                { name: 'UserInfo', url: CONFIG.userinfoEndpoint },
+                { name: 'Introspect', url: CONFIG.introspectEndpoint }
+            ];
+
+            let html = '<div><strong>Endpoint Status:</strong><br>';
+            
+            for (const endpoint of endpoints) {
+                try {
+                    const response = await fetch(endpoint.url, { method: 'GET' });
+                    const status = response.ok || response.status === 405 || response.status === 400;
+                    html += `<span class="status-indicator ${status ? 'success' : 'error'}"></span>`;
+                    html += `${endpoint.name}: ${status ? '✅ Available' : '❌ Not reachable'}<br>`;
+                } catch (e) {
+                    html += `<span class="status-indicator error"></span>`;
+                    html += `${endpoint.name}: ❌ Error<br>`;
+                }
+            }
+            
+            html += '</div>';
+            document.getElementById('quick-actions-results').innerHTML = html;
+        }
+
+        function clearAll() {
+            localStorage.clear();
+            sessionStorage.clear();
+            tokens = {};
+            state = {};
+            window.location.href = '/';
+        }
+
+        function showTab(tabName) {
+            // Update tab buttons
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // Update tab content
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById(`${tabName}-tab`).classList.add('active');
+        }
+
+        function showMessage(message, type) {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = type;
+            alertDiv.textContent = message;
+            document.body.appendChild(alertDiv);
+            
+            setTimeout(() => {
+                alertDiv.remove();
+            }, 5000);
+        }
+
+        // Utility functions
+        function generateRandomString(length) {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+            const array = new Uint8Array(length);
+            crypto.getRandomValues(array);
+            return Array.from(array, byte => chars[byte % chars.length]).join('');
+        }
+
+        async function sha256(plain) {
+            const encoder = new TextEncoder();
+            const data = encoder.encode(plain);
+            const hash = await crypto.subtle.digest('SHA-256', data);
+            return btoa(String.fromCharCode(...new Uint8Array(hash)))
+                .replace(/\+/g, '-')
+                .replace(/\//g, '_')
+                .replace(/=/g, '');
+        }
+    </script>
+</body>
+</html>

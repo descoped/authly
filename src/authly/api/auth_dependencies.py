@@ -91,6 +91,31 @@ class DeferredOAuth2PasswordBearer:
 # Single instance
 oauth2_scheme = DeferredOAuth2PasswordBearer()
 
+
+class DeferredOAuth2PasswordBearerOptional(DeferredOAuth2PasswordBearer):
+    """OAuth2 scheme that returns None instead of raising exception when no token present."""
+
+    async def initialize(self, request: Request = None) -> OAuth2State:
+        """Thread-safe, retry-safe initialization with auto_error=False"""
+        if self._init_error:
+            self._init_error = None
+
+        async with self._lock:
+            if self._state is None:
+                try:
+                    token_url = self.get_token_url(request)
+                    oauth = OAuth2PasswordBearer(tokenUrl=token_url, auto_error=False)
+                    self._state = OAuth2State(oauth=oauth, token_url=token_url)
+                except Exception as e:
+                    self._init_error = e
+                    return None
+
+        return self._state
+
+
+# Optional OAuth2 scheme (returns None if no token)
+oauth2_scheme_optional = DeferredOAuth2PasswordBearerOptional()
+
 # HTTP Basic scheme for client authentication
 basic_auth_scheme = HTTPBasic(auto_error=False)
 

@@ -61,6 +61,10 @@ After starting, run `make standalone-info` to see all service URLs and credentia
   
 - **pgAdmin**: http://localhost:5050
   - Login: `admin@example.com` / `authly`
+  
+- **Adminer**: http://localhost:8082
+  - OAuth-integrated database access
+  - Auto-login in development mode
 
 ### Cache Services
 - **Redis/KeyDB**: localhost:6379
@@ -140,7 +144,7 @@ make standalone-full
 ```
 
 ### Available Profiles
-- **`tools`**: pgAdmin, Redis Commander
+- **`tools`**: pgAdmin, Adminer, Redis Commander
 - **`monitoring`**: Prometheus, Grafana
 - **`authz`**: OAuth proxy servers for database and cache
 

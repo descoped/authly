@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple OAuth Test for Authly</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        input[type="text"], textarea {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .error {
+            color: red;
+            margin: 10px 0;
+        }
+        .success {
+            color: green;
+            margin: 10px 0;
+        }
+        pre {
+            background: #f4f4f4;
+            padding: 10px;
+            overflow-x: auto;
+            border-radius: 4px;
+        }
+        .token-display {
+            word-break: break-all;
+            background: #f9f9f9;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Simple OAuth/OIDC Test for Authly</h1>
+    
+    <div class="section">
+        <h2>1. Configuration</h2>
+        <label>Client ID:</label>
+        <input type="text" id="client_id" value="client_q5IkUufL0c6CvzglVVZcIw">
+        
+        <label>Redirect URI:</label>
+        <input type="text" id="redirect_uri" value="http://localhost:8083/callback">
+        
+        <label>Scope:</label>
+        <input type="text" id="scope" value="openid profile email">
+        
+        <label>Authorization Endpoint:</label>
+        <input type="text" id="auth_endpoint" value="http://localhost:8000/api/v1/oauth/authorize">
+        
+        <label>Token Endpoint:</label>
+        <input type="text" id="token_endpoint" value="http://localhost:8000/api/v1/oauth/token">
+        
+        <label>
+            <input type="checkbox" id="use_pkce" checked> Use PKCE (Required for Authly public clients)
+        </label>
+    </div>
+    
+    <div class="section">
+        <h2>2. Authorization</h2>
+        <button onclick="startAuth()">Start Authorization Flow</button>
+        <div id="auth-info"></div>
+        <div id="auth-url"></div>
+    </div>
+    
+    <div class="section">
+        <h2>3. Callback Handler</h2>
+        <p>After authorization, you'll be redirected back here with a code.</p>
+        <div id="callback-info"></div>
+        <button onclick="exchangeCode()" id="exchange-btn" style="display:none;">Exchange Code for Tokens</button>
+    </div>
+    
+    <div class="section">
+        <h2>4. Tokens</h2>
+        <div id="token-info"></div>
+    </div>
+
+    <script>
+        // Check if we're handling a callback
+        const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get('code');
+        const state = urlParams.get('state');
+        const error = urlParams.get('error');
+        
+        if (code) {
+            document.getElementById('callback-info').innerHTML = `
+                <div class="success">
+                    <strong>Authorization Code Received!</strong><br>
+                    Code: <span class="token-display">${code}</span><br>
+                    State: ${state}
+                </div>
+            `;
+            document.getElementById('exchange-btn').style.display = 'inline-block';
+            
+            // Store code for exchange
+            sessionStorage.setItem('auth_code', code);
+        } else if (error) {
+            document.getElementById('callback-info').innerHTML = `
+                <div class="error">
+                    <strong>Authorization Error:</strong><br>
+                    ${error}: ${urlParams.get('error_description') || ''}
+                </div>
+            `;
+        }
+        
+        function generateRandomString(length) {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+            let result = '';
+            const array = new Uint8Array(length);
+            crypto.getRandomValues(array);
+            for (let i = 0; i < length; i++) {
+                result += chars[array[i] % chars.length];
+            }
+            return result;
+        }
+        
+        async function sha256(plain) {
+            const encoder = new TextEncoder();
+            const data = encoder.encode(plain);
+            const hash = await crypto.subtle.digest('SHA-256', data);
+            return btoa(String.fromCharCode(...new Uint8Array(hash)))
+                .replace(/\+/g, '-')
+                .replace(/\//g, '_')
+                .replace(/=/g, '');
+        }
+        
+        async function startAuth() {
+            const clientId = document.getElementById('client_id').value;
+            const redirectUri = document.getElementById('redirect_uri').value;
+            const scope = document.getElementById('scope').value;
+            const authEndpoint = document.getElementById('auth_endpoint').value;
+            const usePkce = document.getElementById('use_pkce').checked;
+            
+            const state = generateRandomString(16);
+            sessionStorage.setItem('oauth_state', state);
+            
+            let params = {
+                response_type: 'code',
+                client_id: clientId,
+                redirect_uri: redirectUri,
+                scope: scope,
+                state: state
+            };
+            
+            if (usePkce) {
+                const codeVerifier = generateRandomString(128);
+                const codeChallenge = await sha256(codeVerifier);
+                
+                sessionStorage.setItem('code_verifier', codeVerifier);
+                params.code_challenge = codeChallenge;
+                params.code_challenge_method = 'S256';
+                
+                document.getElementById('auth-info').innerHTML = `
+                    <div class="success">
+                        PKCE Generated:<br>
+                        Code Verifier (saved): ${codeVerifier.substring(0, 20)}...<br>
+                        Code Challenge: ${codeChallenge.substring(0, 20)}...
+                    </div>
+                `;
+            }
+            
+            const authUrl = authEndpoint + '?' + new URLSearchParams(params);
+            document.getElementById('auth-url').innerHTML = `
+                <div>
+                    <strong>Authorization URL:</strong><br>
+                    <pre>${authUrl}</pre>
+                    <button onclick="window.location.href='${authUrl}'">Go to Authorization</button>
+                </div>
+            `;
+        }
+        
+        async function exchangeCode() {
+            const code = sessionStorage.getItem('auth_code');
+            const clientId = document.getElementById('client_id').value;
+            const redirectUri = document.getElementById('redirect_uri').value;
+            const tokenEndpoint = document.getElementById('token_endpoint').value;
+            const codeVerifier = sessionStorage.getItem('code_verifier');
+            
+            const params = new URLSearchParams({
+                grant_type: 'authorization_code',
+                code: code,
+                client_id: clientId,
+                redirect_uri: redirectUri
+            });
+            
+            if (codeVerifier) {
+                params.append('code_verifier', codeVerifier);
+            }
+            
+            try {
+                const response = await fetch(tokenEndpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: params
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    document.getElementById('token-info').innerHTML = `
+                        <div class="success">
+                            <strong>Tokens Received!</strong><br><br>
+                            <strong>Access Token:</strong>
+                            <div class="token-display">${data.access_token}</div>
+                            <strong>ID Token:</strong>
+                            <div class="token-display">${data.id_token || 'N/A'}</div>
+                            <strong>Refresh Token:</strong>
+                            <div class="token-display">${data.refresh_token || 'N/A'}</div>
+                            <strong>Expires In:</strong> ${data.expires_in} seconds<br>
+                            <strong>Token Type:</strong> ${data.token_type}
+                        </div>
+                    `;
+                    
+                    // Decode ID token if present
+                    if (data.id_token) {
+                        const idTokenParts = data.id_token.split('.');
+                        const payload = JSON.parse(atob(idTokenParts[1]));
+                        document.getElementById('token-info').innerHTML += `
+                            <br><strong>ID Token Claims:</strong>
+                            <pre>${JSON.stringify(payload, null, 2)}</pre>
+                        `;
+                    }
+                } else {
+                    document.getElementById('token-info').innerHTML = `
+                        <div class="error">
+                            <strong>Token Exchange Error:</strong><br>
+                            ${JSON.stringify(data, null, 2)}
+                        </div>
+                    `;
+                }
+            } catch (err) {
+                document.getElementById('token-info').innerHTML = `
+                    <div class="error">
+                        <strong>Request Error:</strong><br>
+                        ${err.message}
+                    </div>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>

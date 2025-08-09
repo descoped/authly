@@ -163,12 +163,13 @@ def get_login_tracker(config: AuthlyConfig = Depends(get_config)) -> LoginAttemp
     return _login_tracker
 
 
-# Configure template directory
-TEMPLATES_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "templates")
+# Configure template directories - OAuth templates and shared core templates
+OAUTH_TEMPLATES_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "oauth", "templates")
+CORE_TEMPLATES_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "core", "templates")
 STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
 
-# Initialize Jinja2 templates
-templates = Jinja2Templates(directory=TEMPLATES_DIR)
+# Initialize Jinja2 templates with both directories
+templates = Jinja2Templates(directory=[OAUTH_TEMPLATES_DIR, CORE_TEMPLATES_DIR])
 
 
 async def get_discovery_service(scope_repo: "ScopeRepository" = Depends(get_scope_repository)) -> DiscoveryService:
@@ -403,7 +404,7 @@ async def authorize_get(
         # Render the authorization consent template
         return templates.TemplateResponse(
             request=request,
-            name="oauth/authorize.html",
+            name="authorize.html",
             context={
                 "client": client,
                 "client_id": client_id,

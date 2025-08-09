@@ -19,6 +19,7 @@ from authly.api.admin_router import admin_router
 from authly.api.oauth_discovery_router import oauth_discovery_router
 from authly.api.password_change import router as password_change_router
 from authly.api.security_middleware import setup_security_middleware
+from authly.authentication import auth_router as authentication_router
 from authly.config import AuthlyConfig
 from authly.logging.middleware import LoggingMiddleware
 
@@ -65,6 +66,14 @@ def create_app(
 
     if os.path.exists(static_path):
         app.mount("/static", StaticFiles(directory=static_path), name="static")
+
+    # Include authentication router for browser-based login (no prefix - uses /auth)
+    app.include_router(authentication_router)
+
+    # Patch OAuth authorization endpoints to support session-based authentication
+    from authly.authentication.oauth_integration import patch_oauth_authorization_endpoints
+
+    patch_oauth_authorization_endpoints()
 
     # Include health router (no prefix)
     app.include_router(health_router)

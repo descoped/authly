@@ -1,0 +1,32 @@
+--- debugger.js.orig
++++ debugger.js
+@@ -287,15 +287,15 @@
+   var initialized = getLSBooleanItem("initialized");
+   if (localStorage && !initialized) {
+       localStorage.setItem("authorization_grant_type", "oidc_authorization_code_flow");
+-      localStorage.setItem("authorization_endpoint", "https://localhost/oauth2/authorization");
+-      localStorage.setItem("token_endpoint","https://localhost/oauth2/token");
+-      localStorage.setItem("introspection_endpoint","https://localhost/oauth2/token/introspect");
++      localStorage.setItem("authorization_endpoint", "http://localhost:8000/oauth/authorize");
++      localStorage.setItem("token_endpoint","http://localhost:8000/api/v1/oauth/token");
++      localStorage.setItem("introspection_endpoint","http://localhost:8000/api/v1/oauth/introspect");
+       localStorage.setItem("yesResourceCheck", false);
+       localStorage.setItem("noResourceCheck", true);
+       localStorage.setItem("yesCheck", true);
+       localStorage.setItem("noCheck", false);
+       localStorage.setItem("yesCheckOIDCArtifacts", true);
+       localStorage.setItem("noCheckOIDCArtifacts", false);
+       localStorage.setItem("client_id", "");
+       localStorage.setItem("client_secret", "");
+-      localStorage.setItem("redirect_uri", "http://localhost:3000/callback");
++      localStorage.setItem("redirect_uri", "http://localhost:8083/callback");
+       localStorage.setItem("resource", "");
+       localStorage.setItem("remember_this_device_checkbox", false);
+-      localStorage.setItem("oidc_discovery_endpoint", "https://localhost/oidc/.well-known");
+-      localStorage.setItem("oidc_userinfo_endpoint", "https://localhost/oidc/userinfo");
+-      localStorage.setItem("jwks_endpoint", "https://localhost/oidc/.well-known/jwks");
++      localStorage.setItem("oidc_discovery_endpoint", "http://localhost:8000/.well-known/openid-configuration");
++      localStorage.setItem("oidc_userinfo_endpoint", "http://localhost:8000/api/v1/userinfo");
++      localStorage.setItem("jwks_endpoint", "http://localhost:8000/.well-known/jwks.json");
+       localStorage.setItem("oidc_logout_endpoint", "");
+       localStorage.setItem("oidc_logout_redirect_uri", "");

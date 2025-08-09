@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Reset OIDC Debugger to Authly Defaults</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 15px 32px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border: none;
+            border-radius: 4px;
+        }
+        .button:hover {
+            background-color: #45a049;
+        }
+        .endpoint {
+            margin: 10px 0;
+            padding: 10px;
+            background-color: #f0f0f0;
+            border-radius: 4px;
+        }
+        .endpoint strong {
+            display: inline-block;
+            width: 200px;
+        }
+        .success {
+            color: green;
+            font-weight: bold;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>Reset OIDC Debugger to Authly Defaults</h1>
+    
+    <p>This page will reset your OIDC Debugger localStorage to use Authly endpoints.</p>
+    
+    <button class="button" onclick="resetToAuthlyDefaults()">Reset to Authly Defaults</button>
+    <button class="button" onclick="clearAll()">Clear All Settings</button>
+    
+    <div id="success" class="success">✅ Settings reset successfully! Redirecting to debugger...</div>
+    
+    <h2>Endpoints that will be set:</h2>
+    <div class="endpoint">
+        <strong>Authorization:</strong> http://localhost:8000/api/v1/oauth/authorize
+    </div>
+    <div class="endpoint">
+        <strong>Token:</strong> http://localhost:8000/api/v1/oauth/token
+    </div>
+    <div class="endpoint">
+        <strong>Introspection:</strong> http://localhost:8000/api/v1/oauth/introspect
+    </div>
+    <div class="endpoint">
+        <strong>UserInfo:</strong> http://localhost:8000/api/v1/userinfo
+    </div>
+    <div class="endpoint">
+        <strong>Discovery:</strong> http://localhost:8000/.well-known/openid-configuration
+    </div>
+    <div class="endpoint">
+        <strong>JWKS:</strong> http://localhost:8000/.well-known/jwks.json
+    </div>
+    <div class="endpoint">
+        <strong>Redirect URI:</strong> http://localhost:8083/callback
+    </div>
+    
+    <script>
+        function resetToAuthlyDefaults() {
+            // Clear old values first
+            localStorage.clear();
+            
+            // Set Authly defaults
+            localStorage.setItem("authorization_grant_type", "oidc_authorization_code_flow");
+            localStorage.setItem("authorization_endpoint", "http://localhost:8000/api/v1/oauth/authorize");
+            localStorage.setItem("token_endpoint", "http://localhost:8000/api/v1/oauth/token");
+            localStorage.setItem("introspection_endpoint", "http://localhost:8000/api/v1/oauth/introspect");
+            localStorage.setItem("redirect_uri", "http://localhost:8083/callback");
+            localStorage.setItem("oidc_discovery_endpoint", "http://localhost:8000/.well-known/openid-configuration");
+            localStorage.setItem("oidc_userinfo_endpoint", "http://localhost:8000/api/v1/userinfo");
+            localStorage.setItem("jwks_endpoint", "http://localhost:8000/.well-known/jwks.json");
+            
+            // Set other defaults
+            localStorage.setItem("yesResourceCheck", false);
+            localStorage.setItem("noResourceCheck", true);
+            localStorage.setItem("yesCheck", true);
+            localStorage.setItem("noCheck", false);
+            localStorage.setItem("yesCheckOIDCArtifacts", true);
+            localStorage.setItem("noCheckOIDCArtifacts", false);
+            localStorage.setItem("initialized", true);
+            
+            // Show success message
+            document.getElementById('success').style.display = 'block';
+            
+            // Redirect to debugger after 2 seconds
+            setTimeout(function() {
+                window.location.href = '/debugger.html';
+            }, 2000);
+        }
+        
+        function clearAll() {
+            localStorage.clear();
+            document.getElementById('success').innerHTML = '✅ All settings cleared! Redirecting to debugger...';
+            document.getElementById('success').style.display = 'block';
+            setTimeout(function() {
+                window.location.href = '/debugger.html';
+            }, 2000);
+        }
+    </script>
+</body>
+</html>
