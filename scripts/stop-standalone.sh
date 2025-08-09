@@ -22,6 +22,10 @@ print_error() {
 # Parse arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
+        --all|-a)
+            STOP_ALL=true
+            shift
+            ;;
         --volumes|-v)
             REMOVE_VOLUMES=true
             shift
@@ -30,6 +34,7 @@ while [[ $# -gt 0 ]]; do
             echo "Usage: $0 [OPTIONS]"
             echo ""
             echo "Options:"
+            echo "  --all, -a         Stop all services (including tools, monitoring, authz)"
             echo "  --volumes, -v     Remove volumes (deletes all data)"
             echo "  --help, -h        Show this help message"
             echo ""
@@ -61,20 +66,32 @@ docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" | grep authly || 
 echo ""
 
 # Stop services
-print_status "Stopping Authly standalone services..."
+if [ "$STOP_ALL" = true ]; then
+    print_status "Stopping ALL Authly services (standalone + tools + monitoring + authz)..."
+    # Include all profiles to ensure all services are stopped
+    PROFILES="--profile tools --profile monitoring --profile authz"
+else
+    print_status "Stopping Authly standalone service (core only)..."
+    # No profiles - just the main standalone service
+    PROFILES=""
+fi
 
 if [ "$REMOVE_VOLUMES" = true ]; then
     print_status "Removing containers and volumes (all data will be deleted)..."
-    if docker compose -f $COMPOSE_FILE down -v; then
+    if docker compose -f $COMPOSE_FILE $PROFILES down -v; then
         print_success "Services stopped and volumes removed!"
+        print_status "All data has been deleted."
     else
         print_error "Failed to stop services"
         exit 1
     fi
 else
-    if docker compose -f $COMPOSE_FILE down; then
+    if docker compose -f $COMPOSE_FILE $PROFILES down; then
         print_success "Services stopped successfully!"
         echo ""
+        if [ "$STOP_ALL" != true ]; then
+            echo "Note: Only core service stopped. Use --all to stop all services."
+        fi
         echo "Note: Data volumes are preserved. Use --volumes to remove them."
     else
         print_error "Failed to stop services"

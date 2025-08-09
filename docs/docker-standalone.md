@@ -6,7 +6,8 @@ The `descoped/authly-standalone` image is an all-in-one container that includes 
 
 - **🔍 OAuth Token Introspection**: RFC 7662 compliant introspection endpoint at `/api/v1/oauth/introspect`
 - **🔌 Remote Database Access**: PostgreSQL (5432) and Redis (6379) ports can be exposed for external tools
-- **📊 Management Tools**: pgAdmin, Redis Commander, Prometheus, and Grafana via docker-compose
+- **📊 Management Tools**: pgAdmin, Adminer (OAuth), Redis Commander, Prometheus, and Grafana via docker-compose
+- **🗄️ Adminer OAuth Integration**: Lightweight database management with Authly OAuth authentication
 - **🔐 OAuth Database Auth**: Experimental proxy servers for token-based database access
 - **🚀 Service URLs Display**: Automatic display of all service endpoints on startup
 - **🛠️ Enhanced Troubleshooting**: 300+ MB of debugging tools (htop, tcpdump, vim, git, etc.)
@@ -259,11 +260,46 @@ docker compose -f docker-compose.standalone.yml \
 | PostgreSQL | localhost:5432 | authly / authly | (always) |
 | Redis/KeyDB | localhost:6379 | (none) | (always) |
 | pgAdmin | http://localhost:5050 | admin@authly.localhost / admin | tools |
+| Adminer (OAuth) | http://localhost:8082 | OAuth Bearer token | tools |
 | Redis Commander | http://localhost:8081 | admin / admin | tools |
 | Prometheus | http://localhost:9090 | (none) | monitoring |
 | Grafana | http://localhost:3000 | admin / admin | monitoring |
 | PG Proxy (OAuth) | localhost:5433 | Bearer token | authz |
 | Redis Proxy (OAuth) | localhost:6380 | Bearer token | authz |
+
+## Adminer with OAuth Authentication
+
+Adminer is a lightweight database management tool (single PHP file) that has been integrated with Authly's OAuth authentication. Unlike pgAdmin which uses traditional username/password, Adminer authenticates users via OAuth bearer tokens.
+
+### How to Use Adminer
+
+1. **Get an OAuth token from Authly:**
+```bash
+TOKEN=$(curl -s -X POST http://localhost:8000/api/v1/oauth/token \
+  -d "grant_type=password&username=admin&password=admin&scope=database:read database:write" \
+  | jq -r '.access_token')
+echo $TOKEN
+```
+
+2. **Access Adminer at http://localhost:8082**
+
+3. **Login with your OAuth token:**
+   - The username field is hidden (it uses "token" internally)
+   - Paste your OAuth bearer token in the password field
+   - Click Login
+
+### Features
+- **Lightweight**: Single PHP file, minimal resource usage
+- **OAuth Secured**: Uses Authly's token introspection endpoint
+- **Scope Validation**: Requires `database:read` and `database:write` scopes
+- **Token Caching**: Validated tokens are cached for 5 minutes
+- **User Display**: Shows authenticated user and granted scopes
+
+### Why Use Adminer?
+- **Simpler UI** than pgAdmin for quick database operations
+- **OAuth-native** authentication (no database passwords)
+- **Lightweight** - uses minimal resources
+- **Fast** - loads instantly compared to heavier tools
 
 ## OAuth Authorization for Databases (Experimental)
 

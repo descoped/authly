@@ -2,12 +2,12 @@
 
 # Simple, clean service information display
 
-# Colors
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
-BOLD='\033[1m'
+# Colors - using printf-compatible format
+GREEN=$'\033[0;32m'
+YELLOW=$'\033[1;33m'
+BLUE=$'\033[0;34m'
+NC=$'\033[0m' # No Color
+BOLD=$'\033[1m'
 
 # Function to check if a service is running
 check_service() {
@@ -20,92 +20,92 @@ check_service() {
 }
 
 # Main display
-echo ""
-echo "================================================================================"
-echo "🚀 ${BOLD}AUTHLY STANDALONE SERVICES${NC}"
-echo "================================================================================"
-echo ""
-echo "${BOLD}CORE SERVICES:${NC}"
-echo "  • Authly API:        ${BLUE}http://localhost:8000${NC}"
-echo "                       Username: ${YELLOW}admin${NC}"
-echo "                       Password: ${YELLOW}${AUTHLY_ADMIN_PASSWORD:-admin}${NC}"
-echo "  • API Documentation: ${BLUE}http://localhost:8000/docs${NC}"
-echo "  • Health Check:      ${BLUE}http://localhost:8000/health${NC}"
-echo ""
-echo "${BOLD}DATABASE SERVICES:${NC}"
-echo "  • PostgreSQL:        ${BLUE}postgresql://authly:authly@localhost:5432/authly${NC}"
-echo "                       (Internal access only from container)"
+printf "\n"
+printf "================================================================================\n"
+printf "🚀 %bAUTHLY STANDALONE SERVICES%b\n" "${BOLD}" "${NC}"
+printf "================================================================================\n"
+printf "\n"
+printf "%bCORE SERVICES:%b\n" "${BOLD}" "${NC}"
+printf "  • Authly API:        %bhttp://localhost:8000%b\n" "${BLUE}" "${NC}"
+printf "                       Username: %badmin%b\n" "${YELLOW}" "${NC}"
+printf "                       Password: %b${AUTHLY_ADMIN_PASSWORD:-admin}%b\n" "${YELLOW}" "${NC}"
+printf "  • API Documentation: %bhttp://localhost:8000/docs%b\n" "${BLUE}" "${NC}"
+printf "  • Health Check:      %bhttp://localhost:8000/health%b\n" "${BLUE}" "${NC}"
+printf "\n"
+printf "%bDATABASE SERVICES:%b\n" "${BOLD}" "${NC}"
+printf "  • PostgreSQL:        %bpostgresql://authly:authly@localhost:5432/authly%b\n" "${BLUE}" "${NC}"
+printf "                       (Internal access only from container)\n"
 
 if docker ps --format "table {{.Names}}" | grep -q "authly-pgadmin"; then
-    echo "  • pgAdmin:           ${BLUE}http://localhost:5050${NC}"
-    echo "                       Username: ${YELLOW}admin@example.com${NC}"
-    echo "                       Password: ${YELLOW}authly${NC}"
+    printf "  • pgAdmin:           %bhttp://localhost:5050%b\n" "${BLUE}" "${NC}"
+    printf "                       Username: %badmin@example.com%b\n" "${YELLOW}" "${NC}"
+    printf "                       Password: %bauthly%b\n" "${YELLOW}" "${NC}"
 fi
 
 if docker ps --format "table {{.Names}}" | grep -q "authly-pg-proxy"; then
-    echo "  • PG OAuth Proxy:    ${BLUE}localhost:5433${NC}"
-    echo "                       (Requires OAuth token with database:read/write scopes)"
+    printf "  • PG OAuth Proxy:    %blocalhost:5433%b\n" "${BLUE}" "${NC}"
+    printf "                       (Requires OAuth token with database:read/write scopes)\n"
 fi
-echo ""
-echo "${BOLD}CACHE SERVICES:${NC}"
-echo "  • Redis/KeyDB:       ${BLUE}redis://localhost:6379${NC}"
-echo "                       (No authentication required)"
+printf "\n"
+printf "%bCACHE SERVICES:%b\n" "${BOLD}" "${NC}"
+printf "  • Redis/KeyDB:       %bredis://localhost:6379%b\n" "${BLUE}" "${NC}"
+printf "                       (No authentication required)\n"
 
 if docker ps --format "table {{.Names}}" | grep -q "authly-redis-commander"; then
-    echo "  • Redis Commander:   ${BLUE}http://localhost:8081${NC}"
-    echo "                       Username: ${YELLOW}admin${NC}"
-    echo "                       Password: ${YELLOW}admin${NC}"
+    printf "  • Redis Commander:   %bhttp://localhost:8081%b\n" "${BLUE}" "${NC}"
+    printf "                       Username: %badmin%b\n" "${YELLOW}" "${NC}"
+    printf "                       Password: %badmin%b\n" "${YELLOW}" "${NC}"
 fi
 
 if docker ps --format "table {{.Names}}" | grep -q "authly-redis-proxy"; then
-    echo "  • Redis OAuth Proxy: ${BLUE}localhost:6380${NC}"
-    echo "                       (Requires OAuth token with cache:read/write scopes)"
+    printf "  • Redis OAuth Proxy: %blocalhost:6380%b\n" "${BLUE}" "${NC}"
+    printf "                       (Requires OAuth token with cache:read/write scopes)\n"
 fi
 
 if docker ps --format "table {{.Names}}" | grep -q "authly-prometheus"; then
-    echo ""
-    echo "${BOLD}MONITORING SERVICES:${NC}"
-    echo "  • Prometheus:        ${BLUE}http://localhost:9090${NC}"
-    echo "                       (No authentication required)"
-    echo "  • Targets Status:    ${BLUE}http://localhost:9090/targets${NC}"
+    printf "\n"
+    printf "%bMONITORING SERVICES:%b\n" "${BOLD}" "${NC}"
+    printf "  • Prometheus:        %bhttp://localhost:9090%b\n" "${BLUE}" "${NC}"
+    printf "                       (No authentication required)\n"
+    printf "  • Targets Status:    %bhttp://localhost:9090/targets%b\n" "${BLUE}" "${NC}"
 fi
 
 if docker ps --format "table {{.Names}}" | grep -q "authly-grafana"; then
-    echo "  • Grafana:           ${BLUE}http://localhost:3000${NC}"
-    echo "                       Username: ${YELLOW}admin${NC}"
-    echo "                       Password: ${YELLOW}admin${NC}"
-    echo "                       Dashboard: Authly Metrics"
+    printf "  • Grafana:           %bhttp://localhost:3000%b\n" "${BLUE}" "${NC}"
+    printf "                       Username: %badmin%b\n" "${YELLOW}" "${NC}"
+    printf "                       Password: %badmin%b\n" "${YELLOW}" "${NC}"
+    printf "                       Dashboard: Authly Metrics\n"
 fi
 
-echo ""
-echo "${BOLD}QUICK COMMANDS:${NC}"
-echo "  ${GREEN}Get OAuth Token:${NC}"
-echo "    curl -X POST http://localhost:8000/api/v1/oauth/token \\"
-echo "      -d 'grant_type=password&username=admin&password=${AUTHLY_ADMIN_PASSWORD:-admin}'"
-echo ""
-echo "  ${GREEN}Test with Token:${NC}"
-echo "    TOKEN=\$(curl -s -X POST http://localhost:8000/api/v1/oauth/token \\"
-echo "      -d 'grant_type=password&username=admin&password=${AUTHLY_ADMIN_PASSWORD:-admin}' \\"
-echo "      | jq -r '.access_token')"
-echo "    curl -H \"Authorization: Bearer \$TOKEN\" http://localhost:8000/api/v1/users/me"
-echo ""
-echo "  ${GREEN}View Logs:${NC}"
-echo "    docker logs authly-standalone -f"
-echo ""
-echo "  ${GREEN}Stop All Services:${NC}"
-echo "    docker compose -f docker-compose.standalone.yml down"
-echo ""
-echo "================================================================================"
+printf "\n"
+printf "%bQUICK COMMANDS:%b\n" "${BOLD}" "${NC}"
+printf "  %bGet OAuth Token:%b\n" "${GREEN}" "${NC}"
+printf "    curl -X POST http://localhost:8000/api/v1/oauth/token \\\n"
+printf "      -d 'grant_type=password&username=admin&password=${AUTHLY_ADMIN_PASSWORD:-admin}'\n"
+printf "\n"
+printf "  %bTest with Token:%b\n" "${GREEN}" "${NC}"
+printf "    TOKEN=\$(curl -s -X POST http://localhost:8000/api/v1/oauth/token \\\n"
+printf "      -d 'grant_type=password&username=admin&password=${AUTHLY_ADMIN_PASSWORD:-admin}' \\\n"
+printf "      | jq -r '.access_token')\n"
+printf "    curl -H \"Authorization: Bearer \$TOKEN\" http://localhost:8000/api/v1/users/me\n"
+printf "\n"
+printf "  %bView Logs:%b\n" "${GREEN}" "${NC}"
+printf "    docker logs authly-standalone -f\n"
+printf "\n"
+printf "  %bStop All Services:%b\n" "${GREEN}" "${NC}"
+printf "    docker compose -f docker-compose.standalone.yml down\n"
+printf "\n"
+printf "================================================================================\n"
 
 # Show running status summary
 running_count=$(docker ps --format "{{.Names}}" | grep -c authly || echo 0)
-echo "${BOLD}Status:${NC} ${GREEN}$running_count services running${NC}"
+printf "%bStatus:%b %b$running_count services running%b\n" "${BOLD}" "${NC}" "${GREEN}" "${NC}"
 
 # List all running services with their status
-echo "${BOLD}Services:${NC}"
+printf "%bServices:%b\n" "${BOLD}" "${NC}"
 docker ps --format "table {{.Names}}\t{{.Status}}" | grep authly | while read line; do
-    echo "  • $line"
+    printf "  • %s\n" "$line"
 done
 
-echo "================================================================================"
-echo ""
+printf "================================================================================\n"
+printf "\n"
