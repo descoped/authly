@@ -38,11 +38,45 @@ def main(ctx: click.Context, config: Path | None, verbose: bool, dry_run: bool):
 
     Manage OAuth 2.1 clients and scopes for your Authly instance.
 
+    \b
+    Common Commands:
+      authly status                      Show system status
+      authly auth login                   Authenticate with admin API
+      authly client list                 List all OAuth clients
+      authly scope list                  List all OAuth scopes
+
+    \b
     Examples:
-        python -m authly admin client create --name "My App" --client-type public --redirect-uri "http://localhost:3000/callback"
-        python -m authly admin scope create --name read --description "Read access"
-        python -m authly admin client list
-        python -m authly admin scope list
+      # Authenticate with the admin API
+      $ authly auth login -u admin
+      Password: ***
+      ✅ Successfully logged in as admin
+
+      # Create a public OAuth client for a SPA
+      $ authly client create --name "My React App" --type public \\
+          --redirect-uri "http://localhost:3000/callback"
+
+      # Create a confidential OAuth client for a backend service
+      $ authly client create --name "Backend API" --type confidential \\
+          --redirect-uri "https://api.example.com/oauth/callback" \\
+          --scope "read write"
+
+      # Create OAuth scopes
+      $ authly scope create --name read --description "Read access to resources"
+      $ authly scope create --name write --description "Write access to resources" --default
+
+      # List clients with JSON output
+      $ authly client list --output json
+
+      # Dry-run mode to preview changes
+      $ authly --dry-run client delete abc123
+      DRY RUN: Would deactivate client
+
+    \b
+    Environment Variables:
+      AUTHLY_API_URL    API endpoint (default: http://localhost:8000)
+      DATABASE_URL      PostgreSQL connection string
+      JWT_SECRET_KEY    Secret key for JWT signing
     """
     # Ensure context object exists
     ctx.ensure_object(dict)
@@ -79,7 +113,7 @@ def status_impl(verbose: bool):
                 # Check authentication status
                 if not client.is_authenticated:
                     click.echo("⚠️  Authentication: Not logged in")
-                    click.echo("   Use 'python -m authly admin login' to authenticate for detailed status")
+                    click.echo("   Use 'python -m authly admin auth login' to authenticate for detailed status")
                     return
 
                 # Get detailed status (requires authentication)
@@ -135,7 +169,7 @@ def status_impl(verbose: bool):
             except Exception as e:
                 if "401" in str(e) or "403" in str(e):
                     click.echo("❌ Authentication: Invalid or expired credentials")
-                    click.echo("   Use 'python -m authly admin login' to authenticate")
+                    click.echo("   Use 'python -m authly admin auth login' to authenticate")
                 else:
                     click.echo(f"❌ Error connecting to API: {e}")
                     click.echo(f"   Check that the API server is running at {api_url}")
@@ -146,13 +180,42 @@ def status_impl(verbose: bool):
 @main.command()
 @click.pass_context
 def status(ctx: click.Context):
-    """Show Authly instance status and configuration."""
+    """
+    Show Authly instance status and configuration.
+
+    \b
+    Displays:
+      - API health status
+      - Database connection status
+      - Authentication status
+      - Service statistics (clients, scopes)
+      - Environment configuration (with --verbose)
+
+    \b
+    Examples:
+      # Basic status check
+      $ authly status
+      Authly Instance Status
+      ==================================================
+      ✅ API Health: OK
+         API URL: http://localhost:8000
+      ✅ Database: Connected
+
+      # Verbose status with environment details
+      $ authly status --verbose
+      $ authly -v status  # Short form
+
+    \b
+    Exit Codes:
+      0  All systems operational
+      1  Connection or configuration error
+    """
     verbose = ctx.obj.get("verbose", False)
     return status_impl(verbose)
 
 
 # Import command groups after main is defined to avoid circular imports
-from authly.admin.auth_commands import auth_group, login_alias, logout_alias, whoami_alias  # noqa: E402
+from authly.admin.auth_commands import auth_group  # noqa: E402
 from authly.admin.client_commands import client_group  # noqa: E402
 from authly.admin.scope_commands import scope_group  # noqa: E402
 
@@ -161,11 +224,23 @@ main.add_command(auth_group)
 main.add_command(client_group)
 main.add_command(scope_group)
 
-# Add convenient aliases for common auth commands
-main.add_command(login_alias, name="login")
-main.add_command(logout_alias, name="logout")
-main.add_command(whoami_alias, name="whoami")
+
+def entry_point():
+    """Entry point for authly-admin that handles shell completion."""
+    import os
+    import sys
+
+    # Check if shell completion is being requested
+    complete_var = "_AUTHLY_ADMIN_COMPLETE"
+    if complete_var in os.environ:
+        # Handle shell completion
+        from click.shell_completion import shell_complete
+
+        sys.exit(shell_complete(main, {}, "authly-admin", complete_var, os.environ[complete_var]))
+
+    # Normal CLI execution
+    main()
 
 
 if __name__ == "__main__":
-    main()
+    entry_point()

@@ -5,33 +5,48 @@ Unified entry point for Authly authentication service.
 This module provides a single command-line interface for all Authly operations:
 - Web service mode (default)
 - Embedded development mode
-- Admin CLI mode
+- Admin CLI mode (delegates to authly.admin.cli)
 - Library mode (programmatic usage)
 
 Usage:
-    python -m authly                    # Default: web service mode
-    python -m authly serve              # Explicit web service mode
+    python -m authly                    # Show help
+    python -m authly serve              # Start web service
     python -m authly serve --embedded   # Embedded development mode
     python -m authly admin status       # Admin CLI operations
 """
 
 import asyncio
 import logging
+import os
 import sys
 
 import click
 import uvicorn
 
+# Enable Click shell completion
 from authly.app import create_production_app
 from authly.main import lifespan, setup_logging
 
 logger = logging.getLogger(__name__)
 
 
+def _handle_shell_completion():
+    """Check and handle shell completion requests before Click processes arguments."""
+    complete_var = "_AUTHLY_COMPLETE"
+    if complete_var in os.environ:
+        # Handle shell completion and exit
+        from click.shell_completion import shell_complete
+
+        sys.exit(shell_complete(cli, {}, "authly", complete_var, os.environ[complete_var]))
+
+
 @click.group(invoke_without_command=True)
 @click.option("--version", is_flag=True, help="Show version and exit")
+@click.option("--commands", is_flag=True, help="Show all available commands and options")
+@click.option("--install-completion", is_flag=True, help="Install shell tab completion")
+@click.option("--show-completion", is_flag=True, hidden=True, help="Show completion script for current shell")
 @click.pass_context
-def cli(ctx: click.Context, version: bool) -> None:
+def cli(ctx: click.Context, version: bool, commands: bool, install_completion: bool, show_completion: bool) -> None:
     """
     Authly Authentication Service - Unified Entry Point
 
@@ -48,9 +63,29 @@ def cli(ctx: click.Context, version: bool) -> None:
         click.echo(f"Authly Authentication Service v{authly_version}")
         return
 
-    # If no subcommand is provided, default to serve mode
+    if commands:
+        from authly.cli_tree import print_command_tree
+
+        click.echo("Authly CLI Commands Reference")
+        click.echo("=" * 40)
+        print_command_tree(ctx.command)
+        return
+
+    if install_completion:
+        from authly.completion import install_shell_completion
+
+        success = install_shell_completion()
+        sys.exit(0 if success else 1)
+
+    if show_completion:
+        from authly.completion import show_shell_completion
+
+        show_shell_completion()
+        return
+
+    # If no subcommand is provided, show help
     if ctx.invoked_subcommand is None:
-        ctx.invoke(serve)
+        click.echo(ctx.get_help())
 
 
 @cli.command()
@@ -68,6 +103,25 @@ def serve(host: str, port: int, workers: int, embedded: bool, seed: bool, log_le
     This command runs the FastAPI application with uvicorn server.
     Use --embedded for development with PostgreSQL container.
     """
+    # Check if we're running inside the standalone container
+    # BUT allow s6 supervisor to start the server (it runs as authly user via s6-setuidgid)
+    import os
+
+    if os.getenv("AUTHLY_STANDALONE") == "true" and not os.getenv("S6_SERVICE_NAME") and os.getuid() != 1000:
+        # 1000 is authly user UID
+        click.echo("⚠️  Cannot start server - Authly is already running in this container!")
+        click.echo("")
+        click.echo("The Authly server is automatically managed by the standalone container.")
+        click.echo("")
+        click.echo("Available options:")
+        click.echo("  • Check status:     authly admin status")
+        click.echo("  • View logs:        tail -f /var/log/authly.log")
+        click.echo("  • Check health:     curl http://localhost:8000/health")
+        click.echo("  • Admin operations: authly admin --help")
+        click.echo("")
+        click.echo("To run a separate instance, use a different container or host system.")
+        sys.exit(1)
+
     setup_logging()
 
     if embedded:
@@ -80,246 +134,38 @@ def serve(host: str, port: int, workers: int, embedded: bool, seed: bool, log_le
         _run_production_mode(host, port, workers, log_level, access_log)
 
 
-@cli.group()
-def admin() -> None:
+# Admin command group - delegates to the actual admin CLI
+@cli.group(cls=click.Group, invoke_without_command=False)
+@click.pass_context
+def admin(ctx: click.Context) -> None:
     """
     Administrative operations for Authly.
 
     Manage OAuth clients, scopes, users, and system configuration.
     """
-    pass
+    # Initialize context object if not exists (for proper delegation)
+    if ctx.obj is None:
+        ctx.obj = {}
 
+    # Import the actual admin CLI module
 
-@admin.command()
-@click.option("--format", "output_format", default="text", type=click.Choice(["text", "json"]), help="Output format")
-def status(output_format: str) -> None:
-    """Show system status and configuration."""
-    # Import here to avoid circular imports
-    # Import and call admin status command
-    from authly.admin.cli import status as admin_status
-
-    # Call the admin command directly (it doesn't use format parameter)
-    admin_status()
-
-
-@admin.group()
-def client() -> None:
-    """Manage OAuth clients."""
-    pass
-
-
-@client.command("list")
-@click.option("--format", "output_format", default="table", type=click.Choice(["table", "json"]), help="Output format")
-def list_clients(output_format: str) -> None:
-    """List all OAuth clients."""
-    # Import and call admin list clients command
-    from authly.admin.client_commands import list_clients as admin_list_clients
-
-    ctx = click.Context(admin_list_clients)
-    ctx.obj = {}  # Initialize context object
-
-    # Call the admin command with proper parameters
-    ctx.invoke(admin_list_clients, limit=100, offset=0, output=output_format, show_inactive=False)
-
-
-@client.command("create")
-@click.option("--name", required=True, help="Client name")
-@click.option("--client-type", type=click.Choice(["public", "confidential"]), default="public", help="Client type")
-@click.option("--redirect-uri", multiple=True, help="Redirect URI (can be specified multiple times)")
-@click.option("--scope", multiple=True, help="Allowed scopes (can be specified multiple times)")
-@click.option("--description", help="Client description")
-def create_client(name: str, client_type: str, redirect_uri: tuple, scope: tuple, description: str | None) -> None:
-    """Create a new OAuth client."""
-    # Import admin command
-    from authly.admin.client_commands import create_client as admin_create_client
-
-    # Validate that at least one redirect URI is provided for create
-    if not redirect_uri:
-        click.echo("❌ Error: At least one redirect URI is required", err=True)
+    # Get the command name that was invoked
+    if ctx.invoked_subcommand is None:
+        # Show help if no subcommand
+        click.echo(ctx.get_help())
         return
 
-    # Create a proper context and invoke the admin command
-    ctx = click.Context(admin_create_client)
-    ctx.obj = {}  # Initialize context object
 
-    # Map scope tuple to space-separated string if provided
-    scope_str = " ".join(scope) if scope else None
+# Instead of duplicating all admin commands, we dynamically add them from the actual admin CLI
+def _setup_admin_commands():
+    """Dynamically add all commands from the admin CLI to avoid duplication."""
+    from authly.admin import cli as admin_cli
 
-    # Call the admin command with proper parameter mapping
-    ctx.invoke(
-        admin_create_client,
-        name=name,
-        client_type=client_type,
-        redirect_uris=redirect_uri,  # Note: admin expects 'redirect_uris'
-        scope=scope_str,
-        client_uri=None,
-        logo_uri=None,
-        tos_uri=None,
-        policy_uri=None,
-        auth_method=None,  # Will use default based on client_type
-        no_pkce=False,  # Enable PKCE by default
-        output="table",
-    )
-
-
-@admin.group()
-def auth() -> None:
-    """Authentication commands for admin access."""
-    pass
-
-
-@auth.command()
-@click.option("--username", "-u", prompt=True, help="Admin username")
-@click.option("--password", "-p", help="Admin password (will prompt if not provided)")
-@click.option(
-    "--scope",
-    "-s",
-    default="admin:clients:read admin:clients:write admin:scopes:read admin:scopes:write admin:users:read admin:system:read",
-    help="OAuth scopes to request",
-)
-@click.option("--api-url", help="API URL (default: http://localhost:8000 or AUTHLY_API_URL env var)")
-def login(username: str, password: str | None, scope: str, api_url: str | None) -> None:
-    """Login to the Authly Admin API."""
-    # Create a mock context for the admin command
-    import click
-
-    from authly.admin.auth_commands import login as admin_login
-
-    ctx = click.Context(admin_login)
-    ctx.params = {"username": username, "password": password, "scope": scope, "api_url": api_url}
-
-    # Run the admin command
-    admin_login.callback(username, password, scope, api_url)
-
-
-@auth.command()
-def logout() -> None:
-    """Logout from the Authly Admin API."""
-    # Create a mock context for the admin command
-    from authly.admin.auth_commands import logout as admin_logout
-
-    # Run the admin command
-    admin_logout.callback()
-
-
-@auth.command()
-@click.option("--verbose", "-v", is_flag=True, help="Show detailed token information")
-def whoami(verbose: bool) -> None:
-    """Show current authentication status."""
-    # Create a mock context for the admin command
-    import click
-
-    from authly.admin.auth_commands import whoami as admin_whoami
-
-    ctx = click.Context(admin_whoami)
-    ctx.params = {"verbose": verbose}
-
-    # Run the admin command
-    admin_whoami.callback(verbose)
-
-
-@auth.command()
-@click.option("--verbose", "-v", is_flag=True, help="Show detailed token information")
-def auth_status(verbose: bool) -> None:
-    """Show authentication and API status."""
-    # Create a mock context for the admin command
-    from authly.admin.auth_commands import status as admin_auth_status
-
-    # Run the admin command
-    admin_auth_status.callback(verbose)
-
-
-@auth.command()
-def refresh() -> None:
-    """Refresh authentication tokens."""
-    # Create a mock context for the admin command
-    from authly.admin.auth_commands import refresh as admin_refresh
-
-    # Run the admin command
-    admin_refresh.callback()
-
-
-# Add convenient aliases for common auth commands
-@admin.command()
-@click.option("--username", "-u", prompt=True, help="Admin username")
-@click.option("--password", "-p", help="Admin password (will prompt if not provided)")
-@click.option(
-    "--scope",
-    "-s",
-    default="admin:clients:read admin:clients:write admin:scopes:read admin:scopes:write admin:users:read admin:system:read",
-    help="OAuth scopes to request",
-)
-@click.option("--api-url", help="API URL (default: http://localhost:8000 or AUTHLY_API_URL env var)")
-def admin_login(username: str, password: str | None, scope: str, api_url: str | None) -> None:
-    """Login to the Authly Admin API (alias for 'auth login')."""
-    # Create a mock context for the admin command
-    from authly.admin.auth_commands import login as admin_login_cmd
-
-    # Run the admin command
-    admin_login_cmd.callback(username, password, scope, api_url)
-
-
-@admin.command()
-def admin_logout() -> None:
-    """Logout from the Authly Admin API (alias for 'auth logout')."""
-    # Create a mock context for the admin command
-    from authly.admin.auth_commands import logout as admin_logout_cmd
-
-    # Run the admin command
-    admin_logout_cmd.callback()
-
-
-@admin.command()
-@click.option("--verbose", "-v", is_flag=True, help="Show detailed token information")
-def admin_whoami(verbose: bool) -> None:
-    """Show current authentication status (alias for 'auth whoami')."""
-    # Create a mock context for the admin command
-    from authly.admin.auth_commands import whoami as admin_whoami_cmd
-
-    # Run the admin command
-    admin_whoami_cmd.callback(verbose)
-
-
-@admin.group()
-def scope() -> None:
-    """Manage OAuth scopes."""
-    pass
-
-
-@scope.command("list")
-@click.option("--format", "output_format", default="table", type=click.Choice(["table", "json"]), help="Output format")
-def list_scopes(output_format: str) -> None:
-    """List all OAuth scopes."""
-    # Import and call admin scope list command
-    from authly.admin.scope_commands import list_scopes as admin_list_scopes
-
-    ctx = click.Context(admin_list_scopes)
-    ctx.obj = {}  # Initialize context object
-
-    # Call the admin command with proper parameters
-    ctx.invoke(admin_list_scopes, limit=100, offset=0, output=output_format, show_inactive=False, default_only=False)
-
-
-@scope.command("create")
-@click.option("--name", required=True, help="Scope name")
-@click.option("--description", required=True, help="Scope description")
-def create_scope(name: str, description: str) -> None:
-    """Create a new OAuth scope."""
-    # Import and call admin scope create command
-    from authly.admin.scope_commands import create_scope as admin_create_scope
-
-    # Create a proper context and invoke the admin command
-    ctx = click.Context(admin_create_scope)
-    ctx.obj = {}  # Initialize context object
-
-    # Call the admin command with proper parameter mapping
-    ctx.invoke(
-        admin_create_scope,
-        name=name,
-        description=description,
-        is_default=False,  # Default to not a default scope
-        output="table",  # Use table output format
-    )
+    # Add all commands from the admin CLI main group
+    for name, cmd in admin_cli.main.commands.items():
+        # Skip if already exists (shouldn't happen but be safe)
+        if name not in admin.commands:
+            admin.add_command(cmd, name=name)
 
 
 def _run_production_mode(host: str, port: int, workers: int, log_level: str, access_log: bool) -> None:
@@ -366,5 +212,20 @@ def _run_embedded_mode(host: str, port: int, seed: bool) -> None:
         sys.exit(1)
 
 
-if __name__ == "__main__":
+def main():
+    """Main entry point for the CLI."""
+    # Check for shell completion first
+    _handle_shell_completion()
+
+    # Set up admin commands
+    _setup_admin_commands()
+
+    # Run the CLI
     cli()
+
+
+# Set up admin commands when module is imported
+_setup_admin_commands()
+
+if __name__ == "__main__":
+    main()

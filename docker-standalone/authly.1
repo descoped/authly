@@ -1,0 +1,749 @@
+.\" Manpage for authly
+.\" Contact: support@authly.com
+.TH AUTHLY 1 "December 2024" "0.5.8" "Authly Manual"
+
+.SH NAME
+authly \- OAuth 2.1 and OpenID Connect authorization server CLI
+
+.SH SYNOPSIS
+.B authly
+[\fIOPTIONS\fR] \fICOMMAND\fR [\fIARGS\fR]...
+
+.B authly admin
+[\fIOPTIONS\fR] \fICOMMAND\fR [\fIARGS\fR]...
+
+.B python -m authly admin
+[\fIOPTIONS\fR] \fICOMMAND\fR [\fIARGS\fR]...
+
+.SH DESCRIPTION
+Authly is an OAuth 2.1 and OpenID Connect 1.0 authorization server 
+with a powerful CLI for administration. The admin CLI provides complete control
+over OAuth clients, scopes, and authentication management.
+
+The Authly Admin CLI is available in two ways:
+.RS
+.IP \[bu] 2
+\fBauthly admin\fR [command] - Recommended way
+.IP \[bu]
+\fBpython -m authly admin\fR [command] - Alternative Python module invocation
+.RE
+
+Both methods provide the same functionality.
+
+.SH GLOBAL OPTIONS
+.TP
+.B \-\-version
+Show version and exit
+.TP
+.B \-\-commands
+Show all available commands in a tree view
+.TP
+.B \-\-install\-completion
+Install shell tab completion for your shell
+.TP
+.B \-\-help
+Show help message and exit
+
+.SH MAIN COMMANDS
+.TP
+.B authly serve
+Start the Authly web service
+.TP
+.B authly admin
+Administrative operations for Authly
+
+.SH ADMIN COMMANDS
+.SS Authentication Commands
+.TP
+.B authly admin auth login
+Authenticate with the admin API
+.RS
+Options: \-\-username, \-\-password, \-\-scope, \-\-api\-url, \-\-show\-token
+.RE
+
+.TP
+.B authly admin auth logout
+Logout and revoke tokens
+
+.TP
+.B authly admin auth whoami
+Show current authentication status
+.RS
+Options: \-\-verbose
+.RE
+
+.TP
+.B authly admin auth status
+Show authentication and API status
+
+.TP
+.B authly admin auth refresh
+Refresh authentication tokens
+
+.TP
+.B authly admin auth info
+Show configuration and internal information
+
+.SS Client Management
+.TP
+.B authly admin client create
+Create a new OAuth 2.1 client
+.RS
+Required: \-\-name, \-\-type [public|confidential], \-\-redirect\-uri
+.br
+Optional: \-\-scope, \-\-client\-uri, \-\-logo\-uri, \-\-auth\-method, \-\-no\-pkce
+.RE
+
+.TP
+.B authly admin client list
+List OAuth clients
+.RS
+Options: \-\-show\-inactive, \-\-output [table|json]
+.RE
+
+.TP
+.B authly admin client show \fICLIENT_ID\fR
+Show detailed client information
+
+.TP
+.B authly admin client update \fICLIENT_ID\fR
+Update client information
+.RS
+Options: \-\-name, \-\-redirect\-uri, \-\-scope, \-\-logo\-uri, \-\-deactivate, \-\-reactivate
+.RE
+
+.TP
+.B authly admin client delete \fICLIENT_ID\fR
+Delete (deactivate) a client
+.RS
+Options: \-\-confirm
+.RE
+
+.TP
+.B authly admin client regenerate\-secret \fICLIENT_ID\fR
+Regenerate client secret for confidential clients
+.RS
+Options: \-\-confirm
+.RE
+
+.SS Scope Management
+.TP
+.B authly admin scope create
+Create a new OAuth scope
+.RS
+Required: \-\-name, \-\-description
+.br
+Optional: \-\-default
+.RE
+
+.TP
+.B authly admin scope list
+List OAuth scopes
+.RS
+Options: \-\-show\-inactive, \-\-output [table|json]
+.RE
+
+.TP
+.B authly admin scope show \fISCOPE_NAME\fR
+Show scope details
+
+.TP
+.B authly admin scope update \fISCOPE_NAME\fR
+Update scope information
+.RS
+Options: \-\-description, \-\-make\-default, \-\-remove\-default
+.RE
+
+.TP
+.B authly admin scope delete \fISCOPE_NAME\fR
+Delete (deactivate) a scope
+.RS
+Options: \-\-confirm
+.RE
+
+.TP
+.B authly admin scope defaults
+Show default scopes
+
+.SS System Commands
+.TP
+.B authly admin status
+Show system status and configuration
+.RS
+Options: \-\-verbose
+.RE
+
+.SH HOW-TO GUIDE
+
+.SS GETTING STARTED
+.PP
+Welcome to Authly Standalone! This guide helps you manage your OAuth 2.1 
+and OpenID Connect authorization server.
+
+.SS ESSENTIAL COMMANDS
+
+.TP
+.B 1. Check System Configuration
+Show configuration paths, environment, and version:
+.nf
+$ authly admin auth info
+.fi
+
+.TP
+.B 2. Check System Status
+View API health and database connection:
+.nf
+$ authly admin status
+.fi
+
+.TP
+.B 3. Login to Admin API
+Authenticate to perform admin operations:
+.nf
+$ authly admin auth login -u admin -p [password]
+
+# Or interactively (recommended):
+$ authly admin auth login
+Username: admin
+Password: [hidden]
+.fi
+
+.TP
+.B 4. Login with Token Display
+Show access and refresh tokens (use with caution!):
+.nf
+$ authly admin auth login -u admin -p [password] --show-token
+.fi
+
+.TP
+.B 5. Check Authentication Status
+Verify your current login status:
+.nf
+$ authly admin auth whoami
+
+# With verbose details:
+$ authly admin auth whoami --verbose
+.fi
+
+.SS CLIENT MANAGEMENT
+
+.TP
+.B Create a Public Client
+For SPAs and mobile apps:
+.nf
+$ authly admin client create \\
+  --name "My React App" \\
+  --type public \\
+  --redirect-uri "http://localhost:3000/callback"
+.fi
+
+.TP
+.B Create a Confidential Client
+For backend services:
+.nf
+$ authly admin client create \\
+  --name "Backend API Service" \\
+  --type confidential \\
+  --redirect-uri "https://api.example.com/oauth/callback" \\
+  --scope "read write"
+
+⚠️  Save the client secret securely - it won't be shown again!
+.fi
+
+.TP
+.B List All Clients
+.nf
+$ authly admin client list
+
+# Include inactive clients:
+$ authly admin client list --show-inactive
+
+# JSON output for scripting:
+$ authly admin client list --output json
+.fi
+
+.TP
+.B Show Client Details
+.nf
+$ authly admin client show [client-id]
+.fi
+
+.TP
+.B Update Client
+.nf
+$ authly admin client update [client-id] \\
+  --name "New Name" \\
+  --logo-uri "https://example.com/logo.png"
+.fi
+
+.TP
+.B Regenerate Client Secret
+For confidential clients only:
+.nf
+$ authly admin client regenerate-secret [client-id] --confirm
+.fi
+
+.TP
+.B Delete Client
+Soft-delete (deactivate) a client:
+.nf
+$ authly admin client delete [client-id] --confirm
+.fi
+
+.SS SCOPE MANAGEMENT
+
+.TP
+.B Create a Scope
+.nf
+$ authly admin scope create \\
+  --name "user:read" \\
+  --description "Read user information"
+
+# Create as default scope:
+$ authly admin scope create \\
+  --name "profile" \\
+  --description "User profile access" \\
+  --default
+.fi
+
+.TP
+.B List All Scopes
+.nf
+$ authly admin scope list
+
+# Show only default scopes:
+$ authly admin scope defaults
+.fi
+
+.TP
+.B Show Scope Details
+.nf
+$ authly admin scope show [scope-name]
+.fi
+
+.TP
+.B Update Scope
+.nf
+$ authly admin scope update [scope-name] \\
+  --description "Updated description" \\
+  --make-default
+.fi
+
+.TP
+.B Delete Scope
+.nf
+$ authly admin scope delete [scope-name] --confirm
+.fi
+
+.SS AUTHENTICATION MANAGEMENT
+
+.TP
+.B Logout
+Revoke tokens and clear authentication:
+.nf
+$ authly admin auth logout
+.fi
+
+.TP
+.B Refresh Tokens
+Refresh your access token:
+.nf
+$ authly admin auth refresh
+.fi
+
+.TP
+.B Check API Status
+Detailed authentication and API status:
+.nf
+$ authly admin auth status
+.fi
+
+.SS COMMON WORKFLOWS
+
+.TP
+.B Setting Up a New Application
+.nf
+1. Login: authly admin auth login
+2. Create scopes: authly admin scope create \\
+     --name "read" --description "Read access"
+3. Create client: authly admin client create \\
+     --name "My App" --type public \\
+     --redirect-uri "http://localhost:3000/callback"
+4. Verify: authly admin client list
+.fi
+
+.TP
+.B Troubleshooting Authentication
+.nf
+1. Check config: authly admin auth info
+2. Check status: authly admin auth whoami --verbose
+3. Check API: authly admin status
+4. Re-login if needed: authly admin auth login
+.fi
+
+.TP
+.B Managing Client Secrets
+.nf
+1. View client: authly admin client show [client-id]
+2. Regenerate: authly admin client regenerate-secret \\
+     [client-id] --confirm
+3. Update metadata: authly admin client update \\
+     [client-id] --name "New Name"
+.fi
+
+.SH TIPS & BEST PRACTICES
+.IP \[bu] 2
+Use interactive login (without -p flag) for better security
+.IP \[bu]
+Enable PKCE for all clients (default behavior)
+.IP \[bu]
+Use HTTPS redirect URIs in production
+.IP \[bu]
+Store client secrets in a secure secret management system
+.IP \[bu]
+Regularly rotate client secrets for confidential clients
+.IP \[bu]
+Use descriptive scope names (e.g., "user:read", "admin:write")
+.IP \[bu]
+Test commands with --dry-run when available
+.IP \[bu]
+Use JSON output (--output json) for scripting and automation
+
+.SH GETTING HELP
+.TP
+.B Help for Any Command
+.nf
+$ authly admin --help                    # Main help
+$ authly admin client --help             # Client commands help
+$ authly admin client create --help      # Specific command help
+$ authly admin scope --help              # Scope commands help
+$ authly admin auth --help               # Auth commands help
+.fi
+
+.SH ENVIRONMENT VARIABLES
+.TP
+.B AUTHLY_API_URL
+Admin API endpoint (default: http://localhost:8000)
+.TP
+.B AUTHLY_MODE
+Resource mode (cli/production/embedded)
+.TP
+.B DATABASE_URL
+PostgreSQL connection string
+.TP
+.B JWT_SECRET_KEY
+Secret key for JWT signing
+.TP
+.B JWT_REFRESH_SECRET_KEY
+Secret key for refresh tokens
+.TP
+.B AUTHLY_ADMIN_PASSWORD
+Admin password for initial setup
+
+.SH FILES
+.TP
+.I ~/.authly/tokens.json
+Stored authentication tokens
+.TP
+.I ~/.authly/config.toml
+Optional configuration file
+.TP
+.I /app/docs/cli-guide.md
+Full CLI documentation (in container)
+
+.SH EXIT STATUS
+.TP
+.B 0
+Success
+.TP
+.B 1
+General error
+.TP
+.B 2
+Authentication error
+.TP
+.B 3
+Permission denied
+.TP
+.B 4
+Resource not found
+.TP
+.B 5
+Validation error
+
+.SH EXAMPLES
+.SS Quick Client Setup
+.nf
+# Login as admin
+authly admin auth login -u admin
+
+# Create necessary scopes
+authly admin scope create \\
+  --name "read" --description "Read access to resources"
+authly admin scope create \\
+  --name "write" --description "Write access to resources"
+
+# Create a public client for React app
+authly admin client create \\
+  --name "My React App" \\
+  --type public \\
+  --redirect-uri "http://localhost:3000/callback" \\
+  --redirect-uri "http://localhost:3000/silent-renew" \\
+  --scope "read write"
+
+# Create a confidential client for backend
+authly admin client create \\
+  --name "Backend Service" \\
+  --type confidential \\
+  --redirect-uri "https://api.example.com/oauth/callback" \\
+  --scope "read write" \\
+  --auth-method client_secret_post
+.fi
+
+.SS Client Secret Rotation
+.nf
+# Check current client
+authly admin client show abc-123-def
+
+# Regenerate the secret
+authly admin client regenerate-secret abc-123-def --confirm
+
+# Update application configuration with new secret
+# Then verify it works
+.fi
+
+.SS Scope Management
+.nf
+# Create hierarchical scopes
+authly admin scope create \\
+  --name "user:read" --description "Read user data"
+authly admin scope create \\
+  --name "user:write" --description "Modify user data"
+authly admin scope create \\
+  --name "admin:all" --description "Full admin access"
+
+# Set default scopes
+authly admin scope update "openid" --make-default
+authly admin scope update "profile" --make-default
+
+# View default scopes
+authly admin scope defaults
+.fi
+
+.SH TESTING
+
+.SS Complete Test Sequence
+
+The following sequence demonstrates full testing of Authly functionality, including OAuth flows, 
+OIDC discovery, and account recovery procedures.
+
+.TP
+.B 1. Run Full Integration Tests
+.nf
+# Run complete test suite (9 test modules)
+$ run-end-to-end-test comprehensive
+
+# Expected results:
+#   ✓ Infrastructure Check
+#   ✓ Admin Authentication  
+#   ✓ Scope Management
+#   ✓ Client Management
+#   ✓ User Management
+#   ✓ User Authentication
+#   ✓ OAuth Flow Testing
+#   ✓ OIDC Discovery Testing
+#   ○ OIDC Session Testing (not yet implemented)
+#   ○ OIDC Conformance Optional (65% pass rate)
+#   ✓ Post-Test Cleanup
+# 
+# Total: 9 passed, 0 failed, 2 skipped
+# Execution time: ~7 seconds
+.fi
+
+.TP
+.B 2. Run Simple Authentication Flow Tests
+.nf
+# Create test user if needed
+$ simple-auth-flow
+# When prompted, enter 'y' to create user1
+
+# Expected results (16 tests):
+#   ✓ Unauthorized access
+#   ✓ User login (admin)
+#   ✓ Get current user
+#   ✓ Get all users
+#   ✓ User login (user1)
+#   ✓ Login with invalid form data
+#   ✓ Create user
+#   ✓ Login rejection for unverified user
+#   ✓ Verify user
+#   ✓ Update user
+#   ✓ Delete user
+#   ✓ Rate limiting test
+# 
+# All 16 tests should pass
+.fi
+
+.TP
+.B 3. Test Admin CLI Authentication with Token Display
+.nf
+# Login and display tokens (useful for debugging)
+$ authly admin auth login --show-token
+Username: admin
+Password: [enter password]
+
+# Output includes:
+#   - Access token (JWT)
+#   - Refresh token
+#   - Token expiration
+#   - Granted scopes
+#   - Database connection status
+.fi
+
+.TP
+.B 4. Handle Account Lockout Recovery
+.nf
+# If admin account gets locked after failed attempts:
+$ authly admin auth login --show-token
+# Error: Too many failed attempts. Account temporarily locked.
+
+# Unlock the admin account
+$ unlock-admin-account
+# Enter: admin
+
+# This will:
+#   1. Clear lockout in database
+#   2. Reset account flags (active, verified)
+#   3. Remove password change requirement
+#   4. Restart Authly service to clear memory state
+# 
+# Account is immediately ready for login
+
+# Retry login after unlock
+$ authly admin auth login --show-token
+# Should succeed with tokens displayed
+.fi
+
+.SS Test Utilities
+
+.TP
+.B run-end-to-end-test
+Complete integration test suite covering all major functionality:
+.RS
+.IP \[bu] 2
+Infrastructure validation
+.IP \[bu]
+Admin API operations
+.IP \[bu]
+User management lifecycle
+.IP \[bu]
+OAuth 2.1 flows with PKCE
+.IP \[bu]
+OIDC discovery and metadata
+.IP \[bu]
+Post-test cleanup
+.RE
+
+.TP
+.B simple-auth-flow
+Interactive OAuth flow testing with real user scenarios:
+.RS
+.IP \[bu] 2
+User registration and verification
+.IP \[bu]
+Authentication flows
+.IP \[bu]
+Rate limiting validation
+.IP \[bu]
+Error handling
+.IP \[bu]
+Automatic test user cleanup
+.RE
+
+.TP
+.B unlock-admin-account
+Emergency recovery tool for locked admin accounts:
+.RS
+.IP \[bu] 2
+Clears database lockout flags
+.IP \[bu]
+Resets account to active state
+.IP \[bu]
+Restarts service to clear memory
+.IP \[bu]
+No password reset required
+.RE
+
+.SS Test Environment
+
+The standalone container includes pre-configured test tools:
+.RS
+.IP \[bu] 2
+Test users: admin (pre-created), user1 (created on demand)
+.IP \[bu]
+Test database: Embedded PostgreSQL 17
+.IP \[bu]
+Test endpoints: http://localhost:8000
+.IP \[bu]
+Automatic cleanup: All test data removed after tests
+.RE
+
+.SS Common Test Scenarios
+
+.TP
+.B Quick Validation
+.nf
+# Verify system is working
+authly admin status
+run-end-to-end-test comprehensive
+.fi
+
+.TP
+.B Development Testing
+.nf
+# Create test client and run OAuth flow
+authly admin client create \\
+  --name "Test App" \\
+  --type public \\
+  --redirect-uri "http://localhost:3000/callback"
+
+simple-auth-flow
+.fi
+
+.TP
+.B Load Testing
+.nf
+# Run rate limiting tests
+simple-auth-flow
+# Observe rate limiting behavior (120 requests in 3s)
+.fi
+
+.TP
+.B Recovery Testing
+.nf
+# Simulate lockout and recovery
+for i in {1..10}; do
+  authly admin auth login -u admin -p wrong
+done
+# Account locked
+
+unlock-admin-account
+# Account recovered
+.fi
+
+.SH SEE ALSO
+.PP
+Full documentation: https://github.com/descoped/authly
+.br
+API Reference: http://localhost:8000/docs (when server is running)
+.br
+OpenAPI Spec: http://localhost:8000/openapi.json
+
+.SH BUGS
+Report bugs at: https://github.com/descoped/authly/issues
+
+.SH AUTHOR
+Authly Development Team
+
+.SH COPYRIGHT
+Copyright (C) 2024 descoped. Licensed under MIT License.

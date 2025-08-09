@@ -78,7 +78,13 @@ def create_access_token(
             expire = datetime.now(UTC) + timedelta(minutes=config.access_token_expire_minutes)
 
         to_encode = data.copy()
-        to_encode.update({"exp": int(expire.timestamp())})
+        now = datetime.now(UTC)
+        to_encode.update(
+            {
+                "exp": int(expire.timestamp()),
+                "iat": int(now.timestamp()),  # Add issued at timestamp
+            }
+        )
         token = jwt.encode(to_encode, secret_key, algorithm=algorithm)
 
         # Track token generation metrics
@@ -115,8 +121,15 @@ def create_refresh_token(user_id: str, secret_key: str, config: AuthlyConfig, jt
         # Generate a new JTI if one is not provided
         token_jti = secrets.token_hex(config.token_hex_length) if jti is None else jti
 
-        expire = datetime.now(UTC) + timedelta(days=config.refresh_token_expire_days)
-        payload = {"sub": user_id, "type": "refresh", "jti": token_jti, "exp": int(expire.timestamp())}
+        now = datetime.now(UTC)
+        expire = now + timedelta(days=config.refresh_token_expire_days)
+        payload = {
+            "sub": user_id,
+            "type": "refresh",
+            "jti": token_jti,
+            "exp": int(expire.timestamp()),
+            "iat": int(now.timestamp()),  # Add issued at timestamp
+        }
 
         token = jwt.encode(payload, secret_key, algorithm=config.algorithm)
 

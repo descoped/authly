@@ -1,0 +1,31 @@
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    uid: prometheus
+    access: proxy
+    url: http://authly-prometheus:9090
+    isDefault: true
+    editable: true
+    
+  # PostgreSQL datasource - commented out for now
+  # - name: PostgreSQL
+  #   type: postgres
+  #   access: proxy
+  #   url: authly-standalone:5432
+  #   database: authly
+  #   user: authly
+  #   secureJsonData:
+  #     password: admin
+  #   jsonData:
+  #     sslmode: disable
+  #     postgresVersion: 1700
+  #   editable: true
+    
+  # Redis datasource - commented out for now
+  # - name: Redis
+  #   type: redis-datasource
+  #   access: proxy
+  #   url: redis://authly-standalone:6379
+  #   editable: true

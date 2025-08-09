@@ -10,6 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **✅ IMPLEMENTED FEATURES:**
 - OAuth 2.1 implementation with mandatory PKCE support
+- OAuth 2.0 Token Introspection (RFC 7662) for resource server validation
 - Admin API with two-layer security model (intrinsic authority + scoped permissions)
 - Bootstrap system solving IAM chicken-and-egg paradox
 - Admin CLI for OAuth client and scope management
@@ -21,6 +22,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Structured JSON logging with correlation IDs
 - Security headers middleware
 - Prometheus metrics for monitoring
+- Docker standalone deployment with embedded PostgreSQL and Redis
 
 **⚠️ KNOWN LIMITATIONS:**
 - OIDC conformance: 100% specification compliance achieved (not officially certified)

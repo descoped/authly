@@ -1,0 +1,113 @@
+groups:
+  - name: authly_recording_rules
+    interval: 30s
+    rules:
+      # HTTP Request Rate per endpoint
+      - record: authly:http_request_rate_5m
+        expr: sum by (endpoint, method, status_code) (rate(authly_http_requests_total[5m]))
+      
+      # Total request rate
+      - record: authly:http_request_rate_total
+        expr: sum(rate(authly_http_requests_total[5m]))
+      
+      # Error rate (4xx and 5xx)
+      - record: authly:http_error_rate_5m
+        expr: sum by (endpoint) (rate(authly_http_requests_total{status_code=~"4..|5.."}[5m]))
+      
+      # Success rate percentage
+      - record: authly:http_success_rate_percentage
+        expr: |
+          sum(rate(authly_http_requests_total{status_code=~"2.."}[5m])) 
+          / 
+          sum(rate(authly_http_requests_total[5m])) 
+          * 100
+
+  - name: database_recording_rules
+    interval: 30s
+    rules:
+      # PostgreSQL connection utilization
+      - record: postgres:connection_utilization
+        expr: |
+          pg_stat_database_numbackends{datname="authly"} 
+          / 
+          pg_settings_max_connections 
+          * 100
+      
+      # Database size growth rate
+      - record: postgres:database_size_bytes
+        expr: pg_database_size_bytes{datname="authly"}
+      
+      # Active queries
+      - record: postgres:active_queries
+        expr: pg_stat_activity_count{datname="authly",state="active"}
+
+  - name: redis_recording_rules  
+    interval: 30s
+    rules:
+      # Redis memory usage
+      - record: redis:memory_usage_bytes
+        expr: redis_memory_used_bytes
+      
+      # Redis hit rate
+      - record: redis:hit_rate_percentage
+        expr: |
+          rate(redis_keyspace_hits_total[5m]) 
+          / 
+          (rate(redis_keyspace_hits_total[5m]) + rate(redis_keyspace_misses_total[5m])) 
+          * 100
+      
+      # Redis connected clients
+      - record: redis:connected_clients
+        expr: redis_connected_clients
+
+  - name: authly_alerts
+    rules:
+      # High error rate alert
+      - alert: HighErrorRate
+        expr: authly:http_error_rate_5m > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value | humanize }} errors per second for endpoint {{ $labels.endpoint }}"
+      
+      # Service down alert
+      - alert: AuthlyServiceDown
+        expr: up{job="authly"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Authly service is down"
+          description: "Authly service has been down for more than 1 minute"
+      
+      # Database connection pool exhaustion
+      - alert: DatabaseConnectionPoolExhaustion
+        expr: postgres:connection_utilization > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Database connection pool near exhaustion"
+          description: "PostgreSQL connection pool is at {{ $value | humanize }}% utilization"
+      
+      # Redis memory high usage
+      - alert: RedisHighMemoryUsage
+        expr: redis:memory_usage_bytes > 1073741824  # 1GB
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis memory usage is high"
+          description: "Redis is using {{ $value | humanizeBytes }} of memory"
+      
+      # No requests received (possible issue)
+      - alert: NoRequestsReceived
+        expr: authly:http_request_rate_total == 0
+        for: 10m
+        labels:
+          severity: info
+        annotations:
+          summary: "No requests received"
+          description: "Authly has not received any requests in the last 10 minutes"

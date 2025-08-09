@@ -57,6 +57,44 @@ cp your-key.pem docker-compose/nginx/ssl/key.pem
 
 ## 🚀 Quick Start
 
+### **Standalone Container (All-in-One)**
+
+The standalone container includes PostgreSQL, KeyDB/Redis, and Authly in a single image, perfect for development and testing.
+
+```bash
+# Basic usage - all services internal
+docker run -it --rm -p 8000:8000 descoped/authly-standalone
+
+# Full access to all internal services (development/debugging)
+docker run -d \
+  --name authly-standalone \
+  -p 8000:8000 \    # Authly API
+  -p 5432:5432 \    # PostgreSQL (direct access)
+  -p 6379:6379 \    # KeyDB/Redis (direct access)
+  -e AUTHLY_ADMIN_PASSWORD=admin \
+  descoped/authly-standalone
+
+# With persistent data and custom secrets
+docker run -d \
+  --name authly-standalone \
+  -p 8000:8000 \
+  -p 5432:5432 \
+  -p 6379:6379 \
+  -v authly-data:/data \
+  -e JWT_SECRET_KEY=your-secret-key \
+  -e JWT_REFRESH_SECRET_KEY=your-refresh-key \
+  -e AUTHLY_ADMIN_PASSWORD=secure-password \
+  descoped/authly-standalone
+
+# Connect to services from host:
+# PostgreSQL: psql -h localhost -p 5432 -U authly -d authly (password: authly)
+# Redis: redis-cli -h localhost -p 6379
+# API: curl http://localhost:8000/health
+
+# Interactive shell for debugging
+docker exec -it authly-standalone bash
+```
+
 ### **Development Environment**
 
 ```bash

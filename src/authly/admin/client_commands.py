@@ -49,7 +49,27 @@ def validate_auth_method(ctx, param, value):
 
 @click.group(name="client")
 def client_group():
-    """Manage OAuth 2.1 clients."""
+    """
+    Manage OAuth 2.1 clients.
+
+    \b
+    OAuth clients represent applications that can request
+    authorization from users. Clients can be public (SPAs,
+    mobile apps) or confidential (backend services).
+
+    \b
+    Common Commands:
+      authly client create    Create a new OAuth client
+      authly client list      List all clients
+      authly client show      Show client details
+      authly client update    Update client configuration
+      authly client delete    Deactivate a client
+
+    \b
+    Client Types:
+      public        For SPAs, mobile apps (no client secret)
+      confidential  For backend services (has client secret)
+    """
     pass
 
 
@@ -94,7 +114,77 @@ def create_client(
     no_pkce: bool,
     output: str,
 ):
-    """Create a new OAuth 2.1 client."""
+    """
+    Create a new OAuth 2.1 client.
+
+    \b
+    Creates an OAuth client application that can request authorization.
+    Public clients (SPAs, mobile) don't receive a secret.
+    Confidential clients (backend) receive a client secret.
+
+    \b
+    Examples:
+      # Create a public client for a React SPA
+      $ authly client create --name "My React App" --type public \\
+          --redirect-uri "http://localhost:3000/callback" \\
+          --redirect-uri "https://myapp.com/callback"
+      ✅ Client created successfully!
+        Client ID: 9f8e7d6c-5b4a-3c2d-1e0f-9a8b7c6d5e4f
+        Client Name: My React App
+        Client Type: public
+        Client Secret: None (public client)
+
+      # Create a confidential client for a backend API
+      $ authly client create --name "Backend Service" --type confidential \\
+          --redirect-uri "https://api.example.com/oauth/callback" \\
+          --scope "read write admin" \\
+          --client-uri "https://api.example.com" \\
+          --auth-method client_secret_basic
+      ✅ Client created successfully!
+        Client ID: 1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d
+        Client Name: Backend Service
+        Client Type: confidential
+        Client Secret: xY9kL3mN7pQ2wR5tU8vA1bC4dE6fG0hJ
+        ⚠️  Store the client secret securely - it won't be shown again!
+
+      # Create with multiple redirect URIs and metadata
+      $ authly client create --name "Mobile App" --type public \\
+          --redirect-uri "myapp://oauth/callback" \\
+          --redirect-uri "https://myapp.com/oauth/mobile" \\
+          --scope "profile email" \\
+          --logo-uri "https://myapp.com/logo.png" \\
+          --tos-uri "https://myapp.com/terms" \\
+          --policy-uri "https://myapp.com/privacy"
+
+      # Output as JSON for automation
+      $ authly client create --name "CI/CD Client" --type confidential \\
+          --redirect-uri "https://ci.example.com/callback" \\
+          --output json
+
+      # Dry-run to preview without creating
+      $ authly --dry-run client create --name "Test" --type public \\
+          --redirect-uri "http://localhost:3000/callback"
+      DRY RUN: Would create client with the following configuration:
+        Name: Test
+        Type: public
+        Redirect URIs: http://localhost:3000/callback
+        PKCE Required: true
+
+    \b
+    Authentication Methods (--auth-method):
+      none                    Public clients (default for public)
+      client_secret_basic     HTTP Basic Auth (default for confidential)
+      client_secret_post      Client credentials in POST body
+      client_secret_jwt       JWT signed with client secret
+      private_key_jwt         JWT signed with private key
+
+    \b
+    Security Notes:
+      - PKCE is enabled by default (OAuth 2.1 requirement)
+      - Store client secrets securely
+      - Use HTTPS redirect URIs in production
+      - Public clients should use PKCE
+    """
     verbose = ctx.obj.get("verbose", False)
     dry_run = ctx.obj.get("dry_run", False)
 
@@ -179,7 +269,46 @@ def create_client(
 @click.option("--show-inactive", is_flag=True, help="Include inactive clients")
 @click.pass_context
 def list_clients(ctx: click.Context, limit: int, offset: int, output: str, show_inactive: bool):
-    """List OAuth 2.1 clients."""
+    """
+    List OAuth 2.1 clients.
+
+    \b
+    Displays all registered OAuth clients with their configuration.
+    By default shows only active clients.
+
+    \b
+    Examples:
+      # List all active clients
+      $ authly client list
+      Client ID                            Name                Type         Active PKCE Redirect URIs
+      --------------------------------------------------------------------------------------------------------
+      9f8e7d6c-5b4a-3c2d-1e0f-9a8b7c6d5e4f My React App       public       ✅     ✅   http://localhost:3000/callback
+      1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d Backend Service    confidential ✅     ✅   https://api.example.com/oauth/...
+      Total: 2 client(s)
+
+      # Include inactive clients
+      $ authly client list --show-inactive
+
+      # Paginate results
+      $ authly client list --limit 10 --offset 20
+
+      # Output as JSON for scripts
+      $ authly client list --output json | jq '.[].client_name'
+      "My React App"
+      "Backend Service"
+
+      # Filter active public clients with jq
+      $ authly client list --output json | jq '.[] | select(.client_type == "public" and .is_active == true)'
+
+    \b
+    Table Columns:
+      Client ID     Unique identifier (UUID)
+      Name          Human-readable client name
+      Type          public or confidential
+      Active        ✅ (active) or ❌ (inactive)
+      PKCE          ✅ (required) or ❌ (not required)
+      Redirect URIs First redirect URI (truncated if long)
+    """
     verbose = ctx.obj.get("verbose", False)
 
     if verbose:
@@ -237,7 +366,59 @@ def list_clients(ctx: click.Context, limit: int, offset: int, output: str, show_
 @click.option("--output", type=click.Choice(["table", "json"]), default="table", help="Output format")
 @click.pass_context
 def show_client(ctx: click.Context, client_id: str, output: str):
-    """Show detailed information about a specific client."""
+    """
+    Show detailed information about a specific client.
+
+    \b
+    Displays complete configuration and metadata for an OAuth client.
+    CLIENT_ID can be the full UUID of the client.
+
+    \b
+    Examples:
+      # Show client details
+      $ authly client show 9f8e7d6c-5b4a-3c2d-1e0f-9a8b7c6d5e4f
+      Client Details
+      ==================================================
+      Client ID: 9f8e7d6c-5b4a-3c2d-1e0f-9a8b7c6d5e4f
+      Name: My React App
+      Type: public
+      Active: ✅ Yes
+      PKCE Required: ✅ Yes
+      Auth Method: none
+      Created: 2024-01-20 10:30:00
+      Updated: 2024-01-20 10:30:00
+
+      Redirect URIs:
+        - http://localhost:3000/callback
+        - https://myapp.com/callback
+
+      Grant Types:
+        - authorization_code
+        - refresh_token
+
+      Response Types:
+        - code
+
+      Default Scopes: profile email
+
+      Client URI: https://myapp.com
+      Logo URI: https://myapp.com/logo.png
+      Terms of Service: https://myapp.com/terms
+      Privacy Policy: https://myapp.com/privacy
+
+      # Output as JSON for parsing
+      $ authly client show 9f8e7d6c-5b4a-3c2d-1e0f-9a8b7c6d5e4f --output json
+
+      # Extract specific fields with jq
+      $ authly client show $CLIENT_ID --output json | jq '.redirect_uris[]'
+      "http://localhost:3000/callback"
+      "https://myapp.com/callback"
+
+    \b
+    Exit Codes:
+      0  Client found and displayed
+      1  Client not found or error
+    """
     verbose = ctx.obj.get("verbose", False)
 
     if verbose:
@@ -325,7 +506,58 @@ def update_client(
     activate: bool,
     deactivate: bool,
 ):
-    """Update client information."""
+    """
+    Update client information.
+
+    \b
+    Modifies client metadata and status. Cannot change client type,
+    redirect URIs, or security settings through this command.
+
+    \b
+    Examples:
+      # Update client name
+      $ authly client update 9f8e7d6c-5b4a-3c2d-1e0f-9a8b7c6d5e4f \\
+          --name "My Updated React App"
+      ✅ Client updated successfully!
+        Client ID: 9f8e7d6c-5b4a-3c2d-1e0f-9a8b7c6d5e4f
+        Name: My Updated React App
+        Active: ✅ Yes
+
+      # Update multiple metadata fields
+      $ authly client update $CLIENT_ID \\
+          --client-uri "https://newapp.com" \\
+          --logo-uri "https://newapp.com/new-logo.png" \\
+          --tos-uri "https://newapp.com/terms" \\
+          --policy-uri "https://newapp.com/privacy"
+
+      # Deactivate a client (soft delete)
+      $ authly client update $CLIENT_ID --deactivate
+      ✅ Client updated successfully!
+        Client ID: 9f8e7d6c-5b4a-3c2d-1e0f-9a8b7c6d5e4f
+        Name: My React App
+        Active: ❌ No
+
+      # Reactivate a client
+      $ authly client update $CLIENT_ID --activate
+
+      # Dry-run to preview changes
+      $ authly --dry-run client update $CLIENT_ID --name "New Name"
+      DRY RUN: Would update client with:
+        client_name: New Name
+
+    \b
+    Limitations:
+      - Cannot change client type (public/confidential)
+      - Cannot modify redirect URIs (security constraint)
+      - Cannot change auth method or PKCE settings
+      - Use delete and recreate for major changes
+
+    \b
+    Notes:
+      - Deactivating prevents new authorizations
+      - Existing tokens remain valid until expiry
+      - Metadata changes take effect immediately
+    """
     verbose = ctx.obj.get("verbose", False)
     dry_run = ctx.obj.get("dry_run", False)
 
@@ -393,7 +625,50 @@ def update_client(
 @click.option("--confirm", is_flag=True, help="Skip confirmation prompt")
 @click.pass_context
 def regenerate_secret(ctx: click.Context, client_id: str, confirm: bool):
-    """Regenerate client secret for confidential clients."""
+    """
+    Regenerate client secret for confidential clients.
+
+    \b
+    Generates a new client secret, invalidating the old one.
+    Only works for confidential clients. Public clients have no secret.
+
+    \b
+    Examples:
+      # Regenerate with confirmation prompt
+      $ authly client regenerate-secret 1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d
+      This will invalidate the current client secret. Continue? [y/N]: y
+      ✅ Client secret regenerated successfully!
+        New Secret: kR9mT2nL5pQ7wX3vY8bA4cD6eF0gH1jK
+        ⚠️  Store the new secret securely - it won't be shown again!
+
+      # Skip confirmation (useful for automation)
+      $ authly client regenerate-secret $CLIENT_ID --confirm
+      ✅ Client secret regenerated successfully!
+        New Secret: pN8kL3mQ2wR5tU7vA1bC4dE6fG9hJ0xY
+        ⚠️  Store the new secret securely - it won't be shown again!
+
+      # Attempting on a public client fails
+      $ authly client regenerate-secret $PUBLIC_CLIENT_ID --confirm
+      ❌ Cannot regenerate secret for public client
+
+      # Dry-run to test without changing
+      $ authly --dry-run client regenerate-secret $CLIENT_ID --confirm
+      DRY RUN: Would regenerate client secret
+
+    \b
+    Important:
+      - Old secret immediately becomes invalid
+      - Update all applications using this client
+      - No way to recover the old secret
+      - Consider creating a new client instead for rotation
+
+    \b
+    Security Best Practices:
+      - Rotate secrets regularly (e.g., every 90 days)
+      - Never commit secrets to version control
+      - Use secure secret management systems
+      - Have a rotation plan before regenerating
+    """
     verbose = ctx.obj.get("verbose", False)
     dry_run = ctx.obj.get("dry_run", False)
 
@@ -441,7 +716,48 @@ def regenerate_secret(ctx: click.Context, client_id: str, confirm: bool):
 @click.option("--confirm", is_flag=True, help="Skip confirmation prompt")
 @click.pass_context
 def delete_client(ctx: click.Context, client_id: str, confirm: bool):
-    """Delete (deactivate) a client."""
+    """
+    Delete (deactivate) a client.
+
+    \b
+    Soft-deletes a client by deactivating it. The client record
+    remains in the database but cannot be used for new authorizations.
+
+    \b
+    Examples:
+      # Delete with confirmation prompt
+      $ authly client delete 9f8e7d6c-5b4a-3c2d-1e0f-9a8b7c6d5e4f
+      This will deactivate client '9f8e7d6c-5b4a-3c2d-1e0f-9a8b7c6d5e4f'. Continue? [y/N]: y
+      ✅ Client deactivated successfully!
+        Message: Client deleted
+
+      # Skip confirmation (useful for scripts)
+      $ authly client delete $CLIENT_ID --confirm
+      ✅ Client deactivated successfully!
+        Message: Client deleted
+
+      # Dry-run to test
+      $ authly --dry-run client delete $CLIENT_ID --confirm
+      DRY RUN: Would deactivate client
+
+      # Delete non-existent client
+      $ authly client delete non-existent-id --confirm
+      ❌ Client not found
+
+    \b
+    Effects:
+      - Client cannot issue new authorization requests
+      - Existing access tokens remain valid until expiry
+      - Refresh tokens may still work until expiry
+      - Client can be reactivated with 'client update --activate'
+
+    \b
+    Notes:
+      - This is a soft delete (deactivation)
+      - Client data is retained for audit purposes
+      - To fully remove, contact system administrator
+      - Consider revoking all tokens if immediate effect needed
+    """
     verbose = ctx.obj.get("verbose", False)
     dry_run = ctx.obj.get("dry_run", False)
 

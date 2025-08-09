@@ -235,4 +235,4 @@ class TestAdminAPIClientIntegration:
             # Verify it's an authentication error with user-friendly message
             assert exc_info.value.status_code == 401
             assert "Authentication failed" in exc_info.value.message
-            assert "python -m authly admin login" in exc_info.value.message
+            assert "python -m authly admin auth login" in exc_info.value.message

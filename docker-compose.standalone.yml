@@ -7,15 +7,19 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.standalone
+      args:
+        POSTGRES_BUILDER_IMAGE: ghcr.io/descoped/authly-postgres-builder:latest
     ports:
       - "8000:8000"
+      - "5432:5432"  # PostgreSQL direct access
+      - "6379:6379"  # KeyDB/Redis direct access
     volumes:
       - authly_standalone_data:/data
     environment:
       # Override default secrets for production use
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-your-production-secret-key-must-be-at-least-256-bits-long}
       JWT_REFRESH_SECRET_KEY: ${JWT_REFRESH_SECRET_KEY:-your-refresh-secret-key-must-be-at-least-256-bits}
-      AUTHLY_ADMIN_PASSWORD: ${AUTHLY_ADMIN_PASSWORD:-changeme}
+      AUTHLY_ADMIN_PASSWORD: ${AUTHLY_ADMIN_PASSWORD:-admin}
       AUTHLY_ADMIN_USERNAME: ${AUTHLY_ADMIN_USERNAME:-admin}
       AUTHLY_ADMIN_EMAIL: ${AUTHLY_ADMIN_EMAIL:-admin@example.com}
       # Optional: Increase verbosity for debugging
@@ -27,7 +31,180 @@ services:
       timeout: 3s
       retries: 3
       start_period: 60s
+    networks:
+      - authly-net
+
+  # pgAdmin - PostgreSQL Management
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: authly-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+      - ./docker-standalone/config/pgadmin-servers.json:/pgadmin4/servers.json:ro
+    networks:
+      - authly-net
+    depends_on:
+      authly-standalone:
+        condition: service_healthy
+    profiles:
+      - tools
+
+  # Redis Commander - Redis/KeyDB Management
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: authly-redis-commander
+    environment:
+      REDIS_HOSTS: "authly:authly-standalone:6379:0"
+      HTTP_USER: admin
+      HTTP_PASSWORD: admin
+    ports:
+      - "8081:8081"
+    networks:
+      - authly-net
+    depends_on:
+      authly-standalone:
+        condition: service_healthy
+    profiles:
+      - tools
+
+  # Prometheus - Metrics Collection
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: authly-prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./docker-standalone/config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./docker-standalone/config/prometheus-rules.yml:/etc/prometheus/rules/rules.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - authly-net
+    depends_on:
+      authly-standalone:
+        condition: service_healthy
+    profiles:
+      - monitoring
+
+  # Grafana - Metrics Visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: authly-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      # GF_INSTALL_PLUGINS: redis-datasource
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      # - ./docker-standalone/config/grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+      # - ./docker-standalone/config/grafana-dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:ro
+      # - ./docker-standalone/dashboards:/var/lib/grafana/dashboards:ro
+    networks:
+      - authly-net
+    depends_on:
+      - prometheus
+    profiles:
+      - monitoring
+
+  # PostgreSQL Exporter for database metrics
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    container_name: authly-postgres-exporter
+    environment:
+      # Use host=localhost to connect via Unix socket which uses trust auth
+      DATA_SOURCE_NAME: "postgresql://authly@authly-standalone:5432/authly?sslmode=disable"
+    ports:
+      - "9187:9187"
+    networks:
+      - authly-net
+    depends_on:
+      authly-standalone:
+        condition: service_healthy
+    profiles:
+      - monitoring
+
+  # Redis Exporter for cache metrics
+  redis-exporter:
+    image: oliver006/redis_exporter:latest
+    container_name: authly-redis-exporter
+    environment:
+      REDIS_ADDR: "redis://authly-standalone:6379"
+    ports:
+      - "9121:9121"
+    networks:
+      - authly-net
+    depends_on:
+      authly-standalone:
+        condition: service_healthy
+    profiles:
+      - monitoring
+
+  # Authly PostgreSQL Proxy - OAuth token authentication for database
+  pg-proxy:
+    build:
+      context: ./docker-standalone/authly-db-proxy
+      dockerfile: Dockerfile
+    container_name: authly-pg-proxy
+    command: ["python", "pg_proxy.py"]
+    environment:
+      AUTHLY_URL: "http://authly-standalone:8000"
+      DATABASE_URL: "postgresql://authly:admin@authly-standalone:5432/authly"
+      PROXY_PORT: "5433"
+    ports:
+      - "5433:5433"  # PostgreSQL proxy port
+    networks:
+      - authly-net
+    depends_on:
+      authly-standalone:
+        condition: service_healthy
+    profiles:
+      - authz
+
+  # Authly Redis Proxy - OAuth token authentication for cache
+  redis-proxy:
+    build:
+      context: ./docker-standalone/authly-db-proxy
+      dockerfile: Dockerfile
+    container_name: authly-redis-proxy
+    command: ["python", "redis_proxy.py"]
+    environment:
+      AUTHLY_URL: "http://authly-standalone:8000"
+      REDIS_URL: "redis://authly-standalone:6379"
+      PROXY_PORT: "6380"
+    ports:
+      - "6380:6380"  # Redis proxy port
+    networks:
+      - authly-net
+    depends_on:
+      authly-standalone:
+        condition: service_healthy
+    profiles:
+      - authz
+
+networks:
+  authly-net:
+    driver: bridge
 
 volumes:
   authly_standalone_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
     driver: local

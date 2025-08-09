@@ -24,7 +24,8 @@ RUN apk add --no-cache \
     flex \
     perl \
     linux-headers \
-    e2fsprogs-dev
+    e2fsprogs-dev \
+    readline-dev
 
 # Download and extract PostgreSQL 17 source
 WORKDIR /build
@@ -33,7 +34,7 @@ RUN wget -q https://ftp.postgresql.org/pub/source/v17.2/postgresql-17.2.tar.gz &
     cd postgresql-17.2 && \
     ./configure \
         --prefix=/opt/postgresql \
-        --without-readline \
+        --with-readline \
         --without-icu \
         --without-zlib \
         --without-openssl \
@@ -121,13 +122,35 @@ RUN tar -C / -Jxpf /tmp/s6-overlay-noarch.tar.xz && \
 RUN apk add --no-cache \
     libffi \
     bash \
+    bash-completion \
     curl \
+    wget \
     jq \
     openssl \
     tzdata \
-    libuuid && \
+    libuuid \
+    readline \
+    ncurses \
+    man-db \
+    man-pages \
+    netcat-openbsd && \
     echo 'https://dl-cdn.alpinelinux.org/alpine/edge/testing' >> /etc/apk/repositories && \
-    apk add --no-cache keydb
+    apk add --no-cache keydb keydb-cli && \
+    # Install additional tools (allow failures for missing packages)
+    apk add --no-cache \
+        htop \
+        procps \
+        lsof \
+        strace \
+        iproute2 \
+        bind-tools \
+        tcpdump \
+        vim \
+        nano \
+        less \
+        tree \
+        git \
+        2>/dev/null || true
 
 # Copy all binaries and resources from builders
 COPY --from=postgres-builder /opt/postgresql /opt/postgresql
@@ -156,6 +179,7 @@ COPY --chown=authly:authly scripts /app/scripts
 COPY docker-postgres/init-db-and-user.sql /docker-entrypoint-initdb.d/init.sql
 COPY docker-standalone/standalone-init.sh /usr/local/bin/standalone-init
 COPY docker-standalone/scripts /tmp/setup-scripts
+COPY docker-standalone/authly.1 /usr/share/man/man1/authly.1
 
 # Prepare simple-auth-flow script
 RUN cp /app/scripts/simple-auth-flow.sh /app/scripts/simple-auth-flow-original.sh && \
@@ -164,6 +188,18 @@ RUN cp /app/scripts/simple-auth-flow.sh /app/scripts/simple-auth-flow-original.s
 # Run all configuration in a single layer
 RUN chmod +x /tmp/setup-scripts/*.sh && \
     /tmp/setup-scripts/configure-all.sh && \
+    # Install debug tools
+    /tmp/setup-scripts/install-debug-tools.sh || true && \
+    # Copy psqlrc if it exists
+    if [ -f /tmp/setup-scripts/psqlrc ]; then \
+        cp /tmp/setup-scripts/psqlrc /home/authly/.psqlrc && \
+        chown authly:authly /home/authly/.psqlrc; \
+    fi && \
+    # Copy redisclirc if it exists
+    if [ -f /tmp/setup-scripts/redisclirc ]; then \
+        cp /tmp/setup-scripts/redisclirc /home/authly/.redisclirc && \
+        chown authly:authly /home/authly/.redisclirc; \
+    fi && \
     rm -rf /tmp/setup-scripts
 
 # Install Authly package as editable to create console scripts
@@ -200,7 +236,7 @@ ENV DATABASE_URL=postgresql://authly:authly@localhost/authly \
 VOLUME ["/data"]
 
 # Expose ports
-EXPOSE 8000
+EXPOSE 8000 5432 6379
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \

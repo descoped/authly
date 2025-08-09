@@ -1,0 +1,60 @@
+-- PostgreSQL interactive configuration
+-- This file configures psql for a better interactive experience
+
+-- Set prompts to show database and user
+\set PROMPT1 '%[%033[1;32m%]%n@%M:%>%[%033[0m%] %[%033[1;34m%]%/%[%033[0m%]%R%# '
+\set PROMPT2 '%[%033[1;32m%]%n@%M:%>%[%033[0m%] %[%033[1;34m%]%/%[%033[0m%]%R%# '
+
+-- Show query execution times
+\timing on
+
+-- Use table format for output
+\x auto
+
+-- Disable pager for better interactive experience
+\pset pager off
+
+-- Show null values as [NULL]
+\pset null '[NULL]'
+
+-- Set history file
+\set HISTFILE ~/.psql_history
+
+-- Save history
+\set HISTSIZE 5000
+
+-- Enable verbose error reports
+\set VERBOSITY verbose
+
+-- Auto-complete keywords in uppercase
+\set COMP_KEYWORD_CASE upper
+
+-- Enable tab completion for common patterns
+\set COMPLETION_KEYWORD_CASE upper
+\set COMPLETION_AUTOCOMMIT on
+
+-- Useful queries as shortcuts
+\set tables 'SELECT tablename FROM pg_tables WHERE schemaname = ''public'' ORDER BY tablename;'
+\set users 'SELECT id, username, email, is_active, is_admin, created_at FROM users ORDER BY created_at DESC LIMIT 10;'
+\set clients 'SELECT client_id, client_name, client_type, is_active, created_at FROM oauth_clients ORDER BY created_at DESC LIMIT 10;'
+\set tokens 'SELECT id, user_id, token_type, expires_at, created_at FROM tokens WHERE expires_at > NOW() ORDER BY created_at DESC LIMIT 10;'
+\set scopes 'SELECT scope_name, description, is_default, is_active FROM oauth_scopes ORDER BY scope_name;'
+\set stats 'SELECT (SELECT COUNT(*) FROM users) as users, (SELECT COUNT(*) FROM oauth_clients) as clients, (SELECT COUNT(*) FROM tokens WHERE expires_at > NOW()) as active_tokens, (SELECT COUNT(*) FROM oauth_scopes WHERE is_active) as active_scopes;'
+
+-- Welcome message
+\echo ''
+\echo 'Welcome to PostgreSQL interactive shell for Authly'
+\echo 'Connected to database: authly'
+\echo ''
+\echo 'Useful shortcuts (type and press Enter):'
+\echo '  :tables  - List all tables'
+\echo '  :users   - Show recent users'
+\echo '  :clients - Show OAuth clients'
+\echo '  :tokens  - Show active tokens'
+\echo '  :scopes  - Show OAuth scopes'
+\echo '  :stats   - Show database statistics'
+\echo ''
+\echo 'Example: Type :tables and press Enter'
+\echo ''
+\echo 'Type \\h for SQL help, \\? for psql help, or \\q to quit'
+\echo ''

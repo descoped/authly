@@ -204,7 +204,8 @@ class AdminAPIClient:
             # Check if this is an authentication failure from OAuth token endpoint
             if "oauth/token" in path.lower() and "incorrect username or password" in error_message.lower():
                 raise AdminAPIError(
-                    "Authentication failed. Please login again with 'python -m authly admin login'.", status_code=401
+                    "Authentication failed. Please login again with 'python -m authly admin auth login'.",
+                    status_code=401,
                 )
             elif "scope" in path.lower():
                 if "already exists" in error_message.lower() or "duplicate" in error_message.lower():
@@ -242,7 +243,7 @@ class AdminAPIClient:
 
         elif status_code == 401:
             raise AdminAPIError(
-                "Authentication failed. Please login again with 'python -m authly admin login'.", status_code=401
+                "Authentication failed. Please login again with 'python -m authly admin auth login'.", status_code=401
             )
 
         elif status_code == 403:

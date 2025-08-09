@@ -1,0 +1,15 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "Authly Standalone",
+      "Group": "Authly",
+      "Host": "authly-standalone",
+      "Port": 5432,
+      "MaintenanceDB": "authly",
+      "Username": "authly",
+      "Password": "authly",
+      "SSLMode": "disable",
+      "Comment": "Authly embedded PostgreSQL database"
+    }
+  }
+}

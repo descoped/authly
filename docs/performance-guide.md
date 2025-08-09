@@ -1,6 +1,6 @@
 # Performance Guide
 
-Comprehensive performance guide providing benchmarks, optimization strategies, and monitoring recommendations for Authly OAuth 2.1 Authorization Server in production environments.
+Performance guide with benchmarks, optimization strategies, and monitoring recommendations for Authly OAuth 2.1 Authorization Server in production environments.
 
 ## 🎯 Performance Overview
 
@@ -10,7 +10,7 @@ Authly is designed for high-performance OAuth 2.1 operations with enterprise-gra
 - **Optimized Connection Pooling** - Advanced PostgreSQL connection management
 - **Efficient Database Operations** - Proper indexing and query optimization
 - **Minimal Dependencies** - Focused core with essential libraries only
-- **Production-Tested** - Comprehensive test suite ensures optimal code paths
+- **Production-Tested** - Extensive test suite ensures optimal code paths
 - **Prometheus Metrics** - Built-in performance monitoring and observability
 
 ## 📊 Benchmark Results
@@ -590,7 +590,7 @@ class PerformanceMonitor:
             await asyncio.sleep(self.interval)
     
     async def collect_metrics(self) -> Dict[str, Any]:
-        """Collect comprehensive performance metrics."""
+        """Collect detailed performance metrics."""
         process = psutil.Process()
         
         return {
@@ -1121,13 +1121,13 @@ print("Large deployment servers needed:", large_deployment['server_requirements'
 - ✅ **Health Checks** - Proper failover detection
 
 ### Monitoring Level
-- ✅ **Metrics Collection** - Comprehensive Prometheus metrics
+- ✅ **Metrics Collection** - Full Prometheus metrics
 - ✅ **Performance Alerts** - Threshold-based alerting
 - ✅ **Dashboard Setup** - Key performance indicators tracked
 - ✅ **Log Analysis** - Structured logging for performance analysis
 
 ---
 
-This performance guide provides comprehensive benchmarks and optimization strategies based on real-world testing and production deployment experience. Regular performance testing and monitoring are essential for maintaining optimal performance as your OAuth server scales.
+This performance guide provides detailed benchmarks and optimization strategies based on real-world testing and production deployment experience. Regular performance testing and monitoring are essential for maintaining optimal performance as your OAuth server scales.
 
 For performance-related issues or optimization questions, refer to the [troubleshooting guide](troubleshooting-guide.md) and monitor the metrics dashboard for performance trends.

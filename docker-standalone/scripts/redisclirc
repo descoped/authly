@@ -1,0 +1,23 @@
+# Redis/KeyDB CLI configuration
+# This file configures redis-cli for better interactive experience
+
+# Enable raw output for better readability
+raw-output
+
+# Set history file
+histfile ~/.rediscli_history
+
+# Enable command hints
+hints
+
+# Set prompt to show connection info
+prompt keydb@localhost:6379> 
+
+# Common command aliases for convenience
+# Note: These would need to be implemented differently as redis-cli doesn't support aliases
+# Users can use these patterns:
+# KEYS authly:*          - Show all Authly keys
+# GET authly:rate:*      - Get rate limit data
+# SCAN 0 MATCH authly:*  - Scan for Authly keys
+# INFO keyspace          - Show database statistics
+# MONITOR                - Watch commands in real-time

@@ -64,5 +64,33 @@ fi
 # Export for immediate use
 export JWT_SECRET_KEY JWT_REFRESH_SECRET_KEY AUTHLY_ADMIN_PASSWORD
 
+# Display service information
+echo ""
+echo "================================================================================"
+echo "🚀 All services are ready!"
+echo "================================================================================"
+echo ""
+echo "Service URLs and Credentials:"
+echo ""
+echo "  • Authly API:        http://localhost:8000"
+echo "                       Username: admin"
+echo "                       Password: ${AUTHLY_ADMIN_PASSWORD}"
+echo ""
+echo "  • PostgreSQL:        postgresql://authly:authly@localhost:5432/authly"
+echo "                       (Internal access only)"
+echo ""
+echo "  • KeyDB/Redis:       redis://localhost:6379"
+echo "                       (No authentication required)"
+echo ""
+echo "  • API Documentation: http://localhost:8000/docs"
+echo "  • Health Check:      http://localhost:8000/health"
+echo ""
+echo "Quick OAuth Token Test:"
+echo "  curl -X POST http://localhost:8000/api/v1/oauth/token \\"
+echo "    -d 'grant_type=password&username=admin&password=${AUTHLY_ADMIN_PASSWORD}'"
+echo ""
+echo "================================================================================"
+echo ""
+
 # Continue with normal startup
 exec "$@"

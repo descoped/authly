@@ -1,0 +1,29 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+# Load recording and alerting rules
+rule_files:
+  - /etc/prometheus/rules/*.yml
+
+scrape_configs:
+  # Authly application metrics (if exposed)
+  - job_name: 'authly'
+    static_configs:
+      - targets: ['authly-standalone:8000']
+    metrics_path: /metrics
+    
+  # PostgreSQL metrics
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['authly-postgres-exporter:9187']
+      
+  # Redis/KeyDB metrics
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['authly-redis-exporter:9121']
+      
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']

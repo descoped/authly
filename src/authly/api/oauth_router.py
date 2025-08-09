@@ -6,7 +6,7 @@ Provides OAuth 2.1 endpoints including discovery, authorization, and token opera
 import logging
 import os
 from datetime import UTC, datetime, timedelta
-from typing import Annotated
+from typing import Annotated, Any
 from urllib.parse import urlencode
 from uuid import UUID
 
@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request, sta
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_serializer
 
 from authly.api.auth_dependencies import (
     get_authorization_service,
@@ -714,6 +714,7 @@ async def _handle_password_grant(
             refresh_token=token_response.refresh_token,
             token_type=token_response.token_type,
             expires_in=token_response.expires_in,
+            scope=token_response.scope,
         )
 
         if user.requires_password_change:
@@ -838,6 +839,7 @@ async def _handle_authorization_code_grant(
             token_type=token_response.token_type,
             expires_in=token_response.expires_in,
             id_token=token_response.id_token,
+            scope=token_response.scope,
         )
 
     except HTTPException:
@@ -1002,6 +1004,7 @@ async def refresh_access_token(
             token_type=token_response.token_type,
             expires_in=token_response.expires_in,
             id_token=token_response.id_token,
+            scope=token_response.scope,
         )
 
     except HTTPException as he:
@@ -1024,3 +1027,153 @@ async def refresh_access_token(
             duration = time.time() - start_time
             metrics.track_oauth_token_request("refresh_token", "unknown", "error", duration)
         return oauth_error_response("invalid_grant", "Could not refresh tokens")
+
+
+# Token Introspection Models
+class TokenIntrospectionRequest(BaseModel):
+    """RFC 7662 Token Introspection Request"""
+
+    token: str = Field(..., description="The token to introspect")
+    token_type_hint: str | None = Field(
+        None, description="Hint about the type of token (access_token or refresh_token)"
+    )
+
+
+class TokenIntrospectionResponse(BaseModel):
+    """RFC 7662 Token Introspection Response"""
+
+    model_config = {"extra": "forbid"}
+
+    active: bool = Field(..., description="Whether the token is active")
+    scope: str | None = Field(None, description="Space-separated list of scopes")
+    client_id: str | None = Field(None, description="Client identifier")
+    username: str | None = Field(None, description="Username of the resource owner")
+    token_type: str | None = Field(None, description="Type of the token")
+    exp: int | None = Field(None, description="Expiration time (seconds since epoch)")
+    iat: int | None = Field(None, description="Issued at time (seconds since epoch)")
+    nbf: int | None = Field(None, description="Not before time (seconds since epoch)")
+    sub: str | None = Field(None, description="Subject identifier")
+    aud: str | None = Field(None, description="Audience")
+    iss: str | None = Field(None, description="Issuer")
+    jti: str | None = Field(None, description="JWT ID")
+
+    @model_serializer
+    def serialize_model(self) -> dict[str, Any]:
+        """Serialize according to RFC 7662 - exclude None values and limit inactive responses"""
+        data = {
+            "active": self.active,
+            "scope": self.scope,
+            "client_id": self.client_id,
+            "username": self.username,
+            "token_type": self.token_type,
+            "exp": self.exp,
+            "iat": self.iat,
+            "nbf": self.nbf,
+            "sub": self.sub,
+            "aud": self.aud,
+            "iss": self.iss,
+            "jti": self.jti,
+        }
+
+        # For inactive tokens, only include 'active' field per RFC 7662
+        if not self.active:
+            return {"active": False}
+
+        # For active tokens, exclude None values
+        return {k: v for k, v in data.items() if v is not None}
+
+
+@oauth_router.post("/introspect", response_model=TokenIntrospectionResponse)
+async def introspect_token(
+    token: str = Form(..., description="The token to introspect"),
+    token_type_hint: str | None = Form(None, description="Hint about token type"),
+    token_service: TokenService = Depends(get_token_service),
+    user_repo: UserRepository = Depends(get_user_repository),
+    config: AuthlyConfig = Depends(get_config),
+) -> TokenIntrospectionResponse:
+    """
+    OAuth 2.0 Token Introspection endpoint (RFC 7662).
+
+    Allows resource servers to query the authorization server about the state
+    and metadata of a token.
+
+    Args:
+        token: The token string to introspect
+        token_type_hint: Optional hint about token type (access_token or refresh_token)
+        token_service: Service for token operations
+        user_repo: Repository for user operations
+        config: Application configuration
+
+    Returns:
+        TokenIntrospectionResponse with token metadata if active, or active=false if not
+    """
+    try:
+        # Try to decode the token
+        try:
+            payload = decode_token(token, config.secret_key, config.algorithm)
+
+            # Check if token is expired
+            exp = payload.get("exp")
+            if exp and datetime.fromtimestamp(exp, tz=UTC) < datetime.now(UTC):
+                logger.info("Token introspection: token expired")
+                return TokenIntrospectionResponse(active=False)
+
+            # Get user information if available
+            user_id = payload.get("sub")
+            username = None
+            if user_id:
+                try:
+                    user = await user_repo.get_by_id(UUID(user_id))
+                    username = user.username if user else None
+                except Exception:
+                    logger.warning(f"Could not fetch user for token introspection: {user_id}")
+
+            # Build introspection response
+            return TokenIntrospectionResponse(
+                active=True,
+                scope=payload.get("scope", ""),
+                client_id=payload.get("client_id"),
+                username=username,
+                token_type=payload.get("typ", "Bearer"),
+                exp=payload.get("exp"),
+                iat=payload.get("iat"),
+                nbf=payload.get("nbf"),
+                sub=payload.get("sub"),
+                aud=payload.get("aud"),
+                iss=payload.get("iss"),
+                jti=payload.get("jti"),
+            )
+
+        except Exception:
+            # If it's not an access token, try as refresh token
+            if token_type_hint == "refresh_token" or token_type_hint is None:
+                try:
+                    # Try to decode as refresh token
+                    refresh_payload = decode_token(token, config.refresh_secret_key, config.algorithm)
+
+                    # Check if refresh token is expired
+                    exp = refresh_payload.get("exp")
+                    if exp and datetime.fromtimestamp(exp, tz=UTC) < datetime.now(UTC):
+                        logger.info("Token introspection: refresh token expired")
+                        return TokenIntrospectionResponse(active=False)
+
+                    # Refresh tokens are active but have limited metadata
+                    return TokenIntrospectionResponse(
+                        active=True,
+                        token_type="refresh_token",
+                        exp=refresh_payload.get("exp"),
+                        iat=refresh_payload.get("iat"),
+                        sub=refresh_payload.get("sub"),
+                        jti=refresh_payload.get("jti"),
+                    )
+                except Exception:
+                    pass
+
+            # Token is invalid or expired
+            logger.info("Token introspection: invalid token")
+            return TokenIntrospectionResponse(active=False)
+
+    except Exception as e:
+        logger.error(f"Error during token introspection: {e}")
+        # Per RFC 7662, return inactive for any error
+        return TokenIntrospectionResponse(active=False)

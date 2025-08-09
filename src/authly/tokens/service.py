@@ -204,6 +204,7 @@ class TokenService:
                 refresh_token=refresh_token,
                 token_type="Bearer",
                 expires_in=self._config.access_token_expire_minutes * 60,
+                scope=scope,
                 id_token=id_token,
             )
 
@@ -411,6 +412,7 @@ class TokenService:
                 refresh_token=new_refresh_token,
                 token_type="Bearer",
                 expires_in=self._config.access_token_expire_minutes * 60,
+                scope=original_scope,
                 id_token=id_token,
             )
 

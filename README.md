@@ -45,6 +45,7 @@ Through systematic testing and validation, we've achieved 100% conformance with 
 ### **Core Features (Working)**
 - **Authorization Code Flow** with mandatory PKCE (Proof Key for Code Exchange)
 - **Client Management** for confidential and public OAuth clients
+- **Token Introspection** (RFC 7662) for resource server token validation
 - **Token Revocation** (RFC 7009) for immediate token invalidation
 - **Server Discovery** (RFC 8414) for automatic client configuration
 - **Scope Management** with granular permission control
@@ -58,6 +59,7 @@ Through systematic testing and validation, we've achieved 100% conformance with 
 ### **Standards Compliance (Partial)**
 - **RFC 6749** - OAuth 2.0 Authorization Framework ✅ Implemented
 - **RFC 7636** - Proof Key for Code Exchange (PKCE) ✅ Implemented
+- **RFC 7662** - OAuth 2.0 Token Introspection ✅ Implemented
 - **RFC 7009** - OAuth 2.0 Token Revocation ✅ Implemented
 - **RFC 8414** - OAuth 2.0 Authorization Server Metadata ✅ Implemented
 - **Official Certification**: ❌ Not certified
@@ -119,9 +121,9 @@ Through systematic testing and validation, we've achieved 100% conformance with 
 - Password reset functionality
 
 ### **Admin Tools**
-- CLI for OAuth client management
+- Admin CLI (`authly admin`) for OAuth client and scope management
 - Admin API for user management
-- Scope management interface
+- Authentication status and configuration info commands
 - Basic monitoring endpoints
 
 ---
@@ -156,6 +158,9 @@ docker run -p 8000:8000 descoped/authly:latest
 docker pull descoped/authly-standalone:latest
 docker run --rm -p 8000:8000 descoped/authly-standalone:latest
 
+# Access Admin CLI from outside container
+docker exec $(docker ps --filter "ancestor=descoped/authly-standalone" --format "{{.ID}}") authly admin status
+
 # Enter Interactive Shell to access Authly Admin CLI + End-2-End Testing tools
 docker exec -it $(docker ps --filter "ancestor=descoped/authly-standalone" --format "{{.ID}}") /bin/bash
 
@@ -170,10 +175,11 @@ The service will be available at `http://localhost:8000`
 ## 🧪 Testing
 
 The project includes a comprehensive test suite:
-- Integration tests with real PostgreSQL
-- OAuth flow testing
-- Basic OIDC compliance tests
-- ~90% specification compliance achieved
+- 767 unit and integration tests (all passing)
+- Real PostgreSQL transaction testing
+- OAuth 2.1 flow testing with PKCE
+- OAuth 2.0 Token Introspection (RFC 7662) tests
+- OIDC compliance tests with 100% conformance (40/40 checks)
 
 ```bash
 # Run all tests
@@ -182,7 +188,7 @@ uv run pytest
 # Run specific test category
 uv run pytest tests/test_oauth.py -v
 
-# Check conformance (90% compliance)
+# Check conformance (100% compliance)
 cd tck && make validate
 ```
 
@@ -193,6 +199,7 @@ cd tck && make validate
 - **[OAuth Implementation Guide](docs/oauth-guide.md)** - OAuth 2.1 features and usage
 - **[OIDC Implementation Guide](docs/oidc-guide.md)** - OpenID Connect features
 - **[API Reference](docs/api-reference.md)** - Complete API documentation
+- **[CLI Administration Guide](docs/cli-guide.md)** - Admin CLI commands and usage
 - **[Security Guide](docs/security-guide.md)** - Security features and best practices
 - **[Deployment Guide](docs/deployment-guide.md)** - Deployment instructions
 - **[Docker Standalone Guide](docs/docker-standalone.md)** - All-in-one container documentation

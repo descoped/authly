@@ -1,6 +1,6 @@
 # Troubleshooting Guide
 
-Comprehensive troubleshooting guide for Authly OAuth 2.1 Authorization Server, covering common issues, error scenarios, and solutions for deployment, development, and production environments.
+Troubleshooting guide for Authly OAuth 2.1 Authorization Server, covering common issues, error scenarios, and solutions for deployment, development, and production environments.
 
 ## 🚨 Quick Diagnostic Commands
 

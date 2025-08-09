@@ -106,8 +106,7 @@ exclude = [
 ]
 
 [project.scripts]
-authly-admin = "authly.admin.cli:main"
-authly = "authly.__main__:cli"
+authly = "authly.__main__:main"
 
 [project.urls]
 Homepage = "https://github.com/descoped/authly"

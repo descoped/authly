@@ -35,4 +35,5 @@ class TokenPairResponse(BaseModel):
     refresh_token: str
     token_type: str = "Bearer"
     expires_in: int  # Access token expiration in seconds
+    scope: str | None = None  # OAuth scopes granted
     id_token: str | None = None  # ID token for OpenID Connect flows

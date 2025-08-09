@@ -218,4 +218,28 @@ EOF
 
 chmod +x /usr/local/bin/unlock-admin-account
 
+# Create psql wrapper that connects directly to authly database
+# We'll override the PostgreSQL binary directly
+mv /opt/postgresql/bin/psql /opt/postgresql/bin/psql.orig
+
+cat > /opt/postgresql/bin/psql << 'EOF'
+#!/bin/sh
+# Wrapper script for psql to connect directly to authly database
+exec /opt/postgresql/bin/psql.orig -h /run/postgresql -U authly -d authly "$@"
+EOF
+
+chmod +x /opt/postgresql/bin/psql
+
+# Create redis/keydb wrapper for direct access
+cat > /usr/local/bin/redis << 'EOF'
+#!/bin/sh
+# Wrapper script for KeyDB/Redis CLI with direct connection
+exec keydb-cli -h localhost -p 6379 "$@"
+EOF
+
+chmod +x /usr/local/bin/redis
+
+# Also create alias as 'keydb' for consistency
+ln -s /usr/local/bin/redis /usr/local/bin/keydb
+
 echo "✅ Wrapper scripts created"

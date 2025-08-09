@@ -10,7 +10,7 @@ from click.testing import CliRunner
 from fastapi import HTTPException
 from psycopg_toolkit import TransactionManager
 
-from authly.admin.cli import main
+from authly.admin import cli
 from authly.core.resource_manager import AuthlyResourceManager
 from authly.oauth.client_repository import ClientRepository
 from authly.oauth.client_service import ClientService
@@ -29,7 +29,7 @@ class TestAdminCLIStructure:
 
     def test_main_help(self, cli_runner: CliRunner):
         """Test main CLI help command."""
-        result = cli_runner.invoke(main, ["--help"])
+        result = cli_runner.invoke(cli.main, ["--help"])
         assert result.exit_code == 0
         assert "Authly Admin CLI" in result.output
         assert "OAuth 2.1 Administration Tool" in result.output
@@ -39,7 +39,7 @@ class TestAdminCLIStructure:
 
     def test_client_group_help(self, cli_runner: CliRunner):
         """Test client command group help."""
-        result = cli_runner.invoke(main, ["client", "--help"])
+        result = cli_runner.invoke(cli.main, ["client", "--help"])
         assert result.exit_code == 0
         assert "Manage OAuth 2.1 clients" in result.output
         assert "create" in result.output
@@ -51,7 +51,7 @@ class TestAdminCLIStructure:
 
     def test_scope_group_help(self, cli_runner: CliRunner):
         """Test scope command group help."""
-        result = cli_runner.invoke(main, ["scope", "--help"])
+        result = cli_runner.invoke(cli.main, ["scope", "--help"])
         assert result.exit_code == 0
         assert "Manage OAuth 2.1 scopes" in result.output
         assert "create" in result.output
@@ -63,7 +63,7 @@ class TestAdminCLIStructure:
 
     def test_client_create_help(self, cli_runner: CliRunner):
         """Test client create command help."""
-        result = cli_runner.invoke(main, ["client", "create", "--help"])
+        result = cli_runner.invoke(cli.main, ["client", "create", "--help"])
         assert result.exit_code == 0
         assert "--name" in result.output
         assert "--type" in result.output
@@ -77,7 +77,7 @@ class TestAdminCLIStructure:
 
     def test_client_list_help(self, cli_runner: CliRunner):
         """Test client list command help."""
-        result = cli_runner.invoke(main, ["client", "list", "--help"])
+        result = cli_runner.invoke(cli.main, ["client", "list", "--help"])
         assert result.exit_code == 0
         assert "--limit" in result.output
         assert "--offset" in result.output
@@ -86,7 +86,7 @@ class TestAdminCLIStructure:
 
     def test_scope_create_help(self, cli_runner: CliRunner):
         """Test scope create command help."""
-        result = cli_runner.invoke(main, ["scope", "create", "--help"])
+        result = cli_runner.invoke(cli.main, ["scope", "create", "--help"])
         assert result.exit_code == 0
         assert "--name" in result.output
         assert "--description" in result.output
@@ -95,23 +95,40 @@ class TestAdminCLIStructure:
 
     def test_global_options_help(self, cli_runner: CliRunner):
         """Test global CLI options."""
-        result = cli_runner.invoke(main, ["--help"])
+        result = cli_runner.invoke(cli.main, ["--help"])
         assert result.exit_code == 0
         assert "--config" in result.output
         assert "--verbose" in result.output
         assert "--dry-run" in result.output
 
+    def test_auth_group_commands(self, cli_runner: CliRunner):
+        """Test auth group has all expected commands including info."""
+        result = cli_runner.invoke(cli.main, ["auth", "--help"])
+        assert result.exit_code == 0
+        assert "login" in result.output
+        assert "logout" in result.output
+        assert "whoami" in result.output
+        assert "refresh" in result.output
+        assert "info" in result.output
+        assert "status" in result.output
+
+    def test_auth_login_show_token_option(self, cli_runner: CliRunner):
+        """Test auth login has --show-token option."""
+        result = cli_runner.invoke(cli.main, ["auth", "login", "--help"])
+        assert result.exit_code == 0
+        assert "--show-token" in result.output
+
     def test_client_create_validation_errors(self, cli_runner: CliRunner):
         """Test client create command validation."""
         # Missing required name
         result = cli_runner.invoke(
-            main, ["client", "create", "--type", "public", "--redirect-uri", "https://example.com/callback"]
+            cli.main, ["client", "create", "--type", "public", "--redirect-uri", "https://example.com/callback"]
         )
         assert result.exit_code != 0
 
         # Invalid client type
         result = cli_runner.invoke(
-            main,
+            cli.main,
             [
                 "client",
                 "create",
@@ -126,13 +143,13 @@ class TestAdminCLIStructure:
         assert result.exit_code != 0
 
         # Missing redirect URI
-        result = cli_runner.invoke(main, ["client", "create", "--name", "Test", "--type", "public"])
+        result = cli_runner.invoke(cli.main, ["client", "create", "--name", "Test", "--type", "public"])
         assert result.exit_code != 0
 
     def test_scope_create_validation_errors(self, cli_runner: CliRunner):
         """Test scope create command validation."""
         # Missing required name
-        result = cli_runner.invoke(main, ["scope", "create", "--description", "Test description"])
+        result = cli_runner.invoke(cli.main, ["scope", "create", "--description", "Test description"])
         assert result.exit_code != 0
 
 

@@ -31,13 +31,13 @@ uv run python -m authly admin --help
 ### **First-Time Setup**
 ```bash
 # Login to admin interface
-uv run python -m authly admin login
+uv run python -m authly admin auth login
 # Enter admin credentials when prompted
 
 # Create your first OAuth client
 uv run python -m authly admin client create \
   --name "My Application" \
-  --client-type confidential \
+  --type confidential \
   --redirect-uri "https://myapp.com/callback"
 
 # Create a scope
@@ -47,6 +47,9 @@ uv run python -m authly admin scope create \
 
 # Check system status
 uv run python -m authly admin status
+
+# Show configuration and paths
+uv run python -m authly admin auth info
 ```
 
 ---
@@ -64,8 +67,96 @@ Commands:
 
 ### **Global Options**
 ```bash
---version    Show version and exit
---help       Show help message and exit
+--version             Show version and exit
+--commands            Show all available commands and options in a tree view
+--install-completion  Install shell tab completion for your shell
+--help                Show help message and exit
+```
+
+### **Tab Completion Support**
+
+The CLI supports tab completion for faster command entry:
+
+```bash
+# Install tab completion for your shell (bash/zsh/fish)
+python -m authly --install-completion
+
+# After installation, restart your shell or source the completion
+source ~/.bashrc  # for bash
+
+# Now you can use TAB to complete commands
+python -m authly [TAB]           # Shows: admin serve
+python -m authly admin [TAB]     # Shows: auth client scope status
+python -m authly admin client [TAB]  # Shows: create list show update delete regenerate-secret
+```
+
+### **Command Tree View**
+
+View all available commands and options in a structured tree format:
+
+```bash
+# Display complete command tree with descriptions
+python -m authly --commands
+
+# Example output:
+authly
+├── admin                         # Administrative operations for Authly.
+│   ├── auth                      # Authentication commands for admin access.
+│   │   ├── login                 # Login to the Authly Admin API.
+│   │   ├── logout                # Logout from the Authly Admin API.
+│   │   └── ...
+│   ├── client                    # Manage OAuth 2.1 clients.
+│   │   ├── create                # Create a new OAuth 2.1 client.
+│   │   ├── list                  # List all OAuth clients.
+│   │   └── ...
+└── serve                         # Start the Authly web service.
+```
+
+### **Enhanced Help System**
+
+The CLI provides contextual help with examples for every command:
+
+```bash
+# Get help for any command
+python -m authly admin --help              # Main admin help
+python -m authly admin client --help       # Client commands help
+python -m authly admin client create --help # Specific command help
+
+# Help includes:
+# - Command descriptions
+# - Available options with types
+# - Practical examples
+# - Security notes
+# - Exit codes
+```
+
+**Example Help Output**:
+```bash
+$ python -m authly admin client create --help
+Usage: python -m authly admin client create [OPTIONS]
+
+  Create a new OAuth 2.1 client.
+  
+  Creates an OAuth client application that can request authorization.
+  Public clients (SPAs, mobile) don't receive a secret.
+  Confidential clients (backend) receive a client secret.
+
+Examples:
+  # Create a public client for a React SPA
+  $ authly client create --name "My React App" --type public \
+      --redirect-uri "http://localhost:3000/callback"
+  
+  # Create a confidential client for a backend API
+  $ authly client create --name "Backend Service" --type confidential \
+      --redirect-uri "https://api.example.com/oauth/callback" \
+      --scope "read write admin"
+
+Options:
+  --name TEXT           Client name [required]
+  --type [public|confidential]  Client type [required]
+  --redirect-uri TEXT   Redirect URI (can be specified multiple times) [required]
+  --scope TEXT          Default scopes (space-separated)
+  --help                Show this message and exit.
 ```
 
 ---
@@ -202,14 +293,17 @@ AUTHLY_ADMIN_API_ENABLED="true"
 
 All admin commands use the format: `python -m authly admin COMMAND`
 
+The admin commands are delegated to the unified admin CLI implementation,
+ensuring consistency across all access methods.
+
 ### **Authentication**
 
-#### **python -m authly admin login**
+#### **python -m authly admin auth login**
 Authenticate with the Authly admin API.
 
 **Interactive Login**:
 ```bash
-$ python -m authly admin login
+$ python -m authly admin auth login
 Username: admin
 Password: [hidden]
 ✓ Successfully logged in as admin
@@ -218,37 +312,44 @@ Token stored securely in ~/.authly/tokens.json
 
 **Options**:
 ```bash
---username TEXT    Admin username
---password TEXT    Admin password (not recommended for security)
---api-url TEXT     Admin API URL (default: auto-detect)
+--username TEXT      Admin username
+--password TEXT      Admin password (not recommended for security)
+--api-url TEXT       Admin API URL (default: auto-detect)
+--show-token         Display the access and refresh tokens (use with caution)
 ```
 
 **Examples**:
 ```bash
 # Interactive login (recommended)
-python -m authly admin login
+python -m authly admin auth login
 
 # Non-interactive (CI/CD environments only)
-python -m authly admin login --username admin --password "$ADMIN_PASSWORD"
+python -m authly admin auth login --username admin --password "$ADMIN_PASSWORD"
 
 # Custom API URL
-python -m authly admin login --api-url "https://auth.mycompany.com"
+python -m authly admin auth login --api-url "https://auth.mycompany.com"
+
+# Show tokens for debugging (careful - tokens are sensitive!)
+python -m authly admin auth login --show-token
+✓ Successfully logged in as admin
+   Access token: eyJhbGciOiJIUzI1NiIs...
+   Refresh token: eyJhbGciOiJIUzI1NiIs...
 ```
 
-#### **python -m authly admin logout**
+#### **python -m authly admin auth logout**
 Logout from the admin API and clear stored tokens.
 
 ```bash
-$ python -m authly admin logout
+$ python -m authly admin auth logout
 ✓ Successfully logged out
 Tokens cleared from ~/.authly/tokens.json
 ```
 
-#### **python -m authly admin whoami**
+#### **python -m authly admin auth whoami**
 Show current authentication status.
 
 ```bash
-$ python -m authly admin whoami
+$ python -m authly admin auth whoami
 ✓ Authenticated as: admin
 ✓ Token expires: 2025-07-30 15:30:00 UTC
 ✓ Scopes: admin:clients:read, admin:clients:write, admin:scopes:read, admin:scopes:write
@@ -263,6 +364,43 @@ $ python -m authly admin auth refresh
 New expiration: 2025-07-30 16:30:00 UTC
 Token verified - authentication active
 ```
+
+#### **python -m authly admin auth info**
+Show Authly configuration and internal information.
+
+```bash
+$ python -m authly admin auth info
+Authly Configuration Information
+==================================================
+Configuration directory: /home/user/.authly
+Token file: /home/user/.authly/tokens.json
+Token file exists: True
+
+API Configuration:
+  API URL: http://localhost:8000
+  Admin API enabled: true
+
+Environment:
+  AUTHLY_MODE: cli
+  DATABASE_URL: set
+  JWT_SECRET_KEY: set
+  JWT_REFRESH_SECRET_KEY: set
+
+Version Information:
+  Authly version: 0.5.8
+
+Authentication Status:
+  Status: Authenticated
+  Token expires: 2025-07-30 15:30:00 UTC
+```
+
+**Shows**:
+- Configuration directory location (`.authly` folder)
+- Token file path and existence
+- API endpoint configuration
+- Environment variable status
+- Authly version
+- Current authentication status
 
 #### **python -m authly admin auth status**
 Show authentication and API status.
@@ -304,18 +442,18 @@ logout   Logout from the Authly Admin API
 whoami   Show current authentication status
 status   Show authentication and API status
 refresh  Refresh authentication tokens
+info     Show Authly configuration and internal information
 ```
 
 **Examples**:
 ```bash
-# These commands are equivalent to the direct admin aliases:
-python -m authly admin auth login     # Same as: python -m authly admin login
-python -m authly admin auth logout    # Same as: python -m authly admin logout
-python -m authly admin auth whoami    # Same as: python -m authly admin whoami
-
-# Additional auth-specific commands:
+# Authentication commands are accessed through the auth group:
+python -m authly admin auth login     # Login to the admin API
+python -m authly admin auth logout    # Logout and clear tokens
+python -m authly admin auth whoami    # Show authentication status
 python -m authly admin auth status    # Authentication and API status
 python -m authly admin auth refresh   # Refresh authentication tokens
+python -m authly admin auth info      # Show configuration information
 ```
 
 ---
@@ -347,20 +485,20 @@ Create a new OAuth 2.1 client.
 # Basic confidential client
 python -m authly admin client create \
   --name "My Web App" \
-  --client-type confidential \
+  --type confidential \
   --redirect-uri "https://myapp.com/callback"
 
 # Public client with multiple redirect URIs
 python -m authly admin client create \
   --name "My Mobile App" \
-  --client-type public \
+  --type public \
   --redirect-uri "myapp://callback" \
   --redirect-uri "http://localhost:3000/callback"
 
 # Client with metadata and scopes
 python -m authly admin client create \
   --name "Enterprise App" \
-  --client-type confidential \
+  --type confidential \
   --redirect-uri "https://enterprise.com/oauth/callback" \
   --scope "read" \
   --scope "write" \
@@ -587,7 +725,7 @@ The CLI automatically sets `AUTHLY_MODE=cli` when running admin commands:
 
 ```bash
 # These commands automatically use CLI mode
-python -m authly admin login
+python -m authly admin auth login
 python -m authly admin client list
 python -m authly admin status
 
@@ -634,6 +772,111 @@ Admin tokens are securely stored in `~/.authly/tokens.json`:
 
 ---
 
+## 📚 **Common Workflows**
+
+### **Setting Up a New Application**
+
+Complete workflow for registering a new application:
+
+```bash
+# 1. Login as admin
+uv run python -m authly admin auth login
+
+# 2. Create necessary scopes
+uv run python -m authly admin scope create \
+  --name "user:read" \
+  --description "Read user information"
+  
+uv run python -m authly admin scope create \
+  --name "user:write" \
+  --description "Modify user information"
+
+# 3. Create the OAuth client
+uv run python -m authly admin client create \
+  --name "Customer Portal" \
+  --type confidential \
+  --redirect-uri "https://portal.example.com/auth/callback" \
+  --redirect-uri "https://portal.example.com/auth/silent-renew" \
+  --scope "user:read user:write" \
+  --client-uri "https://portal.example.com" \
+  --logo-uri "https://portal.example.com/logo.png"
+
+# 4. Verify the setup
+uv run python -m authly admin client list
+uv run python -m authly admin scope list
+```
+
+### **Managing Client Secrets**
+
+```bash
+# View client details (without secret)
+uv run python -m authly admin client show <client-id>
+
+# Regenerate a compromised secret
+uv run python -m authly admin client regenerate-secret <client-id>
+
+# Update client metadata
+uv run python -m authly admin client update <client-id> \
+  --name "Updated Portal Name" \
+  --logo-uri "https://portal.example.com/new-logo.png"
+```
+
+### **Scope Management Best Practices**
+
+```bash
+# Create hierarchical scopes
+uv run python -m authly admin scope create \
+  --name "api:read" \
+  --description "Read API resources"
+
+uv run python -m authly admin scope create \
+  --name "api:write" \
+  --description "Write API resources"
+
+uv run python -m authly admin scope create \
+  --name "api:delete" \
+  --description "Delete API resources"
+
+# Create default scopes (automatically granted)
+uv run python -m authly admin scope create \
+  --name "openid" \
+  --description "OpenID Connect authentication" \
+  --default
+
+uv run python -m authly admin scope create \
+  --name "profile" \
+  --description "User profile information" \
+  --default
+
+# View default scopes
+uv run python -m authly admin scope defaults
+```
+
+---
+
+### **Troubleshooting Authentication**
+
+When having authentication issues, use these commands to diagnose:
+
+```bash
+# 1. Check configuration and paths
+uv run python -m authly admin auth info
+
+# 2. Verify authentication status
+uv run python -m authly admin auth whoami --verbose
+
+# 3. Check API connectivity
+uv run python -m authly admin status
+
+# 4. Re-authenticate if needed
+uv run python -m authly admin auth login
+
+# 5. For debugging, show tokens (careful in production!)
+uv run python -m authly admin auth login --show-token
+```
+
+---
+
 ## 🛠️ **Advanced Usage**
 
 ### **Scripting & Automation**
@@ -647,7 +890,7 @@ echo "$clients" | jq '.clients[].client_id'
 # Create client and extract client_id
 client_info=$(python -m authly admin client create \
   --name "Automated Client" \
-  --client-type confidential \
+  --type confidential \
   --redirect-uri "https://example.com/callback" \
   --output json)
 
@@ -676,14 +919,14 @@ done
 - name: Setup Authly Admin
   run: |
     # Non-interactive login for CI
-    python -m authly admin login \
+    python -m authly admin auth login \
       --username "${{ secrets.AUTHLY_ADMIN_USER }}" \
       --password "${{ secrets.AUTHLY_ADMIN_PASS }}"
     
     # Create deployment client
     python -m authly admin client create \
       --name "Production Deploy" \
-      --client-type confidential \
+      --type confidential \
       --redirect-uri "${{ env.PRODUCTION_CALLBACK_URL }}" \
       --output json > client.json
 ```
@@ -746,7 +989,7 @@ AUTHLY_MODE=testing python -m authly admin status --verbose
 python -m authly admin status
 
 # Test authentication with resource manager info
-python -m authly admin whoami
+python -m authly admin auth whoami
 
 # Show detailed connection and resource info
 python -m authly admin status --verbose
@@ -837,4 +1080,4 @@ python -m authly admin client list --output json | jq '.clients[].client_id'
 
 ---
 
-This comprehensive CLI guide covers all administrative operations for the Authly OAuth 2.1 + OpenID Connect 1.0 authorization server, including the unified resource manager architecture and CLI mode optimizations. For API integration details, see the [API Reference](api-reference.md).
+This CLI guide covers all administrative operations for the Authly OAuth 2.1 + OpenID Connect 1.0 authorization server, including the unified resource manager architecture and CLI mode optimizations. For API integration details, see the [API Reference](api-reference.md).

@@ -1,0 +1,4 @@
+aiohttp>=3.9.0
+asyncpg>=0.29.0
+aioredis>=2.0.0
+PyJWT>=2.8.0

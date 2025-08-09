@@ -27,7 +27,25 @@ def get_api_client() -> AdminAPIClient:
 
 @click.group()
 def auth_group():
-    """Authentication commands for admin access."""
+    """
+    Authentication commands for admin access.
+
+    \b
+    Manage authentication with the Authly Admin API.
+    These commands handle login, logout, token management,
+    and authentication status.
+
+    \b
+    Common Commands:
+      authly auth login       Authenticate with admin credentials
+      authly auth logout      Revoke and clear tokens
+      authly auth whoami      Show current authentication status
+      authly auth refresh     Refresh access token
+
+    \b
+    Note: Most admin operations require authentication.
+    Use 'authly auth login' first.
+    """
     pass
 
 
@@ -38,18 +56,48 @@ def auth_group():
     "--scope",
     "-s",
     default="admin:clients:read admin:clients:write admin:scopes:read admin:scopes:write admin:users:read admin:system:read",
-    help="OAuth scopes to request",
+    help="OAuth scopes to request (space-separated)",
 )
 @click.option("--api-url", help="API URL (default: http://localhost:8000 or AUTHLY_API_URL env var)")
-def login(username: str, password: str | None, scope: str, api_url: str | None):
+@click.option("--show-token", is_flag=True, help="Display the access token (use with caution)")
+def login(username: str, password: str | None, scope: str, api_url: str | None, show_token: bool):
     """
     Login to the Authly Admin API.
 
-    Authenticates with the admin API and stores tokens securely for subsequent commands.
+    \b
+    Authenticates with admin credentials and stores tokens securely
+    for subsequent commands. Tokens are saved to ~/.authly/tokens.json.
 
+    \b
     Examples:
-        authly-admin auth login -u admin
-        authly-admin auth login --username admin --scope "admin:clients:read"
+      # Interactive login (prompts for password)
+      $ authly auth login -u admin
+      Password: ***
+      ✅ Successfully logged in as admin
+
+      # Login with specific scopes
+      $ authly auth login -u admin --scope "admin:clients:read admin:scopes:read"
+
+      # Login with password (not recommended for security)
+      $ authly auth login -u admin -p mypassword
+
+      # Login to custom API endpoint
+      $ authly auth login -u admin --api-url https://auth.example.com
+
+    \b
+    Available Scopes:
+      admin:clients:read     Read OAuth clients
+      admin:clients:write    Create/update/delete OAuth clients
+      admin:scopes:read      Read OAuth scopes
+      admin:scopes:write     Create/update/delete OAuth scopes
+      admin:users:read       Read user accounts
+      admin:system:read      Read system configuration
+
+    \b
+    Security Notes:
+      - Avoid using -p flag; let the command prompt for password
+      - Tokens expire after 60 minutes by default
+      - Use 'authly auth refresh' to renew tokens
     """
 
     async def run_login():
@@ -68,6 +116,12 @@ def login(username: str, password: str | None, scope: str, api_url: str | None):
                 click.echo(f"   API URL: {base_url}")
                 click.echo(f"   Token expires: {token_info.expires_at.strftime('%Y-%m-%d %H:%M:%S UTC')}")
                 click.echo(f"   Granted scopes: {token_info.scope}")
+
+                # Show token if requested
+                if show_token:
+                    click.echo(f"   Access token: {token_info.access_token}")
+                    if token_info.refresh_token:
+                        click.echo(f"   Refresh token: {token_info.refresh_token}")
 
                 # Test the connection
                 try:
@@ -88,10 +142,26 @@ def logout():
     """
     Logout from the Authly Admin API.
 
-    Revokes stored tokens and clears local authentication.
+    \b
+    Revokes stored tokens on the server and clears local authentication.
+    This ensures tokens cannot be reused even if compromised.
 
+    \b
     Examples:
-        authly-admin auth logout
+      # Logout and revoke tokens
+      $ authly auth logout
+      ✅ Successfully logged out
+         Tokens have been revoked and cleared
+
+      # Logout is safe to run multiple times
+      $ authly auth logout
+      i  Already logged out
+
+    \b
+    Notes:
+      - Tokens are revoked on the server
+      - Local token file is deleted
+      - Safe to run even if not logged in
     """
 
     async def run_logout():
@@ -118,18 +188,46 @@ def whoami(verbose: bool):
     """
     Show current authentication status.
 
-    Displays information about the currently logged-in admin user.
+    \b
+    Displays authentication status and system information.
+    Use --verbose to see token details and expiration.
 
+    \b
     Examples:
-        authly-admin auth whoami
-        authly-admin auth whoami --verbose
+      # Check if authenticated
+      $ authly auth whoami
+      ✅ Authenticated
+         API URL: http://localhost:8000
+         Database connected: true
+         Total OAuth clients: 5
+         Total OAuth scopes: 3
+
+      # Show detailed token information
+      $ authly auth whoami --verbose
+      ✅ Authenticated
+         API URL: http://localhost:8000
+         Token type: Bearer
+         Token expires: 2024-01-20 15:30:00 UTC
+         Granted scopes: admin:clients:read admin:clients:write ...
+         Token file: /Users/admin/.authly/tokens.json
+         Database connected: true
+
+      # When not authenticated
+      $ authly auth whoami
+      ❌ Not authenticated
+         Use 'authly auth login' to authenticate
+
+    \b
+    Exit Codes:
+      0  Authenticated and verified
+      1  Not authenticated or token expired
     """
 
     async def run_whoami():
         async with AdminAPIClient(base_url=get_api_url()) as client:
             if not client.is_authenticated:
                 click.echo("❌ Not authenticated")
-                click.echo("   Use 'authly-admin auth login' to authenticate")
+                click.echo("   Use 'authly admin auth login' to authenticate")
                 return
 
             try:
@@ -173,11 +271,37 @@ def status(verbose: bool):
     """
     Show authentication and API status.
 
-    Alias for whoami command with additional API health information.
+    \b
+    Comprehensive status check including API health,
+    authentication status, and system statistics.
 
+    \b
     Examples:
-        authly-admin auth status
-        authly-admin auth status --verbose
+      # Check overall status
+      $ authly auth status
+      ✅ API Health: OK
+         API URL: http://localhost:8000
+      ✅ Authentication: Logged in
+         Database: Connected
+         OAuth clients: 5
+         OAuth scopes: 3
+
+      # Verbose status with token details
+      $ authly auth status --verbose
+      ✅ API Health: OK
+         API URL: http://localhost:8000
+      ✅ Authentication: Logged in
+         Token expires: 2024-01-20 15:30:00 UTC
+         Granted scopes: admin:clients:read admin:clients:write ...
+         Database: Connected
+         OAuth clients: 5
+         OAuth scopes: 3
+
+    \b
+    Difference from 'whoami':
+      - Shows API health status first
+      - More detailed system information
+      - Better for troubleshooting connections
     """
 
     async def run_auth_status():
@@ -197,7 +321,7 @@ def status(verbose: bool):
             # Check authentication status
             if not client.is_authenticated:
                 click.echo("❌ Authentication: Not logged in")
-                click.echo("   Use 'authly-admin auth login' to authenticate")
+                click.echo("   Use 'authly admin auth login' to authenticate")
                 return
 
             try:
@@ -230,26 +354,125 @@ def status(verbose: bool):
 
 
 @auth_group.command()
+def info():
+    """
+    Show Authly configuration and internal information.
+
+    \b
+    Displays:
+      - Configuration paths
+      - Token storage location
+      - API endpoints
+      - Environment settings
+      - Version information
+
+    \b
+    Examples:
+      $ authly auth info
+      Authly Configuration Information
+      ==================================================
+      Configuration directory: /home/user/.authly
+      Token file: /home/user/.authly/tokens.json
+      API URL: http://localhost:8000
+      Environment: development
+      Version: 0.5.8
+    """
+    import os
+    from pathlib import Path
+
+    async def run_info():
+        # Get home directory and .authly location
+        home_dir = Path.home()
+        authly_dir = home_dir / ".authly"
+        token_file = authly_dir / "tokens.json"
+
+        click.echo("Authly Configuration Information")
+        click.echo("=" * 50)
+        click.echo(f"Configuration directory: {authly_dir}")
+        click.echo(f"Token file: {token_file}")
+        click.echo(f"Token file exists: {token_file.exists()}")
+
+        # API configuration
+        api_url = get_api_url()
+        click.echo("\nAPI Configuration:")
+        click.echo(f"  API URL: {api_url}")
+        click.echo(f"  Admin API enabled: {os.getenv('AUTHLY_ADMIN_API_ENABLED', 'true')}")
+
+        # Environment info
+        click.echo("\nEnvironment:")
+        click.echo(f"  AUTHLY_MODE: {os.getenv('AUTHLY_MODE', 'not set')}")
+        click.echo(f"  DATABASE_URL: {'set' if os.getenv('DATABASE_URL') else 'not set'}")
+        click.echo(f"  JWT_SECRET_KEY: {'set' if os.getenv('JWT_SECRET_KEY') else 'not set'}")
+        click.echo(f"  JWT_REFRESH_SECRET_KEY: {'set' if os.getenv('JWT_REFRESH_SECRET_KEY') else 'not set'}")
+
+        # Version info
+        try:
+            from importlib.metadata import version as get_version
+
+            authly_version = get_version("authly")
+        except Exception:
+            authly_version = "unknown"
+        click.echo("\nVersion Information:")
+        click.echo(f"  Authly version: {authly_version}")
+
+        # Check authentication status
+        async with AdminAPIClient(base_url=api_url) as client:
+            click.echo("\nAuthentication Status:")
+            if client.is_authenticated:
+                click.echo("  Status: Authenticated")
+                if client._token_info:
+                    click.echo(f"  Token expires: {client._token_info.expires_at.strftime('%Y-%m-%d %H:%M:%S UTC')}")
+            else:
+                click.echo("  Status: Not authenticated")
+
+    asyncio.run(run_info())
+
+
+@auth_group.command()
 def refresh():
     """
     Refresh authentication tokens.
 
-    Attempts to refresh the access token using the stored refresh token.
+    \b
+    Uses the stored refresh token to obtain a new access token.
+    This extends your session without re-entering credentials.
 
+    \b
     Examples:
-        authly-admin auth refresh
+      # Refresh expired or expiring token
+      $ authly auth refresh
+      ✅ Token refreshed successfully
+         New expiration: 2024-01-20 16:30:00 UTC
+         Token verified - authentication active
+
+      # When refresh token is missing
+      $ authly auth refresh
+      ❌ No refresh token available
+         Use 'authly auth login' to authenticate
+
+      # When refresh token is expired
+      $ authly auth refresh
+      ❌ Token refresh failed: Refresh token expired
+         Use 'authly auth login' to authenticate
+
+    \b
+    Notes:
+      - Access tokens expire after 60 minutes
+      - Refresh tokens expire after 7 days
+      - Run this before your access token expires
+      - Automatic refresh not yet implemented
     """
 
     async def run_refresh():
         async with AdminAPIClient(base_url=get_api_url()) as client:
             if not client._token_info:
                 click.echo("❌ No stored tokens found")
-                click.echo("   Use 'authly-admin auth login' to authenticate")
+                click.echo("   Use 'authly admin auth login' to authenticate")
                 return
 
             if not client._token_info.refresh_token:
                 click.echo("❌ No refresh token available")
-                click.echo("   Use 'authly-admin auth login' to authenticate")
+                click.echo("   Use 'authly admin auth login' to authenticate")
                 return
 
             try:
@@ -266,41 +489,7 @@ def refresh():
 
             except Exception as e:
                 click.echo(f"❌ Token refresh failed: {e}")
-                click.echo("   Use 'authly-admin auth login' to authenticate")
+                click.echo("   Use 'authly admin auth login' to authenticate")
                 raise click.ClickException(f"Token refresh failed: {e}") from e
 
     asyncio.run(run_refresh())
-
-
-# Add aliases for convenience
-@click.command()
-@click.option("--username", "-u", prompt=True, help="Admin username")
-@click.option("--password", "-p", help="Admin password (will prompt if not provided)")
-@click.option(
-    "--scope",
-    "-s",
-    default="admin:clients:read admin:clients:write admin:scopes:read admin:scopes:write admin:users:read admin:system:read",
-    help="OAuth scopes to request",
-)
-@click.option("--api-url", help="API URL (default: http://localhost:8000 or AUTHLY_API_URL env var)")
-def login_alias(username: str, password: str | None, scope: str, api_url: str | None):
-    """Alias for 'auth login' command."""
-    # Create a context to pass to the login command
-    ctx = click.Context(login)
-    ctx.params = {"username": username, "password": password, "scope": scope, "api_url": api_url}
-    ctx.invoke(login, username=username, password=password, scope=scope, api_url=api_url)
-
-
-@click.command()
-def logout_alias():
-    """Alias for 'auth logout' command."""
-    ctx = click.Context(logout)
-    ctx.invoke(logout)
-
-
-@click.command()
-@click.option("--verbose", "-v", is_flag=True, help="Show detailed token information")
-def whoami_alias(verbose: bool):
-    """Alias for 'auth whoami' command."""
-    ctx = click.Context(whoami)
-    ctx.invoke(whoami, verbose=verbose)
