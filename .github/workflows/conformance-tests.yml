@@ -92,7 +92,7 @@ jobs:
       
       - name: Build and Push Conformance Suite Image
         if: steps.check-image.outputs.exists == 'false'
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ./tck
           file: ./tck/conformance-suite-production/Dockerfile
