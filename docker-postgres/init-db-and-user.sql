@@ -213,7 +213,7 @@ CREATE INDEX IF NOT EXISTS idx_oauth_clients_active ON oauth_clients(is_active);
 CREATE TABLE IF NOT EXISTS tokens (
     -- OAUTH: Token identity
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),                    -- OAUTH: Internal token identifier
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,    -- OAUTH: Token owner (user)
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,             -- OAUTH: Token owner (NULL for client credentials tokens)
     client_id UUID REFERENCES oauth_clients(id) ON DELETE SET NULL,  -- OAUTH: Issuing client (NULL for non-OAuth tokens)
     token_jti VARCHAR(64) NOT NULL UNIQUE,                           -- OAUTH: JWT ID claim (unique identifier)
     token_type VARCHAR(10) NOT NULL CHECK (token_type IN ('access', 'refresh')), -- OAUTH: Token type

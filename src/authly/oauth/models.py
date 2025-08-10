@@ -40,7 +40,8 @@ class GrantType(str, Enum):
 
     AUTHORIZATION_CODE = "authorization_code"
     REFRESH_TOKEN = "refresh_token"
-    # Note: OAuth 2.1 deprecates implicit and password grants
+    CLIENT_CREDENTIALS = "client_credentials"
+    # Note: OAuth 2.1 deprecates implicit and password grants but keeps client_credentials
 
 
 class ResponseType(str, Enum):

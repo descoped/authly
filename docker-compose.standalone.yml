@@ -234,6 +234,24 @@ services:
     profiles:
       - tools
 
+  # Authly Compliance Tester - OAuth 2.1 + PKCE and OIDC 1.0 compliance validation
+  compliance-tester:
+    build:
+      context: ./docker-standalone/authly-compliance-tester
+      dockerfile: Dockerfile
+    container_name: authly-compliance-tester
+    ports:
+      - "8080:8080"  # Web UI
+    networks:
+      - authly-net
+    environment:
+      - AUTHLY_SERVER_URL=http://authly-standalone:8000
+    depends_on:
+      authly-standalone:
+        condition: service_healthy
+    profiles:
+      - tools
+
 networks:
   authly-net:
     driver: bridge

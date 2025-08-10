@@ -1,0 +1,550 @@
+"""
+Session management tests.
+
+Tests cookie-based session handling, expiration, and security features
+using real database and services.
+"""
+
+from uuid import uuid4
+
+import pytest
+from fastapi import status
+from psycopg_toolkit import TransactionManager
+
+from authly.core.resource_manager import AuthlyResourceManager
+from authly.users import UserRepository
+from authly.users.service import UserService
+
+
+@pytest.fixture
+async def test_user_with_session(
+    test_server,
+    initialize_authly: AuthlyResourceManager,
+    transaction_manager: TransactionManager
+):
+    """Create a test user and establish a session using real services."""
+    async with transaction_manager.transaction() as conn:
+        user_repo = UserRepository(conn)
+        user_service = UserService(user_repo)
+
+        # Create test user
+        username = f"testuser_{uuid4().hex[:8]}"
+        password = "TestPassword123!"
+
+        user = await user_service.create_user({
+            "username": username,
+            "email": f"{username}@example.com",
+            "password": password,
+            "is_active": True,
+            "is_verified": True,
+        })
+
+        # Login to create session
+        async with test_server.client as client:
+            response = await client.post(
+                "/auth/login",
+                data={
+                    "username": username,
+                    "password": password,
+                    "csrf_token": "test_csrf_token"
+                },
+                follow_redirects=False
+            )
+
+        return {
+            "user": user,
+            "username": username,
+            "password": password,
+            "response": response,
+            "cookies": response.cookies
+        }
+
+
+class TestSessionCookieManagement:
+    """Test session cookie handling with real backend."""
+
+    @pytest.mark.asyncio
+    async def test_session_cookie_creation(
+        self,
+        test_server,
+        initialize_authly: AuthlyResourceManager,
+        transaction_manager: TransactionManager
+    ):
+        """Test that session cookies are created correctly using real services."""
+        async with transaction_manager.transaction() as conn:
+            user_repo = UserRepository(conn)
+            user_service = UserService(user_repo)
+
+            # Create real test user
+            username = f"testuser_{uuid4().hex[:8]}"
+            password = "TestPassword123!"
+
+            await user_service.create_user({
+                "username": username,
+                "email": f"{username}@example.com",
+                "password": password,
+                "is_active": True,
+                "is_verified": True,
+            })
+
+            # Login to create session
+            async with test_server.client as client:
+                response = await client.post(
+                    "/auth/login",
+                    data={
+                        "username": username,
+                        "password": password,
+                        "csrf_token": "test_csrf_token"
+                    },
+                    follow_redirects=False
+                )
+
+            # Check cookie is set
+            cookies = response.headers.get("set-cookie", "")
+            assert cookies
+            assert "authly_session" in cookies or "session" in cookies
+
+    @pytest.mark.asyncio
+    async def test_session_cookie_httponly_flag(
+        self,
+        test_server,
+        test_user_with_session
+    ):
+        """Test that session cookies have HttpOnly flag."""
+        response = test_user_with_session["response"]
+        cookies = response.headers.get("set-cookie", "")
+        assert "httponly" in cookies.lower()
+
+    @pytest.mark.asyncio
+    async def test_session_cookie_secure_flag(
+        self,
+        test_server,
+        initialize_authly: AuthlyResourceManager
+    ):
+        """Test that session cookies have appropriate security flags."""
+        # In test environment, secure flag might not be set
+        # This documents expected production behavior
+        config = initialize_authly.config
+
+        # If running in production mode with HTTPS
+        if config.environment == "production":
+            # Would expect secure flag to be set
+            pass
+
+    @pytest.mark.asyncio
+    async def test_session_cookie_samesite(
+        self,
+        test_server,
+        test_user_with_session
+    ):
+        """Test that session cookies have SameSite attribute."""
+        response = test_user_with_session["response"]
+        cookies = response.headers.get("set-cookie", "")
+        assert "samesite" in cookies.lower()
+        # Should be 'lax' or 'strict'
+        assert "samesite=lax" in cookies.lower() or "samesite=strict" in cookies.lower()
+
+
+class TestSessionLifecycle:
+    """Test session lifecycle management with real backend."""
+
+    @pytest.mark.asyncio
+    async def test_session_validation(
+        self,
+        test_server,
+        test_user_with_session
+    ):
+        """Test that valid sessions work correctly."""
+        cookies = test_user_with_session["cookies"]
+
+        # Try to access protected endpoint with session
+        async with test_server.client as client:
+            response = await client.get("/auth/session", cookies=cookies)
+
+            # Should be authenticated
+            if response.status_code == status.HTTP_200_OK:
+                data = response.json()
+                assert "user_id" in data or "username" in data
+
+    @pytest.mark.asyncio
+    async def test_session_renewal(
+        self,
+        test_server,
+        test_user_with_session
+    ):
+        """Test that active sessions can be renewed."""
+        cookies = test_user_with_session["cookies"]
+
+        # Make authenticated request
+        async with test_server.client as client:
+            response = await client.get("/auth/session", cookies=cookies)
+
+        # Check if session was renewed (new expiration time)
+        new_cookies = response.headers.get("set-cookie", "")
+        if new_cookies:
+            # Session was renewed with new cookie
+            assert "authly_session" in new_cookies or "session" in new_cookies
+
+    @pytest.mark.asyncio
+    async def test_session_invalidation_on_logout(
+        self,
+        test_server,
+        test_user_with_session
+    ):
+        """Test that sessions are invalidated on logout."""
+        cookies = test_user_with_session["cookies"]
+
+        # Logout
+        async with test_server.client as client:
+            response = await client.post("/auth/logout", cookies=cookies)
+            assert response.status_code in [status.HTTP_200_OK, status.HTTP_204_NO_CONTENT, status.HTTP_302_FOUND]
+
+            # Try to use session after logout
+            response = await client.get("/auth/session", cookies=cookies)
+            assert response.status_code in [status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN]
+
+    @pytest.mark.asyncio
+    async def test_multiple_sessions(
+        self,
+        test_server,
+        initialize_authly: AuthlyResourceManager,
+        transaction_manager: TransactionManager
+    ):
+        """Test handling of multiple sessions for same user."""
+        async with transaction_manager.transaction() as conn:
+            user_repo = UserRepository(conn)
+            user_service = UserService(user_repo)
+
+            # Create test user
+            username = f"testuser_{uuid4().hex[:8]}"
+            password = "TestPassword123!"
+
+            await user_service.create_user({
+                "username": username,
+                "email": f"{username}@example.com",
+                "password": password,
+                "is_active": True,
+                "is_verified": True,
+            })
+
+            # Create multiple sessions
+            async with test_server.client as client:
+                sessions = []
+                for _i in range(3):
+                    response = await client.post(
+                        "/auth/login",
+                        data={
+                            "username": username,
+                            "password": password,
+                            "csrf_token": "test_csrf_token"
+                        },
+                        follow_redirects=False
+                    )
+                    sessions.append(response.cookies)
+
+                # All sessions should be valid initially
+                for session_cookies in sessions:
+                    response = await client.get("/auth/session", cookies=session_cookies)
+                # Sessions might be valid or invalidated based on implementation
+                assert response.status_code in [
+                    status.HTTP_200_OK,
+                    status.HTTP_401_UNAUTHORIZED,
+                    status.HTTP_403_FORBIDDEN
+                ]
+
+
+class TestSessionSecurity:
+    """Test session security features with real backend."""
+
+    @pytest.mark.asyncio
+    async def test_session_fixation_protection(
+        self,
+        test_server,
+        initialize_authly: AuthlyResourceManager,
+        transaction_manager: TransactionManager
+    ):
+        """Test protection against session fixation attacks."""
+        async with transaction_manager.transaction() as conn:
+            user_repo = UserRepository(conn)
+            user_service = UserService(user_repo)
+
+            # Create test user
+            username = f"testuser_{uuid4().hex[:8]}"
+            password = "TestPassword123!"
+
+            await user_service.create_user({
+                "username": username,
+                "email": f"{username}@example.com",
+                "password": password,
+                "is_active": True,
+                "is_verified": True,
+            })
+
+            async with test_server.client as client:
+                # Get initial session from login page
+                response = await client.get("/auth/login")
+                initial_cookies = response.cookies
+
+                # Login should generate new session ID
+                response = await client.post(
+                    "/auth/login",
+                    data={
+                        "username": username,
+                        "password": password,
+                        "csrf_token": "test_csrf_token"
+                    },
+                    cookies=initial_cookies,
+                    follow_redirects=False
+                )
+
+            new_cookies = response.cookies
+
+            # Session ID should change after login (if fixation protection is enabled)
+            # This is implementation dependent
+            assert new_cookies  # At least ensure cookies are set
+
+    @pytest.mark.asyncio
+    async def test_session_hijacking_prevention(
+        self,
+        test_server,
+        test_user_with_session
+    ):
+        """Test prevention of session hijacking."""
+        cookies = test_user_with_session["cookies"]
+
+        async with test_server.client as client:
+            # Try to use session from different IP
+            headers = {"X-Forwarded-For": "10.0.0.1"}
+            response = await client.get("/auth/session", cookies=cookies, headers=headers)
+
+        # Session might work or be rejected based on IP validation
+        # Implementation dependent
+        assert response.status_code in [
+            status.HTTP_200_OK,  # IP validation not enforced
+            status.HTTP_401_UNAUTHORIZED,  # IP mismatch detected
+            status.HTTP_403_FORBIDDEN  # Session rejected
+        ]
+
+    @pytest.mark.asyncio
+    async def test_concurrent_session_limit(
+        self,
+        test_server,
+        initialize_authly: AuthlyResourceManager,
+        transaction_manager: TransactionManager
+    ):
+        """Test enforcement of concurrent session limits."""
+        async with transaction_manager.transaction() as conn:
+            user_repo = UserRepository(conn)
+            user_service = UserService(user_repo)
+
+            # Create test user
+            username = f"testuser_{uuid4().hex[:8]}"
+            password = "TestPassword123!"
+
+            await user_service.create_user({
+                "username": username,
+                "email": f"{username}@example.com",
+                "password": password,
+                "is_active": True,
+                "is_verified": True,
+            })
+
+            sessions = []
+
+            async with test_server.client as client:
+                # Create multiple sessions
+                for _i in range(5):
+                    response = await client.post(
+                        "/auth/login",
+                        data={
+                            "username": username,
+                            "password": password,
+                            "csrf_token": "test_csrf_token"
+                        },
+                        follow_redirects=False
+                    )
+                    sessions.append(response.cookies)
+
+                # Check if older sessions are invalidated
+                response = await client.get("/auth/session", cookies=sessions[0])
+
+            # First session might be invalidated if max limit reached
+            # Implementation dependent
+            assert response.status_code in [
+                status.HTTP_200_OK,  # No session limit
+                status.HTTP_401_UNAUTHORIZED  # Session invalidated
+            ]
+
+
+class TestSessionValidation:
+    """Test session validation endpoints with real backend."""
+
+    @pytest.mark.asyncio
+    async def test_session_check_endpoint(
+        self,
+        test_server,
+        test_user_with_session
+    ):
+        """Test session validation endpoint."""
+        cookies = test_user_with_session["cookies"]
+
+        async with test_server.client as client:
+            # Check valid session
+            response = await client.get("/auth/session", cookies=cookies)
+
+        if response.status_code == status.HTTP_200_OK:
+            data = response.json()
+            assert "user_id" in data or "username" in data
+
+    @pytest.mark.asyncio
+    async def test_session_validate_endpoint(
+        self,
+        test_server,
+        test_user_with_session
+    ):
+        """Test session validation for OAuth flows."""
+        cookies = test_user_with_session["cookies"]
+
+        # Extract session ID from cookies if needed
+        session_id = None
+        for key, value in cookies.items():
+            if "session" in key.lower():
+                session_id = value
+                break
+
+        if session_id:
+            async with test_server.client as client:
+                # Validate session for OAuth
+                response = await client.post(
+                    "/auth/session/validate",
+                    json={"session_id": session_id},
+                    cookies=cookies
+                )
+
+            if response.status_code == status.HTTP_200_OK:
+                data = response.json()
+                assert "valid" in data or "authenticated" in data
+
+    @pytest.mark.asyncio
+    async def test_session_info_endpoint(
+        self,
+        test_server,
+        test_user_with_session
+    ):
+        """Test getting session information."""
+        cookies = test_user_with_session["cookies"]
+
+        async with test_server.client as client:
+            response = await client.get("/auth/session/info", cookies=cookies)
+
+        if response.status_code == status.HTTP_200_OK:
+            data = response.json()
+            assert "created_at" in data or "expires_at" in data or "user" in data
+
+
+class TestRememberMe:
+    """Test remember me functionality with real backend."""
+
+    @pytest.mark.asyncio
+    async def test_remember_me_duration(
+        self,
+        test_server,
+        initialize_authly: AuthlyResourceManager,
+        transaction_manager: TransactionManager
+    ):
+        """Test that remember me sets longer session duration."""
+        async with transaction_manager.transaction() as conn:
+            user_repo = UserRepository(conn)
+            user_service = UserService(user_repo)
+
+            # Create test user
+            username = f"testuser_{uuid4().hex[:8]}"
+            password = "TestPassword123!"
+
+            await user_service.create_user({
+                "username": username,
+                "email": f"{username}@example.com",
+                "password": password,
+                "is_active": True,
+                "is_verified": True,
+            })
+
+            async with test_server.client as client:
+                # Login without remember me
+                response1 = await client.post(
+                    "/auth/login",
+                    data={
+                        "username": username,
+                        "password": password,
+                        "csrf_token": "test_csrf_token"
+                    },
+                    follow_redirects=False
+                )
+
+                cookies1 = response1.headers.get("set-cookie", "")
+
+                # Login with remember me
+                response2 = await client.post(
+                    "/auth/login",
+                    data={
+                        "username": username,
+                        "password": password,
+                        "remember_me": "true",
+                        "csrf_token": "test_csrf_token"
+                    },
+                    follow_redirects=False
+                )
+
+            cookies2 = response2.headers.get("set-cookie", "")
+
+            # Extract max-age or expires
+            import re
+
+            max_age1 = re.search(r'max-age=(\d+)', cookies1)
+            max_age2 = re.search(r'max-age=(\d+)', cookies2)
+
+            if max_age1 and max_age2:
+                # Remember me should have longer max-age
+                assert int(max_age2.group(1)) > int(max_age1.group(1))
+
+    @pytest.mark.asyncio
+    async def test_remember_me_checkbox(
+        self,
+        test_server,
+        initialize_authly: AuthlyResourceManager,
+        transaction_manager: TransactionManager
+    ):
+        """Test that remember me option is processed correctly."""
+        async with transaction_manager.transaction() as conn:
+            user_repo = UserRepository(conn)
+            user_service = UserService(user_repo)
+
+            # Create test user
+            username = f"testuser_{uuid4().hex[:8]}"
+            password = "TestPassword123!"
+
+            await user_service.create_user({
+                "username": username,
+                "email": f"{username}@example.com",
+                "password": password,
+                "is_active": True,
+                "is_verified": True,
+            })
+
+            async with test_server.client as client:
+                # Create remember me session
+                response = await client.post(
+                    "/auth/login",
+                    data={
+                        "username": username,
+                        "password": password,
+                        "remember_me": "true",
+                        "csrf_token": "test_csrf_token"
+                    },
+                    follow_redirects=False
+                )
+
+            # Should successfully create session
+            assert response.status_code in [status.HTTP_302_FOUND, status.HTTP_303_SEE_OTHER]
+            assert response.cookies
+

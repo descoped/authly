@@ -14,7 +14,7 @@ class TokenModel(BaseModel):
     """Model representing a token in the system"""
 
     id: UUID
-    user_id: UUID
+    user_id: UUID | None = None  # Optional for client credentials tokens
     token_jti: str = Field(..., min_length=32, max_length=64)  # JWT ID from token
     token_type: TokenType
     token_value: str  # The actual JWT token value

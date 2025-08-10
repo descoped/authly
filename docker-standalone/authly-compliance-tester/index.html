@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Authly Testing Platform</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="app">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1>🔐 Authly</h1>
+                <p>Testing Platform</p>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <a href="#dashboard" class="nav-item active">
+                    <span class="icon">📊</span>
+                    <span>Dashboard</span>
+                </a>
+                <a href="#compliance" class="nav-item">
+                    <span class="icon">✅</span>
+                    <span>Compliance Tests</span>
+                </a>
+                <a href="#performance" class="nav-item">
+                    <span class="icon">⚡</span>
+                    <span>Performance</span>
+                </a>
+                <a href="#admin" class="nav-item">
+                    <span class="icon">👤</span>
+                    <span>Admin APIs</span>
+                </a>
+                <a href="#discovery" class="nav-item">
+                    <span class="icon">🔍</span>
+                    <span>API Discovery</span>
+                </a>
+                <a href="#config" class="nav-item">
+                    <span class="icon">⚙️</span>
+                    <span>Configuration</span>
+                </a>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <div class="connection-status">
+                    <span class="status-dot online"></span>
+                    <span>Connected to Authly</span>
+                </div>
+            </div>
+        </aside>
+        
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Top Bar -->
+            <header class="topbar">
+                <div class="topbar-left">
+                    <h2 id="pageTitle">Dashboard</h2>
+                    <div id="discoveryBadge" class="badge badge-success">
+                        42 endpoints discovered
+                    </div>
+                </div>
+                
+                <div class="topbar-right">
+                    <button class="btn btn-primary" id="quickTest">
+                        Quick Test
+                    </button>
+                    <button class="btn btn-secondary" onclick="complianceTester.showExecutionPanel()">
+                        📋 Logs
+                    </button>
+                    <button class="btn btn-secondary" id="exportResults">
+                        Export
+                    </button>
+                </div>
+            </header>
+            
+            <!-- Dashboard View -->
+            <div id="dashboard" class="view active">
+                <!-- Stats Cards -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value">42</div>
+                        <div class="stat-label">API Endpoints</div>
+                        <div class="stat-trend up">+5 since last scan</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">85%</div>
+                        <div class="stat-label">Compliance Score</div>
+                        <div class="stat-trend down">-2% from target</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">125ms</div>
+                        <div class="stat-label">Avg Response Time</div>
+                        <div class="stat-trend">Stable</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">99.9%</div>
+                        <div class="stat-label">Uptime</div>
+                        <div class="stat-trend up">All systems operational</div>
+                    </div>
+                </div>
+                
+                <!-- Quick Actions -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Quick Actions</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="quick-actions">
+                            <button class="action-btn" onclick="complianceTester.runAllTestSuites()">
+                                <span class="action-icon">🚀</span>
+                                <span class="action-label">Run All Tests</span>
+                                <span class="action-desc">Complete compliance validation</span>
+                            </button>
+                            <button class="action-btn" onclick="complianceTester.runTestSuite('oauth21')">
+                                <span class="action-icon">🔐</span>
+                                <span class="action-label">OAuth 2.1 Tests</span>
+                                <span class="action-desc">PKCE + Security validation</span>
+                            </button>
+                            <button class="action-btn" onclick="complianceTester.runPerformanceTests()">
+                                <span class="action-icon">⚡</span>
+                                <span class="action-label">Performance Test</span>
+                                <span class="action-desc">Load & stress testing</span>
+                            </button>
+                            <button class="action-btn" onclick="complianceTester.runAdminTests()">
+                                <span class="action-icon">👤</span>
+                                <span class="action-label">Admin API Test</span>
+                                <span class="action-desc">Management endpoints</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Recent Results -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Recent Test Results</h3>
+                        <div>
+                            <button class="btn btn-primary btn-sm" onclick="complianceTester.copyToClipboard()">📋 Copy Results</button>
+                            <button class="btn btn-sm" onclick="complianceTester.clearResults()">Clear</button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="results-summary">
+                            <div class="result-stat passed">
+                                <span class="result-count" id="passedCount">0</span>
+                                <span class="result-label">Passed</span>
+                            </div>
+                            <div class="result-stat failed">
+                                <span class="result-count" id="failedCount">0</span>
+                                <span class="result-label">Failed</span>
+                            </div>
+                            <div class="result-stat skipped">
+                                <span class="result-count" id="skippedCount">0</span>
+                                <span class="result-label">Skipped</span>
+                            </div>
+                            <div class="result-stat total">
+                                <span class="result-count" id="totalCount">0</span>
+                                <span class="result-label">Total</span>
+                            </div>
+                        </div>
+                        
+                        <div class="test-results" id="resultsDetails">
+                            <!-- Results will be displayed here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Compliance Tests View -->
+            <div id="compliance" class="view">
+                <div class="test-suites">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>OAuth 2.1 + PKCE</h3>
+                            <span class="badge">7 tests</span>
+                        </div>
+                        <div class="card-body">
+                            <p>Validates OAuth 2.1 Authorization Code + PKCE flow compliance</p>
+                            <ul class="test-checklist">
+                                <li>✓ PKCE S256 mandatory</li>
+                                <li>✓ State parameter required</li>
+                                <li>✓ Redirect URI exact match</li>
+                                <li>✓ No implicit/hybrid flows</li>
+                            </ul>
+                            <button class="btn btn-primary" onclick="complianceTester.runSingleTestSuite('oauth21')">
+                                Run Tests
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>OpenID Connect 1.0</h3>
+                            <span class="badge">6 tests</span>
+                        </div>
+                        <div class="card-body">
+                            <p>OIDC 1.0 compliance validation</p>
+                            <ul class="test-checklist">
+                                <li>✓ Discovery document</li>
+                                <li>✓ JWKS endpoint</li>
+                                <li>✓ UserInfo endpoint</li>
+                                <li>✓ ID token validation</li>
+                            </ul>
+                            <button class="btn btn-primary" onclick="complianceTester.runSingleTestSuite('oidc')">
+                                Run Tests
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Execution Panel -->
+            <div class="execution-panel" id="executionPanel">
+                <div class="execution-header">
+                    <div class="execution-info">
+                        <span class="execution-status" id="executionStatus">Idle</span>
+                        <span class="execution-progress" id="progressText">0 / 0 tests</span>
+                    </div>
+                    <div class="execution-controls">
+                        <button class="btn btn-primary btn-sm" onclick="complianceTester.copyExecutionLog()">📋 Copy Log</button>
+                        <button class="btn btn-sm" id="pauseExecution" disabled>Pause</button>
+                        <button class="btn btn-sm btn-danger" id="stopExecution" disabled>Stop</button>
+                        <button class="btn btn-sm" onclick="complianceTester.toggleExecutionPanel()">✕ Close</button>
+                    </div>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <div class="execution-log" id="executionLog">
+                    <!-- Logs appear here -->
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <!-- Configuration Modal -->
+    <div id="configModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Configuration</h3>
+                <button class="modal-close" onclick="closeConfigModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Server URL</label>
+                    <input type="text" id="serverUrl" value="http://localhost:8000">
+                </div>
+                <div class="form-group">
+                    <label>Client ID</label>
+                    <input type="text" id="clientId" value="test_client">
+                </div>
+                <div class="form-group">
+                    <label>Client Secret</label>
+                    <input type="password" id="clientSecret" value="test_secret">
+                </div>
+                <div class="form-group">
+                    <label>Redirect URI</label>
+                    <input type="text" id="redirectUri" value="http://localhost:8080/callback">
+                </div>
+                <div class="form-group">
+                    <label>Scopes</label>
+                    <input type="text" id="scopes" value="openid profile email">
+                </div>
+                <div class="form-group">
+                    <label>Test Username</label>
+                    <input type="text" id="testUsername" value="testuser">
+                </div>
+                <div class="form-group">
+                    <label>Test Password</label>
+                    <input type="password" id="testPassword" value="TestPassword123!">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" id="saveConfig">Save Configuration</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Scripts -->
+    <script src="js/oauth-flows-fixed.js"></script>
+    <script src="js/oidc-flows.js"></script>
+    <script src="js/test-suites.js"></script>
+    <script src="js/api-discovery.js"></script>
+    <script src="js/admin-tester.js"></script>
+    <script src="js/performance-tester.js"></script>
+    <script src="js/compliance-tester.js"></script>
+    <script>
+        // Navigation handling
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.preventDefault();
+                const target = item.getAttribute('href').substring(1);
+                
+                // Update active nav
+                document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+                item.classList.add('active');
+                
+                // Update active view
+                document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+                const view = document.getElementById(target);
+                if (view) view.classList.add('active');
+                
+                // Update page title
+                document.getElementById('pageTitle').textContent = item.querySelector('span:last-child').textContent;
+                
+                // Show config modal if config nav clicked
+                if (target === 'config') {
+                    document.getElementById('configModal').classList.add('active');
+                }
+            });
+        });
+        
+        function closeConfigModal() {
+            document.getElementById('configModal').classList.remove('active');
+        }
+    </script>
+</body>
+</html>

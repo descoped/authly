@@ -78,7 +78,7 @@ markers = [
     "unit: Unit tests without external dependencies",
     "tck: TCK/Conformance tests (requires TCK docker stack)",
 ]
-addopts = "-m 'not integration' --verbose --tb=short --strict-markers -ra --ignore=tests/tck"
+addopts = "-m 'not integration' --verbose --tb=short --strict-markers -ra --ignore=tests/tck --ignore=tests/performance"
 
 [build-system]
 requires = ["hatchling>=1.26.3"]

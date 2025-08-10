@@ -358,6 +358,7 @@ class TestJWKSEndpoint:
 
             # Check response
             assert isinstance(response, JSONResponse)
+            # JSONResponse headers are set directly on the response object
             assert "Cache-Control" in response.headers
             assert response.headers["Cache-Control"] == "public, max-age=3600"
 

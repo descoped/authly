@@ -178,6 +178,10 @@ class ScopeRepository(BaseRepository[OAuthScopeModel, UUID]):
                 logger.error(f"Error in get_active_scopes: {e}")
                 raise OperationError(f"Failed to get active scopes: {e!s}") from e
 
+    async def list_scopes(self, limit: int = 100, offset: int = 0) -> list[OAuthScopeModel]:
+        """List all OAuth scopes (alias for get_active_scopes for compatibility)"""
+        return await self.get_active_scopes(limit=limit, offset=offset)
+
     async def get_default_scopes(self) -> list[OAuthScopeModel]:
         """Get all default scopes (granted automatically)"""
         try:

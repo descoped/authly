@@ -65,7 +65,7 @@ class TestTokenRevocation:
 
         # Revoke the access token
         response = await auth_server.client.post(
-            "/api/v1/oauth/revoke", json={"token": access_token, "token_type_hint": "access_token"}
+            "/api/v1/oauth/revoke", data={"token": access_token, "token_type_hint": "access_token"}
         )
 
         # Should always return 200 per RFC 7009
@@ -81,7 +81,7 @@ class TestTokenRevocation:
 
         # Revoke the refresh token
         response = await auth_server.client.post(
-            "/api/v1/oauth/revoke", json={"token": refresh_token, "token_type_hint": "refresh_token"}
+            "/api/v1/oauth/revoke", data={"token": refresh_token, "token_type_hint": "refresh_token"}
         )
 
         # Should always return 200 per RFC 7009
@@ -96,7 +96,7 @@ class TestTokenRevocation:
         access_token = valid_tokens["access_token"]
 
         # Revoke without hint
-        response = await auth_server.client.post("/api/v1/oauth/revoke", json={"token": access_token})
+        response = await auth_server.client.post("/api/v1/oauth/revoke", data={"token": access_token})
 
         # Should work fine without hint
         await response.expect_status(200)
@@ -108,7 +108,7 @@ class TestTokenRevocation:
         """Test that invalid tokens still return 200 per RFC 7009."""
         # Try to revoke completely invalid token
         response = await auth_server.client.post(
-            "/api/v1/oauth/revoke", json={"token": "invalid.jwt.token", "token_type_hint": "access_token"}
+            "/api/v1/oauth/revoke", data={"token": "invalid.jwt.token", "token_type_hint": "access_token"}
         )
 
         # Must return 200 even for invalid tokens (RFC 7009 requirement)
@@ -120,7 +120,7 @@ class TestTokenRevocation:
     async def test_revoke_empty_token_returns_200(self, auth_server: AsyncTestServer):
         """Test that empty tokens still return 200."""
         response = await auth_server.client.post(
-            "/api/v1/oauth/revoke", json={"token": "", "token_type_hint": "access_token"}
+            "/api/v1/oauth/revoke", data={"token": "", "token_type_hint": "access_token"}
         )
 
         # Must return 200 even for empty tokens
@@ -135,13 +135,13 @@ class TestTokenRevocation:
 
         # Revoke the token first time
         response1 = await auth_server.client.post(
-            "/api/v1/oauth/revoke", json={"token": access_token, "token_type_hint": "access_token"}
+            "/api/v1/oauth/revoke", data={"token": access_token, "token_type_hint": "access_token"}
         )
         await response1.expect_status(200)
 
         # Revoke the same token again
         response2 = await auth_server.client.post(
-            "/api/v1/oauth/revoke", json={"token": access_token, "token_type_hint": "access_token"}
+            "/api/v1/oauth/revoke", data={"token": access_token, "token_type_hint": "access_token"}
         )
 
         # Should still return 200 (idempotent operation)
@@ -162,7 +162,7 @@ class TestTokenRevocation:
 
         # Revoke the token
         revoke_response = await auth_server.client.post(
-            "/api/v1/oauth/revoke", json={"token": access_token, "token_type_hint": "access_token"}
+            "/api/v1/oauth/revoke", data={"token": access_token, "token_type_hint": "access_token"}
         )
         await revoke_response.expect_status(200)
 
@@ -181,7 +181,7 @@ class TestTokenRevocation:
 
         # Verify refresh works initially
         response = await auth_server.client.post(
-            "/api/v1/oauth/refresh", json={"refresh_token": refresh_token, "grant_type": "refresh_token"}
+            "/api/v1/oauth/token", data={"refresh_token": refresh_token, "grant_type": "refresh_token"}
         )
         await response.expect_status(200)
 
@@ -191,13 +191,13 @@ class TestTokenRevocation:
 
         # Revoke the new refresh token
         revoke_response = await auth_server.client.post(
-            "/api/v1/oauth/revoke", json={"token": new_refresh_token, "token_type_hint": "refresh_token"}
+            "/api/v1/oauth/revoke", data={"token": new_refresh_token, "token_type_hint": "refresh_token"}
         )
         await revoke_response.expect_status(200)
 
         # Try to use revoked refresh token
         refresh_response = await auth_server.client.post(
-            "/api/v1/oauth/refresh", json={"refresh_token": new_refresh_token, "grant_type": "refresh_token"}
+            "/api/v1/oauth/token", data={"refresh_token": new_refresh_token, "grant_type": "refresh_token"}
         )
 
         # Should fail with 400 Bad Request (OAuth 2.0 returns 400 for invalid grant)
@@ -213,7 +213,7 @@ class TestTokenRevocation:
 
         # Use invalid hint
         response = await auth_server.client.post(
-            "/api/v1/oauth/revoke", json={"token": access_token, "token_type_hint": "invalid_hint"}
+            "/api/v1/oauth/revoke", data={"token": access_token, "token_type_hint": "invalid_hint"}
         )
 
         # Should still work (hint is optional and just for optimization)
@@ -226,7 +226,7 @@ class TestTokenRevocation:
         """Test revocation request missing required token parameter."""
         response = await auth_server.client.post(
             "/api/v1/oauth/revoke",
-            json={
+            data={
                 "token_type_hint": "access_token"
                 # Missing required 'token' parameter
             },
@@ -243,7 +243,7 @@ class TestTokenRevocation:
         # Provide wrong hint (access token with refresh_token hint)
         response = await auth_server.client.post(
             "/api/v1/oauth/revoke",
-            json={
+            data={
                 "token": access_token,
                 "token_type_hint": "refresh_token",  # Wrong hint
             },

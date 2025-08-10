@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Authly Comprehensive Testing Toolkit - Dynamic API Discovery</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <h1>🔐 Authly Comprehensive Testing Toolkit</h1>
+                <p>Dynamic API Discovery • OAuth 2.1 + OIDC • Admin APIs • Performance Testing</p>
+            </div>
+            <div class="header-actions">
+                <button id="copyResults" class="btn btn-secondary">📋 Copy Results</button>
+                <button id="clearResults" class="btn btn-secondary">Clear Results</button>
+                <button id="exportReport" class="btn btn-primary">Export Report</button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Configuration Panel -->
+            <div class="panel config-panel">
+                <h2>Configuration</h2>
+                
+                <div class="config-section">
+                    <h3>Server Settings</h3>
+                    <div class="form-group">
+                        <label for="serverUrl">Authly Server URL</label>
+                        <input type="text" id="serverUrl" value="http://localhost:8000" />
+                    </div>
+                </div>
+
+                <div class="config-section">
+                    <h3>Client Configuration</h3>
+                    <div class="form-group">
+                        <label for="clientId">Client ID</label>
+                        <input type="text" id="clientId" value="test_client" />
+                    </div>
+                    <div class="form-group">
+                        <label for="clientSecret">Client Secret</label>
+                        <input type="password" id="clientSecret" value="test_secret" />
+                    </div>
+                    <div class="form-group">
+                        <label for="redirectUri">Redirect URI</label>
+                        <input type="text" id="redirectUri" value="http://localhost:8080/callback" />
+                    </div>
+                    <div class="form-group">
+                        <label for="scopes">Scopes</label>
+                        <input type="text" id="scopes" value="openid profile email" />
+                    </div>
+                </div>
+
+                <div class="config-section">
+                    <h3>Test User Credentials</h3>
+                    <div class="form-group">
+                        <label for="testUsername">Username</label>
+                        <input type="text" id="testUsername" value="testuser" />
+                    </div>
+                    <div class="form-group">
+                        <label for="testPassword">Password</label>
+                        <input type="password" id="testPassword" value="TestPassword123!" />
+                    </div>
+                </div>
+
+                <button id="saveConfig" class="btn btn-primary">Save Configuration</button>
+            </div>
+
+            <!-- Test Suite Selection -->
+            <div class="panel test-suite-panel">
+                <h2>Test Suites</h2>
+                <div class="discovery-status">
+                    <span id="discoveryStatus">🔍 Discovering API capabilities...</span>
+                    <button id="refreshDiscovery" class="btn btn-secondary btn-sm">Refresh Discovery</button>
+                </div>
+                
+                <div class="test-suite-grid">
+                    <div class="test-suite-card">
+                        <h3>OAuth 2.1 + PKCE</h3>
+                        <p>High-security authorization code flow ONLY</p>
+                        <ul class="test-list">
+                            <li>PKCE Mandatory (S256 only)</li>
+                            <li>Authorization Code Flow Only</li>
+                            <li>No Implicit/Hybrid Support</li>
+                            <li>Strict Redirect URI Validation</li>
+                            <li>State Parameter Required</li>
+                        </ul>
+                        <button class="btn btn-primary run-suite" data-suite="oauth21">Run Tests</button>
+                    </div>
+
+                    <div class="test-suite-card">
+                        <h3>OpenID Connect 1.0</h3>
+                        <p>OIDC 1.0 compliance validation</p>
+                        <ul class="test-list">
+                            <li>Discovery Endpoint</li>
+                            <li>JWKS Endpoint</li>
+                            <li>ID Token Validation</li>
+                            <li>UserInfo Endpoint</li>
+                            <li>Claims Validation</li>
+                        </ul>
+                        <button class="btn btn-primary run-suite" data-suite="oidc">Run Tests</button>
+                    </div>
+
+                    <div class="test-suite-card">
+                        <h3>Browser Session Flow</h3>
+                        <p>Session-based authentication testing</p>
+                        <ul class="test-list">
+                            <li>Login Flow</li>
+                            <li>Session Management</li>
+                            <li>CSRF Protection</li>
+                            <li>Remember Me</li>
+                            <li>Logout Flow</li>
+                        </ul>
+                        <button class="btn btn-primary run-suite" data-suite="session">Run Tests</button>
+                    </div>
+
+                    <div class="test-suite-card">
+                        <h3>Security Validation</h3>
+                        <p>Security feature compliance</p>
+                        <ul class="test-list">
+                            <li>PKCE S256 Challenge</li>
+                            <li>Token Expiration</li>
+                            <li>Refresh Token Rotation</li>
+                            <li>Rate Limiting</li>
+                            <li>CORS Headers</li>
+                        </ul>
+                        <button class="btn btn-primary run-suite" data-suite="security">Run Tests</button>
+                    </div>
+                </div>
+
+                <div class="test-actions">
+                    <button id="runAllTests" class="btn btn-success">Run All Test Suites</button>
+                    <button id="runCustomTest" class="btn btn-primary">🔐 Interactive Flows</button>
+                    <button id="runPerformanceTests" class="btn btn-warning">⚡ Performance Tests</button>
+                    <button id="runAdminTests" class="btn btn-info">👤 Admin API Tests</button>
+                    <button id="runDynamicTests" class="btn btn-secondary">🔄 Dynamic Tests</button>
+                </div>
+            </div>
+
+            <!-- Test Execution Panel -->
+            <div class="panel execution-panel">
+                <h2>Test Execution</h2>
+                
+                <div class="execution-header">
+                    <div class="execution-status">
+                        <span class="status-label">Status:</span>
+                        <span id="executionStatus" class="status-value">Idle</span>
+                    </div>
+                    <div class="execution-progress">
+                        <div class="progress-bar">
+                            <div id="progressFill" class="progress-fill"></div>
+                        </div>
+                        <span id="progressText">0 / 0 tests</span>
+                    </div>
+                </div>
+
+                <div class="execution-log" id="executionLog">
+                    <!-- Test execution logs will appear here -->
+                </div>
+
+                <div class="execution-controls">
+                    <button id="pauseExecution" class="btn btn-warning" disabled>Pause</button>
+                    <button id="stopExecution" class="btn btn-danger" disabled>Stop</button>
+                </div>
+            </div>
+
+            <!-- Results Panel -->
+            <div class="panel results-panel">
+                <div class="panel-header">
+                    <h2>Test Results</h2>
+                    <div class="results-actions">
+                        <button id="copyResultsFromPanel" class="btn btn-secondary" disabled>
+                            📋 Copy Results
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="results-summary">
+                    <div class="summary-card passed">
+                        <div class="summary-value" id="passedCount">0</div>
+                        <div class="summary-label">Passed</div>
+                    </div>
+                    <div class="summary-card failed">
+                        <div class="summary-value" id="failedCount">0</div>
+                        <div class="summary-label">Failed</div>
+                    </div>
+                    <div class="summary-card skipped">
+                        <div class="summary-value" id="skippedCount">0</div>
+                        <div class="summary-label">Skipped</div>
+                    </div>
+                    <div class="summary-card total">
+                        <div class="summary-value" id="totalCount">0</div>
+                        <div class="summary-label">Total</div>
+                    </div>
+                </div>
+
+                <div class="results-details" id="resultsDetails">
+                    <!-- Detailed test results will appear here -->
+                </div>
+            </div>
+
+            <!-- Flow Visualization Panel -->
+            <div class="panel flow-panel">
+                <h2>Flow Visualization</h2>
+                <div class="flow-diagram" id="flowDiagram">
+                    <!-- Flow diagram will be rendered here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>Authly Testing Toolkit v2.0.0 | Dynamic API Discovery | Comprehensive Testing Suite</p>
+        </footer>
+    </div>
+
+    <!-- Hidden callback handler -->
+    <div id="callbackHandler" style="display: none;"></div>
+
+    <!-- Scripts -->
+    <script src="js/oauth-flows.js"></script>
+    <script src="js/oidc-flows.js"></script>
+    <script src="js/test-suites.js"></script>
+    <script src="js/api-discovery.js"></script>
+    <script src="js/admin-tester.js"></script>
+    <script src="js/performance-tester.js"></script>
+    <script src="js/compliance-tester.js"></script>
+</body>
+</html>

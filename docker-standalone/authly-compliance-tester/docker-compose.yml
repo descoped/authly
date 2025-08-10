@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  compliance-tester:
+    build: .
+    container_name: authly-compliance-tester
+    ports:
+      - "8080:8080"
+    networks:
+      - authly-network
+    environment:
+      - AUTHLY_SERVER_URL=http://authly:8000
+    labels:
+      - "com.authly.component=compliance-tester"
+      - "com.authly.description=OAuth 2.1 and OIDC 1.0 compliance testing tool"
+
+networks:
+  authly-network:
+    name: authly-network
+    external: true

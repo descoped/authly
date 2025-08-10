@@ -108,18 +108,19 @@ class UserService:
 
     async def create_user(
         self,
-        username: str,
-        email: str,
-        password: str,
+        username: str | dict = None,
+        email: str = None,
+        password: str = None,
         is_admin: bool = False,
         is_verified: bool = False,
         is_active: bool = True,
+        **extra_fields,
     ) -> UserModel:
         """
         Create a new user with business logic validation.
 
         Args:
-            username: Unique username
+            username: Unique username OR a dict with all user data
             email: Unique email address
             password: Plain text password (will be hashed)
             is_admin: Admin privileges flag
@@ -132,6 +133,19 @@ class UserService:
         Raises:
             HTTPException: If validation fails or user already exists
         """
+        # Support both dict and individual arguments for backward compatibility
+        if isinstance(username, dict):
+            user_data = username
+            username = user_data.get("username")
+            email = user_data.get("email")
+            password = user_data.get("password")
+            is_admin = user_data.get("is_admin", False)
+            is_verified = user_data.get("is_verified", False)
+            is_active = user_data.get("is_active", True)
+            # Merge any extra fields from the dict
+            for key, value in user_data.items():
+                if key not in ["username", "email", "password", "is_admin", "is_verified", "is_active"]:
+                    extra_fields[key] = value
         try:
             # Check for existing username
             if await self._repo.get_by_username(username):
@@ -142,17 +156,21 @@ class UserService:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
 
             # Create user model with hashed password
-            user = UserModel(
-                id=uuid4(),
-                username=username,
-                email=email,
-                password_hash=get_password_hash(password),
-                created_at=datetime.now(UTC),
-                updated_at=datetime.now(UTC),
-                is_active=is_active,
-                is_verified=is_verified,
-                is_admin=is_admin,
-            )
+            user_dict = {
+                "id": uuid4(),
+                "username": username,
+                "email": email,
+                "password_hash": get_password_hash(password),
+                "created_at": datetime.now(UTC),
+                "updated_at": datetime.now(UTC),
+                "is_active": is_active,
+                "is_verified": is_verified,
+                "is_admin": is_admin,
+            }
+            # Add any extra fields (like OIDC claims)
+            user_dict.update(extra_fields)
+
+            user = UserModel(**user_dict)
 
             created_user = await self._repo.create(user)
             logger.info(f"Created new user: {username} (ID: {created_user.id})")

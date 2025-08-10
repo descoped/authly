@@ -1,0 +1,19 @@
+--- a/authly/api/oauth_router.py
++++ b/authly/api/oauth_router.py
+@@ -336,6 +336,15 @@ async def authorize_get(
+             status_code=400,
+         )
+ 
++    # Validate PKCE method - OAuth 2.1 only allows S256
++    # This MUST be validated before authentication check
++    if code_challenge_method != "S256":
++        return JSONResponse(
++            content={
++                "error": "invalid_request",
++                "error_description": "Only S256 code_challenge_method is supported (OAuth 2.1 requirement)",
++            },
++            status_code=400,
++        )
++
+     # NOW check authentication manually after parameter validation
+     current_user = None

@@ -18,6 +18,9 @@ from pydantic import BaseModel, Field, model_serializer
 
 from authly.api.auth_dependencies import (
     get_authorization_service,
+    get_client_repository,
+    get_config,
+    get_database_connection,
     get_rate_limiter,
     get_scope_repository,
     get_token_service_with_client,
@@ -25,8 +28,8 @@ from authly.api.auth_dependencies import (
 from authly.api.users_dependencies import get_current_user, get_user_repository
 from authly.auth import decode_token, verify_password
 from authly.config import AuthlyConfig
-from authly.core.dependencies import get_config
 from authly.oauth.authorization_service import AuthorizationService
+from authly.oauth.client_repository import ClientRepository
 from authly.oauth.discovery_service import DiscoveryService
 from authly.oauth.models import (
     AuthorizationError,
@@ -40,6 +43,7 @@ from authly.oauth.models import (
 )
 from authly.oauth.scope_repository import ScopeRepository
 from authly.tokens import TokenService, get_token_service
+from authly.tokens.repository import TokenRepository
 from authly.users import UserModel, UserRepository
 
 logger = logging.getLogger(__name__)
@@ -112,11 +116,16 @@ class TokenResponse(BaseModel):
     requires_password_change: bool | None = Field(None, description="Whether password change is required")
 
 
-class TokenRevocationRequest(BaseModel):
-    """OAuth 2.0 Token Revocation Request."""
+class TokenRevocationRequest:
+    """OAuth 2.0 Token Revocation Request using Form data."""
 
-    token: str = Field(..., description="The token to revoke (access or refresh token)")
-    token_type_hint: str | None = Field(None, description="Optional hint: 'access_token' or 'refresh_token'")
+    def __init__(
+        self,
+        token: str = Form(..., description="The token to revoke (access or refresh token)"),
+        token_type_hint: str | None = Form(None, description="Optional hint: 'access_token' or 'refresh_token'"),
+    ):
+        self.token = token
+        self.token_type_hint = token_type_hint
 
 
 # Create OAuth router
@@ -598,11 +607,12 @@ async def get_access_token(
     client_id: str | None = Form(None, description="OAuth client ID"),
     client_secret: str | None = Form(None, description="OAuth client secret"),
     refresh_token: str | None = Form(None, description="Refresh token"),
-    user_repo: UserRepository = Depends(get_user_repository),
+    db_connection=Depends(get_database_connection),
     token_service: TokenService = Depends(get_token_service_with_client),
     authorization_service: AuthorizationService = Depends(get_authorization_service),
+    client_repo: ClientRepository = Depends(get_client_repository),
+    scope_repo: ScopeRepository = Depends(get_scope_repository),
     rate_limiter=Depends(get_rate_limiter),
-    login_tracker: LoginAttemptTracker = Depends(get_login_tracker),
 ):
     """
     OAuth 2.1 Token Endpoint - supports multiple grant types.
@@ -614,6 +624,13 @@ async def get_access_token(
     - authorization_code: OAuth 2.1 authorization code flow with PKCE
     - refresh_token: Refresh an access token
     """
+
+    # Create repositories from database connection
+    user_repo = UserRepository(db_connection)
+    token_repo = TokenRepository(db_connection)
+
+    # Create login tracker
+    login_tracker = LoginAttemptTracker()
 
     # Create a TokenRequest object from form data for backward compatibility
     request = TokenRequest(
@@ -635,6 +652,10 @@ async def get_access_token(
         return await _handle_authorization_code_grant(request, user_repo, token_service, authorization_service)
     elif request.grant_type == "refresh_token":
         return await _handle_refresh_token_grant(request, user_repo, token_service)
+    elif request.grant_type == "client_credentials":
+        return await _handle_client_credentials_grant(
+            request, client_repo, scope_repo, token_repo, token_service._config
+        )
     else:
         return oauth_error_response(
             "unsupported_grant_type", f"The authorization grant type '{request.grant_type}' is not supported"
@@ -917,9 +938,129 @@ async def _handle_refresh_token_grant(
         return oauth_error_response("invalid_grant", "Could not process refresh token")
 
 
+async def _handle_client_credentials_grant(
+    request: TokenRequest,
+    client_repo: ClientRepository,
+    scope_repo: ScopeRepository,
+    token_repo: TokenRepository,
+    config,
+) -> TokenResponse:
+    """Handle client_credentials grant type for machine-to-machine authentication."""
+    import time
+
+    from authly.api.oauth_client_credentials import handle_client_credentials_grant
+
+    start_time = time.time()
+
+    # Validate required fields for client credentials grant
+    if not request.client_id or not request.client_secret:
+        # Track validation error
+        if METRICS_ENABLED and metrics:
+            metrics.track_oauth_token_request(
+                "client_credentials", request.client_id or "unknown", "validation_error", 0.0
+            )
+        return oauth_error_response(
+            "invalid_request", "client_id and client_secret are required for client_credentials grant"
+        )
+
+    try:
+        # Handle the client credentials grant
+        token_data = await handle_client_credentials_grant(
+            client_id=request.client_id,
+            client_secret=request.client_secret,
+            scope=request.scope,
+            client_repo=client_repo,
+            scope_repo=scope_repo,
+            token_repo=token_repo,
+            config=config,
+        )
+
+        # Return token response (no refresh token for client credentials)
+        return TokenResponse(
+            access_token=token_data["access_token"],
+            token_type=token_data["token_type"],
+            expires_in=token_data["expires_in"],
+            scope=token_data.get("scope"),
+        )
+
+    except HTTPException as he:
+        # Track client credentials grant error
+        if METRICS_ENABLED and metrics:
+            duration = time.time() - start_time
+            metrics.track_oauth_token_request("client_credentials", request.client_id, "invalid_client", duration)
+
+        # Map HTTP exceptions to OAuth errors
+        if he.status_code == status.HTTP_401_UNAUTHORIZED:
+            return oauth_error_response("invalid_client", he.detail, status_code=401)
+        elif he.status_code == status.HTTP_400_BAD_REQUEST:
+            # Check if this is an invalid_scope error
+            if isinstance(he.detail, dict) and he.detail.get("error") == "invalid_scope":
+                return oauth_error_response("invalid_scope", he.detail.get("error_description", "Invalid scope"))
+            else:
+                return oauth_error_response("invalid_request", str(he.detail))
+        else:
+            return oauth_error_response("invalid_grant", he.detail)
+
+    except Exception as e:
+        # Track general error
+        if METRICS_ENABLED and metrics:
+            duration = time.time() - start_time
+            metrics.track_oauth_token_request("client_credentials", request.client_id or "unknown", "error", duration)
+        logger.error(f"Error handling client credentials grant: {e}")
+        return oauth_error_response("server_error", "Internal server error")
+
+
+@oauth_router.post("/introspect")
+async def introspect_token_endpoint(
+    token: str = Form(..., description="The token to introspect"),
+    token_type_hint: str | None = Form(None, description="Hint about token type"),
+    db_connection=Depends(get_database_connection),
+    config: AuthlyConfig = Depends(get_config),
+):
+    """
+    OAuth 2.0 Token Introspection Endpoint (RFC 7662).
+
+    Allows resource servers to query the authorization server about the
+    state and metadata of tokens.
+
+    **Request Parameters:**
+    - token: The token to introspect (required)
+    - token_type_hint: Optional hint ("access_token" or "refresh_token")
+
+    **Response:**
+    - active: Boolean indicating if token is active
+    - scope: Token scopes (if active)
+    - client_id: Client identifier (if active)
+    - username: Resource owner username (if active)
+    - exp: Expiration timestamp (if active)
+    """
+    from authly.api.oauth_introspection import (
+        TokenIntrospectionRequest,
+        introspect_token_endpoint as introspect_handler,
+    )
+
+    # Create repositories
+    token_repo = TokenRepository(db_connection)
+    user_repo = UserRepository(db_connection)
+
+    # Create request object
+    request = TokenIntrospectionRequest(
+        token=token,
+        token_type_hint=token_type_hint,
+    )
+
+    # Handle introspection
+    return await introspect_handler(
+        request=request,
+        token_repo=token_repo,
+        user_repo=user_repo,
+        config=config,
+    )
+
+
 @oauth_router.post("/revoke", status_code=status.HTTP_200_OK)
 async def revoke_token(
-    request: TokenRevocationRequest,
+    request: TokenRevocationRequest = Depends(),
     token_service: TokenService = Depends(get_token_service),
 ):
     """
