@@ -15,7 +15,7 @@ import pytest
 from fastapi_testing import AsyncTestServer
 from psycopg_toolkit import TransactionManager
 
-from authly.api import auth_router, users_router
+from authly.api import auth_router, users_router, oidc_router
 from authly.auth.core import get_password_hash
 from authly.users import UserModel, UserRepository
 
@@ -28,6 +28,7 @@ class TestTokenRevocation:
         """Configure test server with auth routers."""
         test_server.app.include_router(auth_router, prefix="/api/v1")
         test_server.app.include_router(users_router, prefix="/api/v1")
+        test_server.app.include_router(oidc_router)  # OIDC router at root level
         return test_server
 
     @pytest.fixture
@@ -53,7 +54,12 @@ class TestTokenRevocation:
         """Get valid access and refresh tokens for testing."""
         response = await auth_server.client.post(
             "/api/v1/oauth/token",
-            data={"grant_type": "password", "username": test_user.username, "password": "Test123!"},
+            data={
+                "grant_type": "password", 
+                "username": test_user.username, 
+                "password": "Test123!",
+                "scope": "openid profile email"  # Add OIDC scopes
+            },
         )
         await response.expect_status(200)
         return await response.json()
@@ -157,7 +163,7 @@ class TestTokenRevocation:
         access_token = valid_tokens["access_token"]
 
         # Verify token works initially
-        response = await auth_server.client.get("/api/v1/users/me", headers={"Authorization": f"Bearer {access_token}"})
+        response = await auth_server.client.get("/oidc/userinfo", headers={"Authorization": f"Bearer {access_token}"})
         await response.expect_status(200)
 
         # Revoke the token
@@ -168,7 +174,7 @@ class TestTokenRevocation:
 
         # Try to use revoked token
         protected_response = await auth_server.client.get(
-            "/api/v1/users/me", headers={"Authorization": f"Bearer {access_token}"}
+            "/oidc/userinfo", headers={"Authorization": f"Bearer {access_token}"}
         )
 
         # Should fail with 401 Unauthorized

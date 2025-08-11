@@ -1,5 +1,6 @@
 import logging
 
+from fixtures.committed_data import *  # noqa
 from fixtures.setup_logging import setup_logging
 from fixtures.testing.lifespan import *  # noqa
 from fixtures.testing.postgres import *  # noqa

@@ -17,23 +17,15 @@ logger = logging.getLogger(__name__)
 
 
 class OIDCResponseType(Enum):
-    """OIDC response types."""
+    """OIDC response types - OAuth 2.1 compliant (only authorization code flow)."""
 
-    CODE = "code"
-    ID_TOKEN = "id_token"
-    TOKEN = "token"
-    CODE_ID_TOKEN = "code id_token"
-    CODE_TOKEN = "code token"
-    ID_TOKEN_TOKEN = "id_token token"
-    CODE_ID_TOKEN_TOKEN = "code id_token token"
+    CODE = "code"  # Only supported flow in OAuth 2.1
 
 
 class OIDCFlow(Enum):
-    """OIDC authentication flows."""
+    """OIDC authentication flows - OAuth 2.1 compliant."""
 
-    AUTHORIZATION_CODE = "authorization_code"
-    IMPLICIT = "implicit"
-    HYBRID = "hybrid"
+    AUTHORIZATION_CODE = "authorization_code"  # Only supported flow in OAuth 2.1
 
 
 @dataclass
@@ -157,18 +149,11 @@ class OIDCValidator:
         response_type.split()
 
         # Validate response type combinations
+        # OAuth 2.1 only supports authorization code flow
         if response_type == OIDCResponseType.CODE.value:
             flow_type = OIDCFlow.AUTHORIZATION_CODE
-        elif response_type == OIDCResponseType.ID_TOKEN.value or response_type == OIDCResponseType.ID_TOKEN_TOKEN.value:
-            flow_type = OIDCFlow.IMPLICIT
-        elif response_type in [
-            OIDCResponseType.CODE_ID_TOKEN.value,
-            OIDCResponseType.CODE_TOKEN.value,
-            OIDCResponseType.CODE_ID_TOKEN_TOKEN.value,
-        ]:
-            flow_type = OIDCFlow.HYBRID
         else:
-            errors.append(f"Unsupported response type: {response_type}")
+            errors.append(f"Unsupported response type: {response_type}. OAuth 2.1 only supports 'code' response type.")
             flow_type = None
 
         is_valid = len(errors) == 0

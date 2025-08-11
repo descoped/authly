@@ -66,7 +66,17 @@ class JWKSKeyModel:
 
 
 class JWKSRepository:
-    """Repository for JWKS key database operations."""
+    """
+    Repository for JWKS key database operations.
+
+    SPECIAL CASE: This repository does NOT inherit from BaseRepository because:
+    - It manages cryptographic keys, not standard CRUD entities
+    - Requires specialized operations like key rotation and cryptographic validation
+    - Handles complex key lifecycle management (generation, activation, expiration)
+    - Keys have unique constraints and security requirements beyond standard models
+
+    This is an intentional architectural decision, not an oversight.
+    """
 
     def __init__(self, db_connection: AsyncConnection):
         """Initialize repository with database connection."""

@@ -136,7 +136,6 @@ class TestConformanceFixes:
         error_data = await response.json()
         assert "detail" in error_data or "error" in error_data
 
-    @pytest.mark.skip(reason="Authorization endpoint not implemented yet")
     @pytest.mark.asyncio
     async def test_authorization_endpoint_redirects_when_unauthenticated(self, test_server, test_client):
         """Test that authorization endpoint redirects (not 401) when unauthenticated."""

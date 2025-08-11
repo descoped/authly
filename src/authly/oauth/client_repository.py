@@ -8,7 +8,7 @@ from psycopg.sql import SQL
 from psycopg_toolkit import BaseRepository, OperationError, RecordNotFoundError
 from psycopg_toolkit.utils import PsycopgHelper
 
-from authly.auth import get_password_hash
+from authly.auth import get_password_hash, verify_password
 from authly.oauth.models import OAuthClientModel
 
 logger = logging.getLogger(__name__)
@@ -81,6 +81,49 @@ class ClientRepository(BaseRepository[OAuthClientModel, UUID]):
             except Exception as e:
                 logger.error(f"Error in get_by_client_id: {e}")
                 raise OperationError(f"Failed to get client by client_id: {e!s}") from e
+
+    async def authenticate_client(self, client_id: str, client_secret: str) -> OAuthClientModel | None:
+        """
+        Authenticate a client using client_id and client_secret.
+
+        This method is the centralized way to verify client credentials for:
+        - Client credentials grant
+        - Authorization code exchange
+        - Token refresh for confidential clients
+
+        Args:
+            client_id: The client identifier
+            client_secret: The client secret to verify
+
+        Returns:
+            OAuthClientModel if authentication succeeds, None otherwise
+        """
+        with DatabaseTimer("client_authenticate"):
+            try:
+                # Get the client by client_id
+                client = await self.get_by_client_id(client_id)
+
+                if not client:
+                    logger.debug(f"Client authentication failed: client_id {client_id} not found")
+                    return None
+
+                # Check if client has a secret (confidential client)
+                if not client.client_secret_hash:
+                    logger.debug(f"Client authentication failed: client {client_id} has no secret (public client)")
+                    return None
+
+                # Verify the provided secret against the stored hash
+                if verify_password(client_secret, client.client_secret_hash):
+                    logger.debug(f"Client authentication successful for client_id: {client_id}")
+                    return client
+                else:
+                    logger.debug(f"Client authentication failed: invalid secret for client_id {client_id}")
+                    return None
+
+            except Exception as e:
+                logger.error(f"Error in authenticate_client: {e}")
+                # Don't raise - return None for authentication failure
+                return None
 
     async def create_client(self, client_data: dict) -> OAuthClientModel:
         """Create a new OAuth client"""

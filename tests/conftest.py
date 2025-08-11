@@ -10,6 +10,7 @@ from authly.core.resource_manager import AuthlyResourceManager
 
 pytest_plugins = [
     "fixtures.testing",
+    "fixtures.committed_data",  # Add committed fixtures
 ]
 
 # Import helper fixtures for committed test data

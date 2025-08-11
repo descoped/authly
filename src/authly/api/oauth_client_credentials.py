@@ -127,10 +127,9 @@ class ClientCredentialsGrantHandler:
                 detail="Client credentials grant requires a confidential client",
             )
 
-        # Verify client secret
-        from authly.auth import verify_password
-
-        if not client.client_secret_hash or not verify_password(client_secret, client.client_secret_hash):
+        # Use repository's authenticate_client method for centralized authentication
+        authenticated_client = await self.client_repo.authenticate_client(client_id, client_secret)
+        if not authenticated_client:
             logger.warning(f"Client credentials grant failed: invalid secret for client {client_id}")
             if METRICS_ENABLED and metrics:
                 duration = time.time() - start_time

@@ -32,7 +32,6 @@ class TestBrowserLoginPage:
             assert 'name="password"' in content
             assert 'type="submit"' in content
 
-    @pytest.mark.skip(reason="Authorization endpoint not implemented yet")
     @pytest.mark.asyncio
     async def test_login_page_with_redirect_param(self, test_server):
         """Test login page preserves redirect_to parameter."""
@@ -122,7 +121,6 @@ class TestBrowserLoginSubmission:
                 status.HTTP_303_SEE_OTHER,
             ]
 
-    @pytest.mark.skip(reason="Authorization endpoint not implemented yet")
     @pytest.mark.asyncio
     async def test_login_redirect_after_success(self, test_server, test_user_committed):
         """Test redirect to original URL after successful login."""
@@ -248,7 +246,6 @@ class TestBrowserLoginSession:
                 data = await session_response.json()
                 assert data["authenticated"] is True
 
-    @pytest.mark.skip(reason="Authorization endpoint not implemented yet")
     @pytest.mark.asyncio
     async def test_login_to_oauth_flow(
         self, test_server, test_user_committed, initialize_authly: AuthlyResourceManager

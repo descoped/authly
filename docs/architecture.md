@@ -2,6 +2,11 @@
 
 This document describes the comprehensive architecture of Authly OAuth 2.1 Authorization Server, verified against the current codebase implementation.
 
+## Related Documentation
+
+- **[Service Architecture Patterns](./architecture/service-patterns.md)** - Detailed guide on service layer design, dependency injection, and repository patterns
+- **[Quick Reference Guide](./architecture/QUICK-REFERENCE.md)** - Developer quick reference for common patterns and pitfalls
+
 ## Table of Contents
 
 1. [Architecture Overview](#architecture-overview)

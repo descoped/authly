@@ -7,7 +7,7 @@ from uuid import UUID
 
 from fastapi import HTTPException, status
 
-from authly.auth.core import get_password_hash, verify_password
+from authly.auth.core import get_password_hash
 from authly.config import AuthlyConfig
 from authly.oauth.client_repository import ClientRepository
 from authly.oauth.models import (
@@ -353,8 +353,9 @@ class ClientService:
                         )
                     return None
 
-                # Verify client secret
-                if not verify_password(client_secret, client.client_secret_hash):
+                # Use repository's authenticate_client method for password verification
+                authenticated_client = await self._client_repo.authenticate_client(client_id, client_secret)
+                if not authenticated_client:
                     logger.warning(f"Invalid client secret for confidential client: {client_id}")
 
                     # Track invalid secret

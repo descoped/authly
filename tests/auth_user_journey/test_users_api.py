@@ -6,7 +6,7 @@ import pytest
 from fastapi_testing import AsyncTestServer
 from psycopg_toolkit import TransactionManager
 
-from authly.api import auth_router, users_router
+from authly.api import auth_router, users_router, oidc_router
 from authly.auth import create_access_token, get_password_hash, verify_password
 from authly.config import AuthlyConfig
 from authly.core.resource_manager import AuthlyResourceManager
@@ -49,7 +49,10 @@ async def test_user_token(
     test_user: UserModel,
 ) -> str:
     return create_access_token(
-        data={"sub": str(test_user.id)},
+        data={
+            "sub": str(test_user.id),
+            "scope": "openid profile email"  # Add required OIDC scopes
+        },
         secret_key=test_config.secret_key,
         config=test_config,
         algorithm=test_config.algorithm,
@@ -128,14 +131,16 @@ class TestUserAPI:
         """Test getting current user information"""
         test_server.app.include_router(auth_router, prefix="/api/v1")
         test_server.app.include_router(users_router, prefix="/api/v1")
+        test_server.app.include_router(oidc_router)  # OIDC router at root level
 
         headers = {"Authorization": f"Bearer {test_user_token}"}
-        response = await test_server.client.get("/api/v1/users/me", headers=headers)
+        response = await test_server.client.get("/oidc/userinfo", headers=headers)
         await response.expect_status(200)
         data = await response.json()
 
-        assert data["id"] == str(test_user.id)
-        assert data["username"] == test_user.username
+        # UserInfo response has 'sub' instead of 'id' and 'preferred_username' instead of 'username'
+        assert data["sub"] == str(test_user.id)
+        assert data["preferred_username"] == test_user.username
 
     @pytest.mark.asyncio
     async def test_update_user(self, test_server: AsyncTestServer, test_user: UserModel, test_admin_token: str):

@@ -49,7 +49,6 @@ class TestOAuthTemplates:
         assert ".btn-primary" in content
         assert ".consent-form" in content
 
-    @pytest.mark.skip(reason="Authorization endpoint not implemented yet")
     @pytest.mark.asyncio
     async def test_authorization_template_rendering(self, template_server: AsyncTestServer):
         """Test OAuth authorization consent form template rendering."""
@@ -75,7 +74,6 @@ class TestOAuthTemplates:
         status_code = response._response.status_code
         assert status_code in [302, 401, 403], f"Expected 302, 401 or 403, got {status_code}"
 
-    @pytest.mark.skip(reason="Authorization endpoint not implemented yet")
     @pytest.mark.asyncio
     async def test_authorization_endpoint_requires_auth(self, template_server: AsyncTestServer):
         """Test that authorization endpoint properly requires authentication."""

@@ -89,7 +89,7 @@ async def auth_server(test_server) -> AsyncGenerator[AsyncTestServer, Any]:
 
 @pytest.mark.asyncio
 async def test_unauthorized_access(auth_server: AsyncTestServer):
-    response = await auth_server.client.get("/api/v1/users/me")
+    response = await auth_server.client.get("/oidc/userinfo")
     await response.expect_status(401)
 
 

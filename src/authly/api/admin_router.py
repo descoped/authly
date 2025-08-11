@@ -42,6 +42,9 @@ from authly.admin.models import (
     AdminUserUpdateRequest,
 )
 from authly.api.admin_dependencies import (
+    get_admin_client_service,
+    get_admin_scope_service,
+    get_admin_token_service,
     require_admin_client_read,
     require_admin_client_write,
     require_admin_scope_read,
@@ -55,7 +58,6 @@ from authly.config import AuthlyConfig
 from authly.core.backend_factory import BackendFactory
 from authly.core.dependencies import get_config, get_database_connection, get_resource_manager
 from authly.core.resource_manager import AuthlyResourceManager
-from authly.oauth.client_repository import ClientRepository
 from authly.oauth.client_service import ClientService
 from authly.oauth.models import (
     OAuthClientCreateRequest,
@@ -63,8 +65,8 @@ from authly.oauth.models import (
     OAuthClientModel,
     OAuthScopeModel,
 )
-from authly.oauth.scope_repository import ScopeRepository
 from authly.oauth.scope_service import ScopeService
+from authly.tokens.service import TokenService
 from authly.users.models import UserModel
 from authly.users.service import UserService
 
@@ -99,6 +101,8 @@ async def admin_health():
 async def get_system_status(
     conn: AsyncConnection = Depends(get_database_connection),
     config=Depends(get_config),
+    client_service: ClientService = Depends(get_admin_client_service),
+    scope_service: ScopeService = Depends(get_admin_scope_service),
     _admin: UserModel = Depends(require_admin_system_read),
 ):
     """
@@ -116,11 +120,8 @@ async def get_system_status(
 
     # Get service statistics
     try:
-        client_repo = ClientRepository(conn)
-        scope_repo = ScopeRepository(conn)
-
-        clients = await client_repo.get_active_clients()
-        scopes = await scope_repo.get_active_scopes()
+        clients = await client_service._client_repo.get_active_clients()
+        scopes = await scope_service._scope_repo.get_active_scopes()
 
         stats = {
             "oauth_clients": len(clients),
@@ -177,16 +178,12 @@ async def get_admin_dashboard_stats(
 
     # If not cached, compute stats
     try:
-        from authly.users.repository import UserRepository
-
-        user_repo = UserRepository(conn)
-
         # Get various counts (these could be optimized with a single query)
-        total_users = await user_repo.count_filtered({})
-        active_users = await user_repo.count_filtered({"is_active": True})
-        admin_users = await user_repo.count_filtered({"is_admin": True})
-        unverified_users = await user_repo.count_filtered({"is_verified": False})
-        password_change_required = await user_repo.count_filtered({"requires_password_change": True})
+        total_users = await user_service._repo.count_filtered({})
+        active_users = await user_service._repo.count_filtered({"is_active": True})
+        admin_users = await user_service._repo.count_filtered({"is_admin": True})
+        unverified_users = await user_service._repo.count_filtered({"is_verified": False})
+        password_change_required = await user_service._repo.count_filtered({"requires_password_change": True})
 
         # Get recent activity stats
         from datetime import datetime, timedelta
@@ -195,8 +192,8 @@ async def get_admin_dashboard_stats(
         last_24h = now - timedelta(days=1)
         last_7d = now - timedelta(days=7)
 
-        recent_signups_24h = await user_repo.count_filtered({"created_after": last_24h})
-        recent_signups_7d = await user_repo.count_filtered({"created_after": last_7d})
+        recent_signups_24h = await user_service._repo.count_filtered({"created_after": last_24h})
+        recent_signups_7d = await user_service._repo.count_filtered({"created_after": last_7d})
 
         stats = {
             "users": {
@@ -237,7 +234,7 @@ async def list_clients(
     limit: int = 100,
     offset: int = 0,
     include_inactive: bool = False,
-    conn: AsyncConnection = Depends(get_database_connection),
+    client_service: ClientService = Depends(get_admin_client_service),
     _admin: UserModel = Depends(require_admin_client_read),
 ) -> list[OAuthClientModel]:
     """
@@ -245,8 +242,7 @@ async def list_clients(
     Mirrors the CLI 'client list' command functionality.
     """
     try:
-        client_repo = ClientRepository(conn)
-        clients = await client_repo.get_active_clients(limit=limit, offset=offset)
+        clients = await client_service._client_repo.get_active_clients(limit=limit, offset=offset)
 
         if not include_inactive:
             clients = [client for client in clients if client.is_active]
@@ -262,8 +258,7 @@ async def list_clients(
 @admin_router.post("/clients")
 async def create_client(
     client_request: OAuthClientCreateRequest,
-    conn: AsyncConnection = Depends(get_database_connection),
-    config: AuthlyConfig = Depends(get_config),
+    client_service: ClientService = Depends(get_admin_client_service),
     _admin: UserModel = Depends(require_admin_client_write),
 ) -> OAuthClientCredentialsResponse:
     """
@@ -271,10 +266,6 @@ async def create_client(
     Mirrors the CLI 'client create' command functionality.
     """
     try:
-        client_repo = ClientRepository(conn)
-        scope_repo = ScopeRepository(conn)
-        client_service = ClientService(client_repo, scope_repo, config)
-
         result = await client_service.create_client(client_request)
 
         logger.info(f"Created OAuth client: {result.client_id}")
@@ -292,8 +283,7 @@ async def create_client(
 @admin_router.get("/clients/{client_id}")
 async def get_client(
     client_id: str,
-    conn: AsyncConnection = Depends(get_database_connection),
-    config: AuthlyConfig = Depends(get_config),
+    client_service: ClientService = Depends(get_admin_client_service),
     _admin: UserModel = Depends(require_admin_client_read),
 ) -> dict:
     """
@@ -301,10 +291,6 @@ async def get_client(
     Mirrors the CLI 'client show' command functionality.
     """
     try:
-        client_repo = ClientRepository(conn)
-        scope_repo = ScopeRepository(conn)
-        client_service = ClientService(client_repo, scope_repo, config)
-
         client = await client_service.get_client_by_id(client_id)
         if not client:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Client not found: {client_id}")
@@ -331,8 +317,7 @@ async def get_client(
 async def update_client(
     client_id: str,
     update_data: dict,
-    conn: AsyncConnection = Depends(get_database_connection),
-    config: AuthlyConfig = Depends(get_config),
+    client_service: ClientService = Depends(get_admin_client_service),
     _admin: UserModel = Depends(require_admin_client_write),
 ) -> OAuthClientModel:
     """
@@ -340,10 +325,6 @@ async def update_client(
     Mirrors the CLI 'client update' command functionality.
     """
     try:
-        client_repo = ClientRepository(conn)
-        scope_repo = ScopeRepository(conn)
-        client_service = ClientService(client_repo, scope_repo, config)
-
         updated_client = await client_service.update_client(client_id, update_data)
 
         logger.info(f"Updated OAuth client: {client_id}")
@@ -361,8 +342,7 @@ async def update_client(
 @admin_router.post("/clients/{client_id}/regenerate-secret")
 async def regenerate_client_secret(
     client_id: str,
-    conn: AsyncConnection = Depends(get_database_connection),
-    config: AuthlyConfig = Depends(get_config),
+    client_service: ClientService = Depends(get_admin_client_service),
     _admin: UserModel = Depends(require_admin_client_write),
 ) -> dict:
     """
@@ -370,10 +350,6 @@ async def regenerate_client_secret(
     Mirrors the CLI 'client regenerate-secret' command functionality.
     """
     try:
-        client_repo = ClientRepository(conn)
-        scope_repo = ScopeRepository(conn)
-        client_service = ClientService(client_repo, scope_repo, config)
-
         new_secret = await client_service.regenerate_client_secret(client_id)
 
         if new_secret:
@@ -401,8 +377,7 @@ async def regenerate_client_secret(
 @admin_router.delete("/clients/{client_id}")
 async def delete_client(
     client_id: str,
-    conn: AsyncConnection = Depends(get_database_connection),
-    config: AuthlyConfig = Depends(get_config),
+    client_service: ClientService = Depends(get_admin_client_service),
     _admin: UserModel = Depends(require_admin_client_write),
 ) -> dict:
     """
@@ -410,10 +385,6 @@ async def delete_client(
     Mirrors the CLI 'client delete' command functionality.
     """
     try:
-        client_repo = ClientRepository(conn)
-        scope_repo = ScopeRepository(conn)
-        client_service = ClientService(client_repo, scope_repo, config)
-
         success = await client_service.deactivate_client(client_id)
 
         if success:
@@ -439,15 +410,14 @@ async def delete_client(
 @admin_router.get("/clients/{client_id}/oidc")
 async def get_client_oidc_settings(
     client_id: str,
-    conn: AsyncConnection = Depends(get_database_connection),
+    client_service: ClientService = Depends(get_admin_client_service),
     _admin: UserModel = Depends(require_admin_client_read),
 ) -> dict:
     """
     Get OpenID Connect specific settings for a client.
     """
     try:
-        client_repo = ClientRepository(conn)
-        client = await client_repo.get_by_client_id(client_id)
+        client = await client_service._client_repo.get_by_client_id(client_id)
 
         if not client:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found")
@@ -484,15 +454,14 @@ async def get_client_oidc_settings(
 async def update_client_oidc_settings(
     client_id: str,
     oidc_settings: dict,
-    conn: AsyncConnection = Depends(get_database_connection),
+    client_service: ClientService = Depends(get_admin_client_service),
     _admin: UserModel = Depends(require_admin_client_write),
 ) -> dict:
     """
     Update OpenID Connect specific settings for a client.
     """
     try:
-        client_repo = ClientRepository(conn)
-        client = await client_repo.get_by_client_id(client_id)
+        client = await client_service._client_repo.get_by_client_id(client_id)
 
         if not client:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found")
@@ -521,7 +490,7 @@ async def update_client_oidc_settings(
             )
 
         # Update client with OIDC settings
-        await client_repo.update_client(client.id, update_data)
+        await client_service._client_repo.update_client(client.id, update_data)
 
         logger.info(f"Updated OIDC settings for client: {client_id}")
 
@@ -570,7 +539,7 @@ async def list_scopes(
     offset: int = 0,
     include_inactive: bool = False,
     default_only: bool = False,
-    conn: AsyncConnection = Depends(get_database_connection),
+    scope_service: ScopeService = Depends(get_admin_scope_service),
     _admin: UserModel = Depends(require_admin_scope_read),
 ) -> list[OAuthScopeModel]:
     """
@@ -578,9 +547,6 @@ async def list_scopes(
     Mirrors the CLI 'scope list' command functionality.
     """
     try:
-        scope_repo = ScopeRepository(conn)
-        scope_service = ScopeService(scope_repo)
-
         if default_only:
             scopes = await scope_service.get_default_scopes()
         else:
@@ -598,7 +564,7 @@ async def list_scopes(
 @admin_router.post("/scopes")
 async def create_scope(
     scope_data: dict,
-    conn: AsyncConnection = Depends(get_database_connection),
+    scope_service: ScopeService = Depends(get_admin_scope_service),
     _admin: UserModel = Depends(require_admin_scope_write),
 ) -> OAuthScopeModel:
     """
@@ -606,9 +572,6 @@ async def create_scope(
     Mirrors the CLI 'scope create' command functionality.
     """
     try:
-        scope_repo = ScopeRepository(conn)
-        scope_service = ScopeService(scope_repo)
-
         result = await scope_service.create_scope(
             scope_data["scope_name"],
             scope_data.get("description"),
@@ -630,16 +593,14 @@ async def create_scope(
 
 @admin_router.get("/scopes/defaults")
 async def get_default_scopes(
-    conn: AsyncConnection = Depends(get_database_connection), _admin: UserModel = Depends(require_admin_scope_read)
+    scope_service: ScopeService = Depends(get_admin_scope_service),
+    _admin: UserModel = Depends(require_admin_scope_read),
 ) -> list[OAuthScopeModel]:
     """
     Get all default scopes.
     Mirrors the CLI 'scope defaults' command functionality.
     """
     try:
-        scope_repo = ScopeRepository(conn)
-        scope_service = ScopeService(scope_repo)
-
         default_scopes = await scope_service.get_default_scopes()
         return default_scopes
 
@@ -653,7 +614,7 @@ async def get_default_scopes(
 @admin_router.get("/scopes/{scope_name}")
 async def get_scope(
     scope_name: str,
-    conn: AsyncConnection = Depends(get_database_connection),
+    scope_service: ScopeService = Depends(get_admin_scope_service),
     _admin: UserModel = Depends(require_admin_scope_read),
 ) -> OAuthScopeModel:
     """
@@ -661,9 +622,6 @@ async def get_scope(
     Mirrors the CLI 'scope show' command functionality.
     """
     try:
-        scope_repo = ScopeRepository(conn)
-        scope_service = ScopeService(scope_repo)
-
         scope = await scope_service.get_scope_by_name(scope_name)
 
         if not scope:
@@ -684,7 +642,7 @@ async def get_scope(
 async def update_scope(
     scope_name: str,
     update_data: dict,
-    conn: AsyncConnection = Depends(get_database_connection),
+    scope_service: ScopeService = Depends(get_admin_scope_service),
     _admin: UserModel = Depends(require_admin_scope_write),
 ) -> OAuthScopeModel:
     """
@@ -692,9 +650,6 @@ async def update_scope(
     Mirrors the CLI 'scope update' command functionality.
     """
     try:
-        scope_repo = ScopeRepository(conn)
-        scope_service = ScopeService(scope_repo)
-
         updated_scope = await scope_service.update_scope(scope_name, update_data, requesting_admin=True)
 
         logger.info(f"Updated OAuth scope: {scope_name}")
@@ -712,7 +667,7 @@ async def update_scope(
 @admin_router.delete("/scopes/{scope_name}")
 async def delete_scope(
     scope_name: str,
-    conn: AsyncConnection = Depends(get_database_connection),
+    scope_service: ScopeService = Depends(get_admin_scope_service),
     _admin: UserModel = Depends(require_admin_scope_write),
 ) -> dict:
     """
@@ -720,9 +675,6 @@ async def delete_scope(
     Mirrors the CLI 'scope delete' command functionality.
     """
     try:
-        scope_repo = ScopeRepository(conn)
-        scope_service = ScopeService(scope_repo)
-
         success = await scope_service.deactivate_scope(scope_name, requesting_admin=True)
 
         if success:
@@ -976,6 +928,7 @@ async def create_admin_user(
     create_request: AdminUserCreateRequest,
     admin_user: UserModel = Depends(require_admin_user_write),
     user_service: UserService = Depends(get_user_service),
+    token_service: TokenService = Depends(get_admin_token_service),
     conn: AsyncConnection = Depends(get_database_connection),
     cache_service: AdminCacheService = Depends(get_admin_cache),
 ):
@@ -1029,10 +982,7 @@ async def create_admin_user(
         )
 
         # Get active session count (should be 0 for new user)
-        from authly.tokens.repository import TokenRepository
-
-        token_repo = TokenRepository(conn)
-        active_sessions = await token_repo.count_active_sessions(created_user.id)
+        active_sessions = await token_service._repo.count_active_sessions(created_user.id)
 
         # Convert to AdminUserCreateResponse with session count and temporary password
         user_response_data = created_user.model_dump()
@@ -1071,6 +1021,7 @@ async def update_admin_user(
     update_request: AdminUserUpdateRequest,
     admin_user: UserModel = Depends(require_admin_user_write),
     user_service: UserService = Depends(get_user_service),
+    token_service: TokenService = Depends(get_admin_token_service),
     conn: AsyncConnection = Depends(get_database_connection),
     cache_service: AdminCacheService = Depends(get_admin_cache),
 ):
@@ -1115,10 +1066,7 @@ async def update_admin_user(
         )
 
         # Get active session count for the response
-        from authly.tokens.repository import TokenRepository
-
-        token_repo = TokenRepository(conn)
-        active_sessions = await token_repo.count_active_sessions(user_id)
+        active_sessions = await token_service._repo.count_active_sessions(user_id)
 
         # Convert to AdminUserResponse with session count
         user_data = updated_user.model_dump()
@@ -1218,6 +1166,7 @@ async def reset_user_password(
     user_id: UUID,
     admin_user: UserModel = Depends(require_admin_user_write),
     user_service: UserService = Depends(get_user_service),
+    token_service: TokenService = Depends(get_admin_token_service),
     conn: AsyncConnection = Depends(get_database_connection),
 ):
     """
@@ -1264,10 +1213,7 @@ async def reset_user_password(
         )
 
         # Invalidate all existing sessions for security
-        from authly.tokens.repository import TokenRepository
-
-        token_repo = TokenRepository(conn)
-        invalidated_count = await token_repo.invalidate_user_sessions(user_id)
+        invalidated_count = await token_service._repo.invalidate_user_sessions(user_id)
 
         logger.info(
             f"Admin user {admin_user.username} reset password for user {updated_user.username} "
@@ -1308,6 +1254,7 @@ async def get_user_sessions(
     include_inactive: bool = Query(True, description="Include inactive/expired sessions"),
     admin_user: UserModel = Depends(require_admin_user_read),
     user_service: UserService = Depends(get_user_service),
+    token_service: TokenService = Depends(get_admin_token_service),
     conn: AsyncConnection = Depends(get_database_connection),
 ):
     """
@@ -1330,14 +1277,11 @@ async def get_user_sessions(
         user = await validation.validate_session_access(user_id, admin_user)
 
         # Get user sessions from token repository
-        from authly.tokens.repository import TokenRepository
-
-        token_repo = TokenRepository(conn)
-        sessions = await token_repo.get_user_sessions(
+        sessions = await token_service._repo.get_user_sessions(
             user_id, skip=skip, limit=limit, include_inactive=include_inactive
         )
-        total_count = await token_repo.count_user_sessions(user_id, include_inactive=include_inactive)
-        active_count = await token_repo.count_active_sessions(user_id)
+        total_count = await token_service._repo.count_user_sessions(user_id, include_inactive=include_inactive)
+        active_count = await token_service._repo.count_active_sessions(user_id)
 
         # Convert TokenModel instances to AdminSessionResponse
         from datetime import datetime
@@ -1416,6 +1360,7 @@ async def revoke_all_user_sessions(
     user_id: UUID,
     admin_user: UserModel = Depends(require_admin_user_write),
     user_service: UserService = Depends(get_user_service),
+    token_service: TokenService = Depends(get_admin_token_service),
     conn: AsyncConnection = Depends(get_database_connection),
 ):
     """
@@ -1442,18 +1387,14 @@ async def revoke_all_user_sessions(
         user = await validation.validate_session_revocation(user_id, admin_user)
 
         # Revoke all user sessions
-        from authly.tokens.repository import TokenRepository
-
-        token_repo = TokenRepository(conn)
-
         # Count active sessions before revocation
-        active_sessions_before = await token_repo.count_active_sessions(user_id)
+        active_sessions_before = await token_service._repo.count_active_sessions(user_id)
 
         # Invalidate all user tokens (both access and refresh)
-        await token_repo.invalidate_user_tokens(user_id)
+        await token_service._repo.invalidate_user_tokens(user_id)
 
         # Count active sessions after revocation (should be 0)
-        active_sessions_after = await token_repo.count_active_sessions(user_id)
+        active_sessions_after = await token_service._repo.count_active_sessions(user_id)
         revoked_count = active_sessions_before - active_sessions_after
 
         logger.warning(
@@ -1492,6 +1433,7 @@ async def revoke_specific_user_session(
     session_id: UUID,
     admin_user: UserModel = Depends(require_admin_user_write),
     user_service: UserService = Depends(get_user_service),
+    token_service: TokenService = Depends(get_admin_token_service),
     conn: AsyncConnection = Depends(get_database_connection),
 ):
     """
@@ -1519,10 +1461,7 @@ async def revoke_specific_user_session(
         user = await validation.validate_session_revocation(user_id, admin_user, session_id)
 
         # Get the specific session and validate ownership
-        from authly.tokens.repository import TokenRepository
-
-        token_repo = TokenRepository(conn)
-        session = await token_repo.get_by_id(session_id)
+        session = await token_service._repo.get_by_id(session_id)
 
         if not session:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
@@ -1536,7 +1475,7 @@ async def revoke_specific_user_session(
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Session is already invalidated")
 
         # Invalidate the specific session
-        await token_repo.invalidate_token(session.token_jti)
+        await token_service._repo.invalidate_token(session.token_jti)
 
         logger.info(
             f"Admin user {admin_user.username} revoked session {session_id} for user {user.username} "

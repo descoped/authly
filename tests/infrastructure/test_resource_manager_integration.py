@@ -74,10 +74,10 @@ class TestResourceManagerIntegration:
 
     async def test_user_dependencies_with_resource_manager(self, resource_manager_server: AsyncTestServer):
         """Test that user dependencies work with resource manager after singleton removal."""
-        # Test that user repository creation works - this tests get_database_connection
+        # Test that OIDC userinfo endpoint works - this tests get_database_connection
         # We'll just test that the endpoint exists and doesn't crash with dependency injection
         response = await resource_manager_server.client.get(
-            "/api/v1/users/me", headers={"Authorization": "Bearer invalid-token"}
+            "/oidc/userinfo", headers={"Authorization": "Bearer invalid-token"}
         )
         # Should return 401 for invalid token, but that means the dependencies are working
         await response.expect_status(401)

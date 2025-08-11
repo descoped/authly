@@ -39,7 +39,7 @@ class TestJWTSecurity:
 
             # Try to use the fake token
             response = await http_client.get(
-                "/api/v1/users/me",
+                "/oidc/userinfo",
                 headers={"Authorization": f"Bearer {fake_token}"},
             )
 
@@ -68,7 +68,7 @@ class TestJWTSecurity:
             unsigned_token = f"{header_b64}.{payload_b64}."
 
             response = await http_client.get(
-                "/api/v1/users/me",
+                "/oidc/userinfo",
                 headers={"Authorization": f"Bearer {unsigned_token}"},
             )
 
@@ -89,7 +89,7 @@ class TestJWTSecurity:
                     confused_token = jwt.encode(payload, public_key, algorithm="HS256")
 
                     response = await http_client.get(
-                        "/api/v1/users/me",
+                        "/oidc/userinfo",
                         headers={"Authorization": f"Bearer {confused_token}"},
                     )
 
@@ -113,7 +113,7 @@ class TestJWTSecurity:
             expired_token = jwt.encode(payload, secret, algorithm="HS256")
 
             response = await http_client.get(
-                "/api/v1/users/me",
+                "/oidc/userinfo",
                 headers={"Authorization": f"Bearer {expired_token}"},
             )
 
@@ -137,7 +137,7 @@ class TestJWTSecurity:
             token_no_sub = jwt.encode(payload_no_sub, secret, algorithm="HS256")
 
             response = await http_client.get(
-                "/api/v1/users/me",
+                "/oidc/userinfo",
                 headers={"Authorization": f"Bearer {token_no_sub}"},
             )
 
@@ -155,7 +155,7 @@ class TestJWTSecurity:
             token_no_exp = jwt.encode(payload_no_exp, secret, algorithm="HS256")
 
             response = await http_client.get(
-                "/api/v1/users/me",
+                "/oidc/userinfo",
                 headers={"Authorization": f"Bearer {token_no_exp}"},
             )
 
@@ -196,7 +196,7 @@ class TestJWTSecurity:
             tampered_token = f"{parts[0]}.{tampered_payload}.{parts[2]}"
 
             response = await http_client.get(
-                "/api/v1/users/me",
+                "/oidc/userinfo",
                 headers={"Authorization": f"Bearer {tampered_token}"},
             )
 
@@ -221,7 +221,7 @@ class TestJWTSecurity:
             future_token = jwt.encode(payload, secret, algorithm="HS256")
 
             response = await http_client.get(
-                "/api/v1/users/me",
+                "/oidc/userinfo",
                 headers={"Authorization": f"Bearer {future_token}"},
             )
 
@@ -250,14 +250,14 @@ class TestJWTSecurity:
 
             # First use should work
             response1 = await http_client.get(
-                "/api/v1/users/me",
+                "/oidc/userinfo",
                 headers={"Authorization": f"Bearer {token}"},
             )
 
             # If tokens are revoked after use, second use should fail
             # This depends on implementation
             response2 = await http_client.get(
-                "/api/v1/users/me",
+                "/oidc/userinfo",
                 headers={"Authorization": f"Bearer {token}"},
             )
 
@@ -292,7 +292,7 @@ class TestJWTSecurity:
                 weak_token = jwt.encode(payload, weak_secret, algorithm="HS256")
 
                 response = await http_client.get(
-                    "/api/v1/users/me",
+                    "/oidc/userinfo",
                     headers={"Authorization": f"Bearer {weak_token}"},
                 )
 

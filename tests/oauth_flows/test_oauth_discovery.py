@@ -21,7 +21,6 @@ logger = logging.getLogger(__name__)
 class TestDiscoveryService:
     """Test cases for OAuth 2.1 Discovery Service."""
 
-    @pytest.mark.skip(reason="Authorization endpoint not implemented yet")
     @pytest.mark.asyncio
     async def test_get_server_metadata_without_scope_repo(self):
         """Test generating server metadata without scope repository."""
@@ -104,7 +103,6 @@ class TestDiscoveryService:
             for scope_name in scope_names:
                 assert scope_name in metadata.scopes_supported
 
-    @pytest.mark.skip(reason="Authorization endpoint not implemented yet")
     @pytest.mark.asyncio
     async def test_get_server_metadata_with_trailing_slash(self):
         """Test issuer URL handling with trailing slash."""
@@ -118,7 +116,6 @@ class TestDiscoveryService:
         # Should strip trailing slash
         assert metadata.issuer == "https://auth.example.com"
 
-    @pytest.mark.skip(reason="Authorization endpoint not implemented yet")
     @pytest.mark.asyncio
     async def test_get_server_metadata_scope_repo_error(
         self, initialize_authly: AuthlyResourceManager, transaction_manager: TransactionManager

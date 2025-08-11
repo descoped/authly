@@ -26,8 +26,16 @@ class SessionRepository:
     """
     Repository for managing browser sessions using SessionBackend.
 
+    SPECIAL CASE: This repository does NOT inherit from BaseRepository because:
+    - It manages ephemeral session state, not persistent database entities
+    - Uses specialized storage backends (memory/Redis) instead of PostgreSQL
+    - Sessions have different lifecycle patterns (TTL-based expiry vs CRUD)
+    - Requires real-time performance characteristics not suited for DB transactions
+
     Sessions are stored using the backend abstraction which handles
     both memory and Redis storage transparently.
+
+    This is an intentional architectural decision, not an oversight.
     """
 
     SESSION_PREFIX = "session:"

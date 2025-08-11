@@ -178,8 +178,8 @@ class TestMainApplicationIntegration:
         response = await test_server.client.get("/api/v1/oauth/token")
         assert response._response.status_code != 404  # Should exist, even if wrong method
 
-        # Test users endpoints exist
-        response = await test_server.client.get("/api/v1/users/me")
+        # Test OIDC userinfo endpoint exists
+        response = await test_server.client.get("/oidc/userinfo")
         assert response._response.status_code in [401, 422]  # Needs auth, but endpoint exists
 
         # Test OAuth endpoints exist

@@ -15,10 +15,22 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 
 from authly.api.users_dependencies import get_current_user
-from authly.core.dependencies import get_config
+from authly.core.dependencies import get_config, get_database_connection
+
+# Service imports for dependency injection
+from authly.oauth.client_repository import ClientRepository
+from authly.oauth.client_service import ClientService
+from authly.oauth.scope_repository import ScopeRepository
+from authly.oauth.scope_service import ScopeService
+from authly.tokens.repository import TokenRepository
+from authly.tokens.service import TokenService
 from authly.users.models import UserModel
+from authly.users.repository import UserRepository
+from authly.users.service import UserService
 
 if TYPE_CHECKING:
+    from psycopg import AsyncConnection
+
     from authly.config import AuthlyConfig
 
 logger = logging.getLogger(__name__)
@@ -196,3 +208,87 @@ require_admin_user_read = require_admin_scope("admin:users:read")
 require_admin_user_write = require_admin_scope("admin:users:write")
 require_admin_system_read = require_admin_scope("admin:system:read")
 require_admin_system_write = require_admin_scope("admin:system:write")
+
+
+# Service dependencies for admin operations
+async def get_admin_client_service(
+    conn: "AsyncConnection" = Depends(get_database_connection),
+    config: "AuthlyConfig" = Depends(get_config),
+) -> ClientService:
+    """
+    Get ClientService instance for admin operations.
+
+    Creates ClientService with required repositories and configuration,
+    following the established service pattern.
+
+    Args:
+        conn: Database connection from pool
+        config: Authly configuration
+
+    Returns:
+        ClientService: Configured service instance
+    """
+    client_repo = ClientRepository(conn)
+    scope_repo = ScopeRepository(conn)
+    return ClientService(client_repo, scope_repo, config)
+
+
+async def get_admin_scope_service(
+    conn: "AsyncConnection" = Depends(get_database_connection),
+) -> ScopeService:
+    """
+    Get ScopeService instance for admin operations.
+
+    Creates ScopeService with required repository,
+    following the established service pattern.
+
+    Args:
+        conn: Database connection from pool
+
+    Returns:
+        ScopeService: Configured service instance
+    """
+    scope_repo = ScopeRepository(conn)
+    return ScopeService(scope_repo)
+
+
+async def get_admin_user_service(
+    conn: "AsyncConnection" = Depends(get_database_connection),
+) -> UserService:
+    """
+    Get UserService instance for admin operations.
+
+    Creates UserService with required repository,
+    following the established service pattern.
+
+    Args:
+        conn: Database connection from pool
+
+    Returns:
+        UserService: Configured service instance
+    """
+    user_repo = UserRepository(conn)
+    return UserService(user_repo)
+
+
+async def get_admin_token_service(
+    conn: "AsyncConnection" = Depends(get_database_connection),
+    config: "AuthlyConfig" = Depends(get_config),
+) -> TokenService:
+    """
+    Get TokenService instance for admin operations.
+
+    Creates TokenService with required repository and configuration,
+    following the established service pattern.
+
+    Args:
+        conn: Database connection from pool
+        config: Authly configuration
+
+    Returns:
+        TokenService: Configured service instance
+    """
+    token_repo = TokenRepository(conn)
+    # TokenService expects (repository, config, client_repository)
+    # For admin operations, we don't need client_repository
+    return TokenService(token_repo, config, client_repository=None)

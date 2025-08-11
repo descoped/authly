@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Query, status
 from pydantic import BaseModel
 
 from authly.api.admin_dependencies import require_admin_user
-from authly.api.users_dependencies import get_current_user, get_user_service
+from authly.api.users_dependencies import get_user_service
 from authly.api.validation_models import create_user_create_model, create_user_update_model
 from authly.users.models import UserModel
 from authly.users.service import UserService
@@ -66,24 +66,6 @@ async def create_user(
         is_verified=False,
         is_active=True,
     )
-
-
-@router.get("/me", response_model=UserResponse, deprecated=True)
-async def get_current_user_info(current_user: UserModel = Depends(get_current_user)):
-    """
-    Get information about the currently authenticated user.
-
-    **DEPRECATED**: This endpoint is deprecated in favor of the OIDC-compliant
-    GET /oidc/userinfo endpoint which provides standardized user claims based
-    on granted scopes. Please migrate to /oidc/userinfo for better compatibility
-    with OpenID Connect standards.
-
-    This endpoint will be removed in a future version.
-    """
-    logger.warning(
-        f"Deprecated /users/me endpoint accessed by user {current_user.id}. Client should migrate to /oidc/userinfo"
-    )
-    return current_user
 
 
 @router.get("/{user_id}", response_model=UserResponse)
