@@ -71,12 +71,44 @@ class AuthlyConfig:
     # Security configuration
     _lockout_duration_seconds: int
     _lockout_max_attempts: int
+    # CORS configuration
+    _cors_allowed_origins: list[str]
+    _cors_allow_credentials: bool
+    _cors_allow_methods: list[str]
+    _cors_allow_headers: list[str]
+    _cors_expose_headers: list[str]
+    _cors_max_age: int
     _secrets: SecureSecrets | None = None
 
     def __del__(self):
         """Ensure secure cleanup of secrets."""
         if self._secrets:
             self._secrets.clear_memory()
+
+    @staticmethod
+    def _parse_list(value: str) -> list[str]:
+        """Parse comma-separated list from environment variable."""
+        if not value or value == "*":
+            return ["*"]
+        return [item.strip() for item in value.split(",") if item.strip()]
+
+    @staticmethod
+    def _parse_cors_origins(value: str) -> list[str]:
+        """Parse CORS origins from environment variable."""
+        if not value:
+            # Default development origins
+            return [
+                "http://localhost:8080",
+                "http://localhost:3000",
+                "http://localhost:8000",
+                "http://127.0.0.1:8080",
+                "http://127.0.0.1:3000",
+                "http://127.0.0.1:8000",
+            ]
+        elif value == "*":
+            return ["*"]
+        else:
+            return [origin.strip() for origin in value.split(",") if origin.strip()]
 
     @classmethod
     def load(
@@ -147,6 +179,13 @@ class AuthlyConfig:
             # Security configuration
             _lockout_duration_seconds=int(os.getenv("AUTHLY_LOCKOUT_DURATION_SECONDS", "300")),
             _lockout_max_attempts=int(os.getenv("AUTHLY_LOCKOUT_MAX_ATTEMPTS", "5")),
+            # CORS configuration
+            _cors_allowed_origins=cls._parse_cors_origins(os.getenv("AUTHLY_CORS_ORIGINS", "")),
+            _cors_allow_credentials=os.getenv("AUTHLY_CORS_ALLOW_CREDENTIALS", "true").lower() == "true",
+            _cors_allow_methods=cls._parse_list(os.getenv("AUTHLY_CORS_ALLOW_METHODS", "GET,POST,PUT,DELETE,OPTIONS")),
+            _cors_allow_headers=cls._parse_list(os.getenv("AUTHLY_CORS_ALLOW_HEADERS", "*")),
+            _cors_expose_headers=cls._parse_list(os.getenv("AUTHLY_CORS_EXPOSE_HEADERS", "*")),
+            _cors_max_age=int(os.getenv("AUTHLY_CORS_MAX_AGE", "600")),
         )
 
         config._secrets = SecureSecrets(secrets_path)
@@ -346,6 +385,36 @@ class AuthlyConfig:
     def lockout_max_attempts(self) -> int:
         """Get maximum login attempts before lockout."""
         return self._lockout_max_attempts
+
+    @property
+    def cors_allowed_origins(self) -> list[str]:
+        """Get CORS allowed origins."""
+        return self._cors_allowed_origins
+
+    @property
+    def cors_allow_credentials(self) -> bool:
+        """Get CORS allow credentials setting."""
+        return self._cors_allow_credentials
+
+    @property
+    def cors_allow_methods(self) -> list[str]:
+        """Get CORS allowed methods."""
+        return self._cors_allow_methods
+
+    @property
+    def cors_allow_headers(self) -> list[str]:
+        """Get CORS allowed headers."""
+        return self._cors_allow_headers
+
+    @property
+    def cors_expose_headers(self) -> list[str]:
+        """Get CORS exposed headers."""
+        return self._cors_expose_headers
+
+    @property
+    def cors_max_age(self) -> int:
+        """Get CORS max age in seconds."""
+        return self._cors_max_age
 
     def get_masked_database_url(self) -> str:
         """Get database URL with password masked for safe logging."""

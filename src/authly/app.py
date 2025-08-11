@@ -9,6 +9,7 @@ import os
 from collections.abc import AsyncGenerator
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from fastapi.staticfiles import StaticFiles
 
@@ -54,7 +55,76 @@ def create_app(
     # Add logging middleware first (to capture all requests)
     app.add_middleware(LoggingMiddleware)
 
-    # Setup security headers middleware (before other middleware)
+    # Add CORS middleware for browser compatibility
+    # This should be after logging but before other middleware
+    # Load CORS configuration from AuthlyConfig or use defaults
+    if config:
+        # Use config if provided
+        from authly.config import AuthlyConfig
+
+        if isinstance(config, AuthlyConfig):
+            allowed_origins = config.cors_allowed_origins
+            allow_credentials = config.cors_allow_credentials
+            allow_methods = config.cors_allow_methods
+            allow_headers = config.cors_allow_headers
+            expose_headers = config.cors_expose_headers
+            max_age = config.cors_max_age
+        else:
+            # Fallback to environment variables if config is not AuthlyConfig
+            cors_origins = os.getenv("AUTHLY_CORS_ORIGINS", "")
+            if cors_origins == "*":
+                allowed_origins = ["*"]
+            elif cors_origins:
+                allowed_origins = cors_origins.split(",")
+            else:
+                # Default development origins
+                allowed_origins = [
+                    "http://localhost:8080",
+                    "http://localhost:3000",
+                    "http://localhost:8000",
+                    "http://127.0.0.1:8080",
+                    "http://127.0.0.1:3000",
+                    "http://127.0.0.1:8000",
+                ]
+            allow_credentials = True
+            allow_methods = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+            allow_headers = ["*"]
+            expose_headers = ["*"]
+            max_age = 600
+    else:
+        # No config provided, use environment or defaults
+        cors_origins = os.getenv("AUTHLY_CORS_ORIGINS", "")
+        if cors_origins == "*":
+            allowed_origins = ["*"]
+        elif cors_origins:
+            allowed_origins = cors_origins.split(",")
+        else:
+            # Default development origins
+            allowed_origins = [
+                "http://localhost:8080",
+                "http://localhost:3000",
+                "http://localhost:8000",
+                "http://127.0.0.1:8080",
+                "http://127.0.0.1:3000",
+                "http://127.0.0.1:8000",
+            ]
+        allow_credentials = True
+        allow_methods = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+        allow_headers = ["*"]
+        expose_headers = ["*"]
+        max_age = 600
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=allowed_origins,
+        allow_credentials=allow_credentials,
+        allow_methods=allow_methods,
+        allow_headers=allow_headers,
+        expose_headers=expose_headers,
+        max_age=max_age,
+    )
+
+    # Setup security headers middleware (after CORS)
     setup_security_middleware(app)
 
     # Setup admin security middleware
