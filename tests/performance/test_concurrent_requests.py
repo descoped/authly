@@ -86,7 +86,7 @@ class TestConcurrentRequests:
             for r in results:
                 if r["status"] == -1:
                     print(f"  Request {r['user_num']} error: {r.get('error', 'Unknown')}")
-        
+
         # Check for race conditions
         if failed_count == 0 and success_count == len(results):
             print("✓ All concurrent requests handled successfully")
@@ -96,10 +96,9 @@ class TestConcurrentRequests:
             print("⚠ Some requests had connection issues - may indicate concurrency problems")
 
     @pytest.mark.asyncio
-    async def test_concurrent_token_exchanges(
-        self, test_server, initialize_authly: AuthlyResourceManager
-    ):
+    async def test_concurrent_token_exchanges(self, test_server, initialize_authly: AuthlyResourceManager):
         """Test concurrent token exchange requests."""
+
         # Prepare multiple token exchange requests
         async def exchange_token(request_num):
             """Attempt to exchange an authorization code for tokens."""
@@ -148,10 +147,9 @@ class TestConcurrentRequests:
         print("✓ All concurrent token exchanges handled properly")
 
     @pytest.mark.asyncio
-    async def test_concurrent_refresh_tokens(
-        self, test_server, initialize_authly: AuthlyResourceManager
-    ):
+    async def test_concurrent_refresh_tokens(self, test_server, initialize_authly: AuthlyResourceManager):
         """Test concurrent refresh token requests."""
+
         async def refresh_token(request_num):
             """Attempt to refresh a token."""
             try:
@@ -194,9 +192,7 @@ class TestConcurrentRequests:
         print("✓ Concurrent refresh token requests handled without crashes")
 
     @pytest.mark.asyncio
-    async def test_race_condition_same_auth_code(
-        self, test_server, initialize_authly: AuthlyResourceManager
-    ):
+    async def test_race_condition_same_auth_code(self, test_server, initialize_authly: AuthlyResourceManager):
         """Test race condition when same auth code is used multiple times concurrently."""
         # Use the same authorization code in multiple concurrent requests
         auth_code = "same_code_for_all"
@@ -248,10 +244,9 @@ class TestConcurrentRequests:
             print(f"⚠ WARNING: {successful} requests succeeded with same code (race condition)")
 
     @pytest.mark.asyncio
-    async def test_concurrent_introspection(
-        self, test_server, initialize_authly: AuthlyResourceManager
-    ):
+    async def test_concurrent_introspection(self, test_server, initialize_authly: AuthlyResourceManager):
         """Test concurrent token introspection requests."""
+
         async def introspect_token(request_num):
             """Introspect a token."""
             try:
@@ -294,10 +289,9 @@ class TestConcurrentRequests:
         print("✓ Concurrent introspection handled without issues")
 
     @pytest.mark.asyncio
-    async def test_database_connection_pool_stress(
-        self, test_server, initialize_authly: AuthlyResourceManager
-    ):
+    async def test_database_connection_pool_stress(self, test_server, initialize_authly: AuthlyResourceManager):
         """Test database connection pool under concurrent load."""
+
         async def make_db_request(request_num):
             """Make a request that requires database access."""
             try:

@@ -60,7 +60,7 @@ async def admin_token(
         client_repo = ClientRepository(conn)
         scope_repo = ScopeRepository(conn)
         client_service = ClientService(client_repo, scope_repo, test_resource_manager.config)
-        
+
         client_request = OAuthClientCreateRequest(
             client_name="Admin Test Client",
             client_type=ClientType.CONFIDENTIAL,
@@ -71,7 +71,7 @@ async def admin_token(
             response_types=[ResponseType.CODE],
         )
         client_response = await client_service.create_client(client_request)
-        
+
         # Get the actual client model for the token service
         client = await client_repo.get_by_client_id(client_response.client_id)
 
@@ -282,11 +282,11 @@ class TestAdminUserCRUD:
         """Test that we can delete admin users when multiple admins exist."""
         # The business rule is: Cannot delete the LAST admin user
         # Since we have multiple admin users in this test, deletion should succeed
-        
+
         response = await test_server.client.delete(
             f"/admin/users/{test_admin_user.id}", headers={"Authorization": f"Bearer {admin_token}"}
         )
-        
+
         # This should succeed since there are multiple admins (won't leave system with no admins)
         assert response.status_code == status.HTTP_204_NO_CONTENT
 
@@ -319,7 +319,5 @@ class TestAdminUserCRUD:
             config=test_resource_manager.config,
         )
 
-        response = await test_server.client.get(
-            "/admin/users", headers={"Authorization": f"Bearer {regular_token}"}
-        )
+        response = await test_server.client.get("/admin/users", headers={"Authorization": f"Bearer {regular_token}"})
         assert response.status_code == status.HTTP_403_FORBIDDEN

@@ -6,7 +6,7 @@ import pytest
 from fastapi_testing import AsyncTestServer
 from psycopg_toolkit import TransactionManager
 
-from authly.api import auth_router, users_router, oidc_router
+from authly.api import auth_router, oidc_router, users_router
 from authly.auth import create_access_token, get_password_hash, verify_password
 from authly.config import AuthlyConfig
 from authly.core.resource_manager import AuthlyResourceManager
@@ -51,7 +51,7 @@ async def test_user_token(
     return create_access_token(
         data={
             "sub": str(test_user.id),
-            "scope": "openid profile email"  # Add required OIDC scopes
+            "scope": "openid profile email",  # Add required OIDC scopes
         },
         secret_key=test_config.secret_key,
         config=test_config,

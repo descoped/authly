@@ -60,7 +60,7 @@ class TestCompleteAuthorizationCodeFlow:
 
             # Should show consent form (200 OK with HTML)
             assert auth_response.status_code == status.HTTP_200_OK
-            
+
             # Step 2b: Submit consent approval (POST)
             consent_data = {
                 "response_type": "code",
@@ -72,14 +72,14 @@ class TestCompleteAuthorizationCodeFlow:
                 "state": "test_state_123",
                 "approved": "true",  # User approves
             }
-            
+
             consent_response = await client.post(
-                "/api/v1/oauth/authorize", 
+                "/api/v1/oauth/authorize",
                 data=consent_data,
                 headers={"Authorization": f"Bearer {access_token}"},
-                follow_redirects=False
+                follow_redirects=False,
             )
-            
+
             # Should redirect with authorization code
             assert consent_response.status_code == status.HTTP_302_FOUND
             location = consent_response._response.headers.get("location")
@@ -156,7 +156,7 @@ class TestCompleteAuthorizationCodeFlow:
             introspection = await introspect_response.json()
             assert introspection["active"] is True
             # Client ID might not always be present in introspection
-            if "client_id" in introspection and introspection["client_id"]:
+            if introspection.get("client_id"):
                 assert introspection["client_id"] == committed_oauth_client["client_id"]
             # Username might not be in introspection response for all token types
             if "username" in introspection:
@@ -216,7 +216,7 @@ class TestCompleteOIDCFlow:
 
             # Should show consent form (200 OK with HTML)
             assert auth_response.status_code == status.HTTP_200_OK
-            
+
             # Step 2b: Submit consent approval (POST) with OIDC parameters
             consent_data = {
                 "response_type": "code",
@@ -229,14 +229,14 @@ class TestCompleteOIDCFlow:
                 "nonce": nonce,
                 "approved": "true",  # User approves
             }
-            
+
             consent_response = await client.post(
-                "/api/v1/oauth/authorize", 
+                "/api/v1/oauth/authorize",
                 data=consent_data,
                 headers={"Authorization": f"Bearer {access_token}"},
-                follow_redirects=False
+                follow_redirects=False,
             )
-            
+
             # Should redirect with authorization code
             assert consent_response.status_code == status.HTTP_302_FOUND
             location = consent_response._response.headers.get("location")
@@ -308,10 +308,10 @@ class TestLogoutFlow:
             login_response = await client.post(
                 "/api/v1/oauth/token",
                 data={
-                    "grant_type": "password", 
-                    "username": committed_user.username, 
+                    "grant_type": "password",
+                    "username": committed_user.username,
                     "password": "TestPassword123!",
-                    "scope": "openid profile email"  # Add OIDC scopes for userinfo endpoint
+                    "scope": "openid profile email",  # Add OIDC scopes for userinfo endpoint
                 },
             )
             assert login_response.status_code == status.HTTP_200_OK
@@ -320,9 +320,7 @@ class TestLogoutFlow:
             refresh_token = login_data["refresh_token"]
 
             # Step 2: Verify tokens work
-            userinfo_response = await client.get(
-                "/oidc/userinfo", headers={"Authorization": f"Bearer {access_token}"}
-            )
+            userinfo_response = await client.get("/oidc/userinfo", headers={"Authorization": f"Bearer {access_token}"})
             assert userinfo_response.status_code == status.HTTP_200_OK
 
             # Step 3: Logout using the auth/logout endpoint
@@ -332,9 +330,7 @@ class TestLogoutFlow:
             assert logout_response.status_code == status.HTTP_200_OK
 
             # Step 4: Verify access token no longer works
-            verify_response = await client.get(
-                "/oidc/userinfo", headers={"Authorization": f"Bearer {access_token}"}
-            )
+            verify_response = await client.get("/oidc/userinfo", headers={"Authorization": f"Bearer {access_token}"})
             assert verify_response.status_code == status.HTTP_401_UNAUTHORIZED
 
             # Step 5: Verify refresh token no longer works
@@ -422,8 +418,10 @@ class TestErrorHandling:
             }
 
             auth_response = await client.get(
-                "/api/v1/oauth/authorize", params=auth_params, headers={"Authorization": f"Bearer {access_token}"},
-                follow_redirects=False
+                "/api/v1/oauth/authorize",
+                params=auth_params,
+                headers={"Authorization": f"Bearer {access_token}"},
+                follow_redirects=False,
             )
 
             # Should redirect back to client with invalid_scope error
@@ -471,7 +469,7 @@ class TestTokenRotation:
 
             # Should show consent form (200 OK with HTML)
             assert auth_response.status_code == status.HTTP_200_OK
-            
+
             # Submit consent approval (POST)
             consent_data = {
                 "response_type": "code",
@@ -483,14 +481,14 @@ class TestTokenRotation:
                 "state": "test_state",
                 "approved": "true",  # User approves
             }
-            
+
             consent_response = await client.post(
-                "/api/v1/oauth/authorize", 
+                "/api/v1/oauth/authorize",
                 data=consent_data,
                 headers={"Authorization": f"Bearer {access_token}"},
-                follow_redirects=False
+                follow_redirects=False,
             )
-            
+
             # Get authorization code from redirect
             assert consent_response.status_code == status.HTTP_302_FOUND
             location = consent_response._response.headers.get("location")

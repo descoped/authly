@@ -53,7 +53,7 @@ class TestSQLInjectionPrevention:
                         assert "database" not in response_text
 
                     print(f"  ✓ Payload handled safely: {payload[:30]}...")
-                    
+
                 except Exception as e:
                     print(f"  ⚠ Error with payload '{payload[:30]}...': {e}")
                     # Allow a few failures but not complete failure

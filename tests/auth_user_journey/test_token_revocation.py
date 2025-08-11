@@ -15,7 +15,7 @@ import pytest
 from fastapi_testing import AsyncTestServer
 from psycopg_toolkit import TransactionManager
 
-from authly.api import auth_router, users_router, oidc_router
+from authly.api import auth_router, oidc_router, users_router
 from authly.auth.core import get_password_hash
 from authly.users import UserModel, UserRepository
 
@@ -55,10 +55,10 @@ class TestTokenRevocation:
         response = await auth_server.client.post(
             "/api/v1/oauth/token",
             data={
-                "grant_type": "password", 
-                "username": test_user.username, 
+                "grant_type": "password",
+                "username": test_user.username,
                 "password": "Test123!",
-                "scope": "openid profile email"  # Add OIDC scopes
+                "scope": "openid profile email",  # Add OIDC scopes
             },
         )
         await response.expect_status(200)

@@ -10,6 +10,7 @@ import time
 from uuid import uuid4
 
 import pytest
+
 from authly.core.resource_manager import AuthlyResourceManager
 
 
@@ -17,9 +18,7 @@ class TestLoadPerformance:
     """Test endpoint performance under load."""
 
     @pytest.mark.asyncio
-    async def test_token_endpoint_throughput(
-        self, test_server, initialize_authly: AuthlyResourceManager
-    ):
+    async def test_token_endpoint_throughput(self, test_server, initialize_authly: AuthlyResourceManager):
         """Measure token endpoint throughput."""
         # Prepare test data
         request_data = {
@@ -91,9 +90,7 @@ class TestLoadPerformance:
         print("✓ Token endpoint performance is acceptable")
 
     @pytest.mark.asyncio
-    async def test_authorization_endpoint_performance(
-        self, test_server, initialize_authly: AuthlyResourceManager
-    ):
+    async def test_authorization_endpoint_performance(self, test_server, initialize_authly: AuthlyResourceManager):
         """Test authorization endpoint performance."""
         params = {
             "response_type": "code",
@@ -116,14 +113,14 @@ class TestLoadPerformance:
         for _i in range(total_requests):
             try:
                 req_start = time.time()
-                response = await test_server.client.get(
+                await test_server.client.get(
                     "/api/v1/oauth/authorize",
                     params=params,
                     follow_redirects=False,  # Don't follow redirects for performance testing
                 )
                 req_time = (time.time() - req_start) * 1000
                 response_times.append(req_time)
-                
+
                 # Small delay to avoid overwhelming the connection pool
                 if _i < total_requests - 1:
                     await asyncio.sleep(0.001)
@@ -139,7 +136,7 @@ class TestLoadPerformance:
         if not response_times:
             print(f"All {total_requests} requests failed!")
             raise Exception("No successful requests to measure performance")
-        
+
         avg_time = statistics.mean(response_times)
         median_time = statistics.median(response_times)
         successful_requests = len(response_times)
@@ -159,14 +156,12 @@ class TestLoadPerformance:
             print("⚠ Authorization endpoint performance is acceptable (< 200ms)")
         else:
             print(f"⚠ Authorization endpoint performance needs improvement ({avg_time:.2f}ms)")
-        
+
         # Be more lenient for test environments
         assert avg_time < 200, f"Authorization endpoint should respond in under 200ms average (was {avg_time:.2f}ms)"
 
     @pytest.mark.asyncio
-    async def test_introspection_endpoint_performance(
-        self, test_server, initialize_authly: AuthlyResourceManager
-    ):
+    async def test_introspection_endpoint_performance(self, test_server, initialize_authly: AuthlyResourceManager):
         """Test introspection endpoint performance."""
         request_data = {
             "token": "test_token",
@@ -202,9 +197,7 @@ class TestLoadPerformance:
         print("✓ Introspection endpoint performance is excellent")
 
     @pytest.mark.asyncio
-    async def test_sustained_load(
-        self, test_server, initialize_authly: AuthlyResourceManager
-    ):
+    async def test_sustained_load(self, test_server, initialize_authly: AuthlyResourceManager):
         """Test system behavior under sustained load."""
         print("\nSustained Load Test:")
         print("Running 30-second sustained load test...")
@@ -276,9 +269,7 @@ class TestLoadPerformance:
             assert error_rate < 1, "Error rate should be less than 1%"
 
     @pytest.mark.asyncio
-    async def test_burst_load(
-        self, test_server, initialize_authly: AuthlyResourceManager
-    ):
+    async def test_burst_load(self, test_server, initialize_authly: AuthlyResourceManager):
         """Test system behavior under burst load."""
         print("\nBurst Load Test:")
 
@@ -337,9 +328,7 @@ class TestLoadPerformance:
             print(f"⚠ Some burst requests failed: {max_errors} errors")
 
     @pytest.mark.asyncio
-    async def test_memory_leak_detection(
-        self, test_server, initialize_authly: AuthlyResourceManager
-    ):
+    async def test_memory_leak_detection(self, test_server, initialize_authly: AuthlyResourceManager):
         """Basic memory leak detection test."""
         print("\nMemory Leak Detection Test:")
         print("Making repeated requests to check for memory leaks...")

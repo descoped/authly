@@ -69,18 +69,18 @@ class TestCommittedFixtures:
         """Test that fixtures are properly cleaned up after use."""
         # This test verifies that the committed user fixture is working
         # The fixture itself handles cleanup via its yield/finally block
-        
+
         # First verify the user exists during the test
         user_id = committed_user.id
-        
+
         async with db_pool.connection() as conn:
             user_repo = UserRepository(conn)
             fetched_user = await user_repo.get_by_id(user_id)
-            
+
             # User should exist during the test
             assert fetched_user is not None
             assert fetched_user.id == user_id
-            
+
         # Note: The actual cleanup happens after the test completes,
         # handled by the fixture's finally block. We can't directly test
         # the cleanup within the same test that uses the fixture.

@@ -10,6 +10,7 @@ from uuid import uuid4
 
 import pytest
 from fastapi import status
+
 from authly.core.resource_manager import AuthlyResourceManager
 
 
@@ -17,9 +18,7 @@ class TestRateLimiting:
     """Test rate limiting on OAuth endpoints."""
 
     @pytest.mark.asyncio
-    async def test_token_endpoint_rate_limit(
-        self, test_server, initialize_authly: AuthlyResourceManager
-    ):
+    async def test_token_endpoint_rate_limit(self, test_server, initialize_authly: AuthlyResourceManager):
         """Test rate limiting on the token endpoint."""
         # Invalid request to trigger rate limiting
         invalid_request = {
@@ -41,9 +40,7 @@ class TestRateLimiting:
                 data=invalid_request,
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
             )
-            responses.append(
-                {"status": response.status_code, "time": time.time() - start_time, "request_num": i + 1}
-            )
+            responses.append({"status": response.status_code, "time": time.time() - start_time, "request_num": i + 1})
 
             # Small delay to avoid overwhelming the test server
             await asyncio.sleep(0.01)
@@ -73,9 +70,7 @@ class TestRateLimiting:
             assert bad_requests == total_requests, "All requests should fail with bad request if no rate limiting"
 
     @pytest.mark.asyncio
-    async def test_authorization_endpoint_rate_limit(
-        self, test_server, initialize_authly: AuthlyResourceManager
-    ):
+    async def test_authorization_endpoint_rate_limit(self, test_server, initialize_authly: AuthlyResourceManager):
         """Test rate limiting on the authorization endpoint."""
         # Invalid authorization request
         invalid_params = {
@@ -113,11 +108,11 @@ class TestRateLimiting:
 
         # Analyze responses
         total_requests = len(responses)
-        
+
         print("\nAuthorization Endpoint Rate Limiting:")
         print(f"Total successful requests: {total_requests}")
         print(f"Connection errors: {connection_errors}")
-        
+
         if total_requests == 0:
             print("⚠ All requests failed with connection errors")
             if connection_errors > 0:
@@ -125,7 +120,7 @@ class TestRateLimiting:
         else:
             rate_limited = sum(1 for r in responses if r["status"] == status.HTTP_429_TOO_MANY_REQUESTS)
             errors = sum(1 for r in responses if r["status"] >= 400)
-            
+
             print(f"Rate limited (429): {rate_limited}")
             print(f"Error responses (4xx/5xx): {errors}")
 
@@ -135,9 +130,7 @@ class TestRateLimiting:
                 print("⚠ No rate limiting on authorization endpoint")
 
     @pytest.mark.asyncio
-    async def test_introspection_endpoint_rate_limit(
-        self, test_server, initialize_authly: AuthlyResourceManager
-    ):
+    async def test_introspection_endpoint_rate_limit(self, test_server, initialize_authly: AuthlyResourceManager):
         """Test rate limiting on the introspection endpoint."""
         # Request without authentication (will fail)
         invalid_request = {
@@ -155,9 +148,7 @@ class TestRateLimiting:
                 data=invalid_request,
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
             )
-            responses.append(
-                {"status": response.status_code, "time": time.time() - start_time, "request_num": i + 1}
-            )
+            responses.append({"status": response.status_code, "time": time.time() - start_time, "request_num": i + 1})
             await asyncio.sleep(0.01)
 
         # Analyze responses
@@ -180,9 +171,7 @@ class TestRateLimiting:
             assert unauthorized + ok_responses == total_requests
 
     @pytest.mark.asyncio
-    async def test_per_client_rate_limiting(
-        self, test_server, initialize_authly: AuthlyResourceManager
-    ):
+    async def test_per_client_rate_limiting(self, test_server, initialize_authly: AuthlyResourceManager):
         """Test if rate limiting is per-client or global."""
         # Simulate requests from different "clients"
         client_responses = {}
@@ -222,9 +211,7 @@ class TestRateLimiting:
             print("⚠ No rate limiting detected across multiple clients")
 
     @pytest.mark.asyncio
-    async def test_rate_limit_headers(
-        self, test_server, initialize_authly: AuthlyResourceManager
-    ):
+    async def test_rate_limit_headers(self, test_server, initialize_authly: AuthlyResourceManager):
         """Test if rate limit headers are included in responses."""
         response = await test_server.client.post(
             "/api/v1/oauth/token",

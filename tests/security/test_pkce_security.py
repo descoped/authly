@@ -7,29 +7,12 @@ Tests the implementation of PKCE to ensure it properly prevents authorization co
 import base64
 import hashlib
 import secrets
-from uuid import uuid4
 
 import pytest
-from fastapi import status
 from fastapi_testing import AsyncTestServer
 from psycopg_toolkit import TransactionManager
 
 from authly.core.resource_manager import AuthlyResourceManager
-from authly.oauth.authorization_code_repository import AuthorizationCodeRepository
-from authly.oauth.authorization_service import AuthorizationService
-from authly.oauth.client_repository import ClientRepository
-from authly.oauth.models import (
-    ClientType,
-    CodeChallengeMethod,
-    GrantType,
-    OAuthAuthorizationRequest,
-    ResponseType,
-    TokenEndpointAuthMethod,
-    UserConsentRequest,
-)
-from authly.oauth.scope_repository import ScopeRepository
-from authly.users import UserRepository
-from authly.users.service import UserService
 
 
 def generate_valid_pkce_pair():
@@ -48,7 +31,9 @@ class TestPKCESecurity:
     """Test PKCE security implementation."""
 
     @pytest.mark.asyncio
-    async def test_pkce_required_for_public_clients(self, test_server: AsyncTestServer, committed_public_client: dict) -> None:
+    async def test_pkce_required_for_public_clients(
+        self, test_server: AsyncTestServer, committed_public_client: dict
+    ) -> None:
         """Test that PKCE is required for public clients."""
         # Try authorization without PKCE
         response = await test_server.client.get(
@@ -83,7 +68,7 @@ class TestPKCESecurity:
             },
             follow_redirects=False,  # Don't follow redirects
         )
-        
+
         # Should reject invalid PKCE (redirect with error or 400/401/422)
         # 302 is valid as it redirects with an error parameter
         # The server is rejecting the short code challenge properly
@@ -95,20 +80,16 @@ class TestPKCESecurity:
         # Generate PKCE pair for legitimate flow
         correct_verifier, code_challenge = generate_valid_pkce_pair()
         wrong_verifier = base64.urlsafe_b64encode(secrets.token_bytes(32)).decode("utf-8").rstrip("=")
-        
+
         async with test_server.client as http_client:
             # Step 1: Login user to get access token
             login_response = await http_client.post(
                 "/api/v1/oauth/token",
-                data={
-                    "grant_type": "password", 
-                    "username": committed_user.username, 
-                    "password": "TestPassword123!"
-                },
+                data={"grant_type": "password", "username": committed_user.username, "password": "TestPassword123!"},
             )
             assert login_response.status_code == 200
             auth_token = (await login_response.json())["access_token"]
-            
+
             # Step 2: Get authorization code with legitimate PKCE challenge
             auth_params = {
                 "response_type": "code",
@@ -119,28 +100,27 @@ class TestPKCESecurity:
                 "scope": "read",
                 "state": "test_state",
             }
-            
+
             auth_response = await http_client.get(
-                "/api/v1/oauth/authorize", 
-                params=auth_params, 
-                headers={"Authorization": f"Bearer {auth_token}"}
+                "/api/v1/oauth/authorize", params=auth_params, headers={"Authorization": f"Bearer {auth_token}"}
             )
             assert auth_response.status_code == 200
-            
+
             # Submit consent
             consent_response = await http_client.post(
-                "/api/v1/oauth/authorize", 
+                "/api/v1/oauth/authorize",
                 data={**auth_params, "approved": "true"},
                 headers={"Authorization": f"Bearer {auth_token}"},
-                follow_redirects=False
+                follow_redirects=False,
             )
             assert consent_response.status_code == 302
-            
+
             # Extract authorization code
             from urllib.parse import parse_qs, urlparse
+
             location = consent_response._response.headers.get("location")
             auth_code = parse_qs(urlparse(location).query)["code"][0]
-            
+
             # Step 3: Try to exchange with WRONG verifier
             response = await http_client.post(
                 "/api/v1/oauth/token",
@@ -152,7 +132,7 @@ class TestPKCESecurity:
                     "code_verifier": wrong_verifier,  # Wrong verifier!
                 },
             )
-            
+
             # Should fail with invalid_grant or similar PKCE error
             assert response.status_code in [400, 401]
             error_data = await response.json()
@@ -166,22 +146,18 @@ class TestPKCESecurity:
         """Test that PKCE prevents authorization code interception attacks."""
         # This test simulates an attacker intercepting an authorization code
         # but not having the PKCE code verifier, which should prevent token exchange
-        
-        from urllib.parse import parse_qs, urlparse
-        import secrets
+
         import base64
-        
+        import secrets
+        from urllib.parse import parse_qs, urlparse
+
         legitimate_verifier, code_challenge = generate_valid_pkce_pair()
-        
+
         async with test_server.client as client:
             # Step 1: Legitimate flow - get auth token
             login_response = await client.post(
                 "/api/v1/oauth/token",
-                data={
-                    "grant_type": "password", 
-                    "username": committed_user.username, 
-                    "password": "TestPassword123!"
-                },
+                data={"grant_type": "password", "username": committed_user.username, "password": "TestPassword123!"},
             )
             assert login_response.status_code == 200
             auth_token = (await login_response.json())["access_token"]
@@ -196,22 +172,20 @@ class TestPKCESecurity:
                 "scope": "read",
                 "state": "legitimate_state",
             }
-            
+
             auth_response = await client.get(
-                "/api/v1/oauth/authorize", 
-                params=auth_params, 
-                headers={"Authorization": f"Bearer {auth_token}"}
+                "/api/v1/oauth/authorize", params=auth_params, headers={"Authorization": f"Bearer {auth_token}"}
             )
             assert auth_response.status_code == 200
-            
+
             consent_response = await client.post(
-                "/api/v1/oauth/authorize", 
+                "/api/v1/oauth/authorize",
                 data={**auth_params, "approved": "true"},
                 headers={"Authorization": f"Bearer {auth_token}"},
-                follow_redirects=False
+                follow_redirects=False,
             )
             assert consent_response.status_code == 302
-            
+
             # Extract authorization code (this is what attacker intercepts)
             location = consent_response._response.headers.get("location")
             auth_code = parse_qs(urlparse(location).query)["code"][0]
@@ -230,7 +204,7 @@ class TestPKCESecurity:
             assert response.status_code >= 400
             print("✓ Authorization code useless without PKCE verifier")
 
-            # ATTACK 2: Try with random verifier (should fail) 
+            # ATTACK 2: Try with random verifier (should fail)
             attacker_verifier = base64.urlsafe_b64encode(secrets.token_bytes(32)).decode("utf-8").rstrip("=")
             response = await client.post(
                 "/api/v1/oauth/token",
