@@ -265,11 +265,64 @@ grep -r "/users/me" tests/
 pytest -v --tb=short
 ```
 
+## Phase 5: TCK Conformance Validation (Priority 0) 🔴
+
+**Goal**: Run TCK conformance tests to identify any compliance gaps
+
+### Current TCK Status
+- **Overall Compliance**: Claims 100% (40/40 checks pass)
+- **Need to Verify**: Actual implementation against TCK suite
+- **Location**: `/tck/` directory with comprehensive test suite
+
+### TCK Conformance Test Plan
+
+1. **Run TCK Validation Suite**:
+   - [ ] Start Authly server (docker compose up)
+   - [ ] Run conformance validator (`cd tck && make validate`)
+   - [ ] Generate API conformance matrix (`make analyze`)
+   - [ ] Review specification conformance report
+
+2. **Analyze Results**:
+   - [ ] Check Discovery endpoint compliance (22 checks)
+   - [ ] Verify JWKS endpoint compliance (7 checks)
+   - [ ] Validate Endpoints compliance (6 checks)
+   - [ ] Confirm Security compliance (5 checks)
+
+3. **Document Findings**:
+   - [ ] Identify any failing conformance checks
+   - [ ] Create actionable items for each failure
+   - [ ] Prioritize fixes based on impact
+
+4. **Fix Compliance Issues**:
+   - [ ] Token endpoint error format (must include 'error' field)
+   - [ ] Authorization endpoint error handling (redirect vs 422)
+   - [ ] Any other issues found by TCK
+
+### TCK Test Categories
+
+| Category | Checks | Purpose |
+|----------|--------|---------|
+| Discovery | 22 | OIDC discovery metadata validation |
+| JWKS | 7 | Key format and structure validation |
+| Endpoints | 6 | Required endpoint availability |
+| Security | 5 | Security requirements compliance |
+
+### Expected Issues (from README)
+
+1. **Token Endpoint Error Format**:
+   - Problem: Missing 'error' field in JSON response
+   - Fix: Update `/api/v1/oauth/token` error responses
+
+2. **Authorization Endpoint Error Handling**:
+   - Problem: Returns 422 instead of redirecting with error
+   - Fix: Update `/api/v1/oauth/authorize` to redirect with `?error=invalid_request`
+
 ## Estimated Timeline
 
+- **Phase 5 (TCK)**: 1-2 hours (validation and analysis)
 - **Phase 1**: 2-4 hours (mostly integration work)
 - **Phase 2**: 1-2 hours (removal and cleanup)
 - **Phase 3**: 4-6 hours (new implementations)
 - **Phase 4**: 2-3 hours (testing and validation)
 
-**Total**: 9-15 hours of focused development
+**Total**: 10-17 hours of focused development
