@@ -31,7 +31,7 @@ jobs:
       # - Security requirements (PKCE, algorithms, etc.)
       
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       
       - name: Get Conformance Suite Latest Tag
         id: conformance-tag
@@ -58,7 +58,7 @@ jobs:
       
       - name: Checkout OIDC Conformance Suite
         if: steps.check-image.outputs.exists == 'false'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: openid-certification/conformance-suite
           path: tck/conformance-suite
@@ -92,7 +92,7 @@ jobs:
       
       - name: Build and Push Conformance Suite Image
         if: steps.check-image.outputs.exists == 'false'
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ./tck
           file: ./tck/conformance-suite-production/Dockerfile
@@ -106,7 +106,7 @@ jobs:
           cache-to: type=gha,mode=max
           
       - name: Checkout Conformance Suite Resources
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: openid-certification/conformance-suite
           path: tck/conformance-suite
