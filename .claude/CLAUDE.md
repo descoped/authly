@@ -6,6 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Authly** is an OAuth 2.1 and OpenID Connect authorization server in active development. It provides JWT-based authentication, admin API with two-layer security, user management, and PostgreSQL integration. The project aims for standards compliance but is currently a work in progress.
 
+**Version**: 1.0.0-dev  
+**Status**: Development/Testing - Not Production Certified  
+**Last Updated**: 2025-08-12
+
 ### Current Implementation Status
 
 **✅ IMPLEMENTED FEATURES:**
@@ -14,7 +18,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Admin API with two-layer security model (intrinsic authority + scoped permissions)
 - Bootstrap system solving IAM chicken-and-egg paradox
 - Admin CLI for OAuth client and scope management
-- Docker support for development and testing
+- Docker support for development and testing (standalone and compose modes)
 - JWT token management with revocation and rotation
 - User management with role-based access control
 - OpenID Connect (OIDC) Core 1.0 basic implementation
@@ -23,13 +27,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Security headers middleware
 - Prometheus metrics for monitoring
 - Docker standalone deployment with embedded PostgreSQL and Redis
+- OAuth 2.1 Compliance Testing Suite (browser-based)
+- OIDC Debugger Integration
 
 **⚠️ KNOWN LIMITATIONS:**
 - OIDC conformance: 100% specification compliance achieved (not officially certified)
-- UserInfo endpoint doesn't support POST method
+- UserInfo endpoint doesn't support POST method (GET only)
 - Not all OIDC test scenarios implemented
 - Performance optimization ongoing
 - Some edge cases in OAuth flows not fully tested
+- Rate limiting middleware in development
+- CORS configuration being refined
 
 **📝 WORK IN PROGRESS:**
 - Full OIDC certification compliance
@@ -38,6 +46,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - GDPR compliance features
 - Enterprise integrations
 - Comprehensive error handling improvements
+- OAuth 2.1 compliance tester enhancements
+- Browser-based login UI implementation
+- Rate limiting refinements
 
 ### Core Technologies
 - **Python 3.11+**: Modern async/await, type annotations, dataclasses
@@ -46,6 +57,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Pydantic v2**: Modern data validation with constraints and serialization
 - **UV**: Modern, fast Python package manager and dependency resolver
 - **JWT**: Token-based authentication with `python-jose` and JTI tracking
+- **Docker**: Multi-stage builds, compose orchestration, standalone images
+- **Redis**: Optional caching and session storage
+- **psycopg-toolkit**: Enhanced PostgreSQL operations (local development)
+- **fastapi-testing**: Async-first testing utilities (local development)
 
 ### Design Philosophy
 - **Package-by-Feature**: Each feature is self-contained with models, repository, and service
@@ -92,6 +107,8 @@ uv sync --all-groups -U
 pytest
 pytest tests/test_auth.py -v          # Run specific test file
 pytest tests/test_users.py -v         # Run user tests
+pytest tests/oauth_flows/ -v          # Run OAuth test suite
+pytest tests/oidc_features/ -v        # Run OIDC test suite
 
 > Note: Run `source .venv/bin/activate` to use `pytest` directly, otherwise use `uv run pytest`
 
@@ -102,6 +119,12 @@ uv run ruff check --fix .             # Auto-fix linting issues
 
 # Build and distribution
 uv build                              # Build package
+
+# Docker operations
+make build                            # Build Docker images
+make start                            # Start all services
+make stop                             # Stop all services
+make test                             # Run compliance test suite
 ```
 
 ### Database Setup
@@ -114,10 +137,11 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 - Uses pytest with asyncio support for async testing
 - Testcontainers for PostgreSQL integration tests
 - Real database transaction testing (no mocking)
-- Run API tests with: `./examples/api-test.sh`
+- Run API tests with: `./scripts/run-integration-tests.sh`
 - Comprehensive test suite organized by feature domains
+- Browser-based compliance testing at http://localhost:8080
 
-**Current Test Status**: Tests generally pass but coverage for edge cases and error scenarios needs improvement
+**Current Test Status**: Core tests passing, ongoing work on edge cases and browser compliance
 
 ## Architecture Overview
 
@@ -184,34 +208,68 @@ Core tables: users, clients, scopes, authorization_codes, tokens, jwks_keys, use
 ### Folder Structure and Purposes
 
 **📁 `.claude/`** - **Permanent Institutional Memory**
-- Project memory, architecture documentation, and development history
+- `CLAUDE.md` - This file, primary project memory
+- `architecture.md` - System architecture documentation
+- `implementation-status.md` - Current development status
+- `codebase-structure.md` - Detailed project structure
+- `external-libraries.md` - psycopg-toolkit and fastapi-testing docs
+- `capabilities.md` - AI assistant configuration
+- `task-management.md` - TodoWrite patterns
+- `psycopg3-transaction-patterns.md` - Database patterns
+- `evolution/` - Historical implementation journey
+- `roadmap/` - Future development plans
+- `instructions/` - Development practices and rules
 - NEVER REMOVE - Contains project knowledge and context
 
-**📁 `src/`** - **Source Code**
+**📁 `src/authly/`** - **Source Code**
 - OAuth 2.1 + OIDC authorization server implementation
 - Package-by-feature architecture
+- Admin CLI and API implementation
+- Authentication and token management
 
 **📁 `tests/`** - **Test Suite**
-- Organized by feature domains
-- Real database integration tests
+- `oauth_flows/` - OAuth 2.1 test suite
+- `oidc_features/` - OIDC test suite
+- `admin_portal/` - Admin interface tests
+- `auth_user_journey/` - User authentication tests
+- `infrastructure/` - Core infrastructure tests
+- Real database integration tests (no mocking)
 
 **📁 `docs/`** - **User Documentation**
 - API references, implementation guides
 - Deployment and security documentation
 - Docker standalone image guide (`docker-standalone.md`)
+- Architecture patterns and quick reference
+
+**📁 `docker-standalone/`** - **Docker Infrastructure**
+- `authly-compliance-tester/` - Browser-based OAuth/OIDC tester
+- `oidc-debugger/` - OIDC debugging interface
+- Standalone deployment configurations
 
 **📁 `tck/`** - **Test Conformance Kit**
 - OIDC/OAuth conformance testing
 - Currently achieves 100% spec compliance (40/40 checks)
+
+**📁 `ai_docs/`** - **AI Development Documentation**
+- `TODO.md` - Current tasks and priorities
+- Implementation status tracking
+- Phase planning documents
+
+**📁 `scripts/`** - **Automation Scripts**
+- Integration test runners
+- Setup and deployment scripts
+- Development utilities
 
 ## Development Status Summary
 
 **This is a work-in-progress authorization server:**
 - ✅ Core OAuth 2.1 features work with compliant error handling
 - ✅ OIDC implementation with 100% conformance (40/40 checks)
+- ✅ Browser-based compliance testing suite available
+- ✅ Docker standalone deployment with embedded dependencies
 - ⚠️ Not ready for production use without thorough testing
 - ⚠️ Not officially OIDC certified (but 100% compliant)
-- 🚧 Active development ongoing
+- 🚧 Active development ongoing on `feature/odic-debugger` branch
 
 **Recommended Use Cases:**
 - Development and testing environments
@@ -233,5 +291,46 @@ When working on this codebase:
 4. Don't claim compliance without verification
 5. Follow existing patterns and conventions
 6. Update documentation to reflect reality
+7. **Follow development practices**: See `.claude/instructions/authly-development-practices.md` for detailed rules
+
+**Key Development Rules:**
+- Always use committed fixtures for HTTP tests (no transactions)
+- No mocking frameworks - real integration testing only
+- Package-by-feature organization for tests
+- Always run pytest after code changes
+- Use dependency injection patterns
 
 Remember: The source code is the truth. Make claims only about what is actually implemented and tested.
+
+## Quick Reference - Important Files
+
+### Memory System (.claude/)
+- **Primary**: `.claude/CLAUDE.md` - This file
+- **Architecture**: `.claude/architecture.md` - System design
+- **Status**: `.claude/implementation-status.md` - Current progress
+- **Structure**: `.claude/codebase-structure.md` - Project layout
+- **Libraries**: `.claude/external-libraries.md` - psycopg-toolkit & fastapi-testing
+- **Practices**: `.claude/instructions/authly-development-practices.md` - Development rules
+
+### Current Work
+- **Tasks**: `ai_docs/TODO.md` - Current priorities
+- **Branch**: `feature/odic-debugger` - Active development branch
+
+### Key Source Files
+- **App Entry**: `src/authly/__main__.py` - CLI entry point
+- **FastAPI App**: `src/authly/app.py` - Application factory
+- **OAuth Router**: `src/authly/api/oauth_router.py` - OAuth endpoints
+- **OIDC Router**: `src/authly/api/oidc_router.py` - OIDC endpoints
+- **Admin CLI**: `src/authly/admin/cli.py` - Admin commands
+
+### Testing
+- **OAuth Tests**: `tests/oauth_flows/` - OAuth 2.1 test suite
+- **OIDC Tests**: `tests/oidc_features/` - OIDC test suite
+- **Fixtures**: `tests/fixtures/committed_data.py` - Test data fixtures
+- **Lifespan**: `tests/fixtures/testing/lifespan.py` - Dependency overrides
+
+### Docker & Tools
+- **Compliance Tester**: `docker-standalone/authly-compliance-tester/` - Browser testing
+- **OIDC Debugger**: `docker-standalone/oidc-debugger/` - OIDC debugging
+- **Integration Tests**: `scripts/integration-tests/` - Test runners
+- **Makefile**: Root directory - Docker orchestration

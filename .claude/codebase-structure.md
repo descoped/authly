@@ -1,9 +1,9 @@
 # Authly Codebase Structure - Current State
 
-**Last Updated**: August 6, 2025  
-**Project Status**: Enterprise Production Ready  
-**Test Status**: 708 tests passing (100% success rate) organized in 7 feature domains  
-**Implementation**: Complete OAuth 2.1 + OpenID Connect Core 1.0 + Session Management 1.0 authorization server with enterprise enhancements
+**Last Updated**: August 12, 2025  
+**Project Status**: Development/Testing - Not Production Certified  
+**Test Status**: 49 test files across 11 test directories  
+**Implementation**: OAuth 2.1 + OpenID Connect Core 1.0 authorization server in active development
 
 ---
 
@@ -21,7 +21,7 @@ authly/
 ├── examples/                   # Usage examples (admin API client, Bruno collections)
 ├── scripts/                    # Integration tests and utility scripts
 ├── src/authly/                 # Main application source code
-├── tests/                      # Comprehensive test suite (708 tests across 56 files in 7 domains)
+├── tests/                      # Comprehensive test suite (49 test files across 11 directories)
 ├── .gitignore                  # Git ignore patterns
 ├── .python-version             # Python version specification
 ├── CHANGELOG.md                # Complete implementation changelog
@@ -242,7 +242,7 @@ tests/
 │       ├── postgres.py         # Testcontainers PostgreSQL integration
 │       └── lifespan.py         # Application lifecycle management
 ├── README.md                   # Test organization and running guide
-├── auth_user_journey/          # Core authentication lifecycle (8 test files)
+├── auth_user_journey/          # Core authentication lifecycle
 │   ├── test_auth_api.py
 │   ├── test_users_api.py
 │   ├── test_users_repository.py
@@ -251,50 +251,45 @@ tests/
 │   ├── test_verify_password_hash.py
 │   ├── test_token_revocation.py
 │   └── test_tokens.py
-├── oauth_flows/                # OAuth 2.1 implementation (7 test files)
+├── oauth_flows/                # OAuth 2.1 implementation (10 test files)
 │   ├── test_oauth_authorization.py
 │   ├── test_oauth_token_flow.py
 │   ├── test_oauth_discovery.py
 │   ├── test_oauth_dependencies.py
-│   ├── test_oauth_repositories.py
-│   ├── test_oauth_services.py
-│   └── test_oauth_templates.py
-├── oidc_features/              # OIDC-specific functionality (7 test files)
-│   ├── test_oidc_discovery.py
-│   ├── test_oidc_id_token.py
-│   ├── test_oidc_jwks.py
-│   ├── test_oidc_logout.py
-│   ├── test_oidc_scopes.py
-│   ├── test_oidc_session_management.py
-│   └── test_oidc_userinfo.py
-├── oidc_scenarios/             # End-to-end OIDC flows (8 test files)
-│   ├── test_oidc_authorization.py
-│   ├── test_oidc_basic_integration.py
-│   ├── test_oidc_client_management.py
-│   ├── test_oidc_complete_flows.py
-│   ├── test_oidc_compliance_features.py
-│   ├── test_oidc_comprehensive_flows.py
-│   ├── test_oidc_integration_flows.py
-│   └── test_oidc_integration_flows_simple.py
-├── admin_portal/               # Admin interface (10 test files)
+│   ├── test_oauth_templates.py
+│   ├── test_oauth_introspection.py
+│   ├── test_client_credentials_flow.py
+│   ├── test_complete_auth_flows.py
+│   ├── test_pkce_compliance.py
+│   └── test_state_parameter.py
+├── oidc_features/              # OIDC-specific functionality (1 test file)
+│   └── test_oidc_compliance.py
+├── oidc_scenarios/             # End-to-end OIDC flows (1 test file)
+│   └── test_oidc_client_management.py
+├── admin_portal/               # Admin interface (4 test files)
 │   ├── test_admin_api.py
-│   ├── test_admin_bootstrap.py
-│   ├── test_admin_dependencies.py
-│   ├── test_admin_middleware.py
-│   ├── test_admin_cache.py
-│   ├── test_admin_error_handling.py
-│   ├── test_admin_session_management.py
-│   ├── test_admin_cli.py
 │   ├── test_admin_api_client.py
-│   └── test_admin_api_client_integration.py
-├── admin_user_management/      # Admin user operations (7 test files)
-│   ├── test_admin_user_listing.py
-│   ├── test_admin_user_create.py
-│   ├── test_admin_user_details.py
-│   ├── test_admin_user_update.py
-│   ├── test_admin_user_delete.py
-│   ├── test_admin_password_reset.py
-│   └── test_admin_service_enhancements.py
+│   ├── test_admin_cli.py
+│   └── test_admin_session_management.py
+├── admin_user_management/      # Admin user operations (1 test file)
+│   └── test_admin_user_crud.py
+├── authentication/             # Authentication system tests (6 test files)
+│   ├── test_browser_login.py
+│   ├── test_models.py
+│   ├── test_repository.py
+│   ├── test_router.py
+│   ├── test_service.py
+│   └── test_session_management.py
+├── security/                   # Security tests (3 test files)
+│   ├── test_jwt_security.py
+│   ├── test_pkce_security.py
+│   └── test_sql_injection.py
+├── performance/                # Performance tests (3 test files)
+│   ├── test_concurrent_requests.py
+│   ├── test_load_performance.py
+│   └── test_rate_limiting.py
+├── tck/                        # TCK conformance tests (1 test file)
+│   └── test_conformance_fixes.py
 └── infrastructure/             # Core framework tests (9 test files)
     ├── test_main_app.py
     ├── test_api.py
@@ -308,8 +303,8 @@ tests/
 ```
 
 **Test Metrics**:
-- **✅ Total Tests**: 708 tests (100% passing)
-- **✅ Test Organization**: 56 test files in 7 feature domains
+- **✅ Total Test Files**: 49 test files
+- **✅ Test Organization**: 11 test directories by feature/domain
 - **✅ Real Integration**: PostgreSQL testcontainers, no mocking
 - **✅ Comprehensive Coverage**: All OAuth 2.1 + OIDC 1.0 + Session Management 1.0
 - **✅ Security Testing**: Authentication, authorization, validation
@@ -349,7 +344,7 @@ docs/
 ```
 .claude/
 ├── CLAUDE.md                   # Primary entry point - project memory (21KB)
-├── implementation-status.md    # Current status, 708 tests, completions (17KB)
+├── implementation-status.md    # Current development status and progress (17KB)
 ├── architecture.md             # System architecture and patterns (31KB)
 ├── codebase-structure.md       # This document - project structure (20KB)
 ├── external-libraries.md       # psycopg-toolkit, fastapi-testing (27KB)
@@ -445,4 +440,4 @@ audit_logs                      # Administrative action logging and compliance
 
 ---
 
-This comprehensive codebase structure document reflects the current state of Authly as an enterprise production-ready OAuth 2.1 + OpenID Connect 1.0 + Session Management 1.0 authorization server with 708 tests passing (organized in 7 feature domains), complete documentation (20 guides), and enterprise features including Redis integration, structured logging, Prometheus metrics, and query optimization.
+This comprehensive codebase structure document reflects the current state of Authly as an OAuth 2.1 + OpenID Connect 1.0 authorization server in active development with 49 test files across 11 test directories, comprehensive documentation (20+ guides), and features including Redis integration, structured logging, Prometheus metrics, and Docker deployment options.
