@@ -282,7 +282,17 @@ class TestBrowserLoginSession:
 
         async with test_server.client as client:
             # Step 1: Try to access OAuth authorize endpoint (should redirect to login)
-            oauth_url = f"/api/v1/oauth/authorize?client_id={client_id}&response_type=code&redirect_uri=http://localhost/callback&code_challenge=test&code_challenge_method=S256"
+            import base64
+            import hashlib
+            import secrets
+
+            # Generate proper PKCE code challenge
+            code_verifier = base64.urlsafe_b64encode(secrets.token_bytes(32)).decode("utf-8").rstrip("=")
+            code_challenge = (
+                base64.urlsafe_b64encode(hashlib.sha256(code_verifier.encode()).digest()).decode("utf-8").rstrip("=")
+            )
+
+            oauth_url = f"/api/v1/oauth/authorize?client_id={client_id}&response_type=code&redirect_uri=http://localhost/callback&code_challenge={code_challenge}&code_challenge_method=S256&state=test_state_123"
 
             auth_response = await client.get(oauth_url, follow_redirects=False)
 

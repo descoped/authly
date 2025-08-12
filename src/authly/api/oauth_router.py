@@ -21,7 +21,6 @@ from authly.api.auth_dependencies import (
     get_client_repository,
     get_config,
     get_database_connection,
-    get_rate_limiter,
     get_scope_repository,
     get_token_service_with_client,
 )
@@ -336,6 +335,36 @@ async def authorize_get(
             status_code=400,
         )
 
+    # State parameter is required for CSRF protection (OAuth 2.1)
+    if not state or state.strip() == "":
+        return JSONResponse(
+            content={
+                "error": "invalid_request",
+                "error_description": "state parameter is required for CSRF protection",
+            },
+            status_code=400,
+        )
+
+    # Validate state parameter length (prevent abuse)
+    if len(state) > 2000:
+        return JSONResponse(
+            content={
+                "error": "invalid_request",
+                "error_description": "state parameter is too long (max 2000 characters)",
+            },
+            status_code=400,
+        )
+
+    # OAuth 2.1 requires S256 only - reject plain method explicitly
+    if code_challenge_method and code_challenge_method != "S256":
+        return JSONResponse(
+            content={
+                "error": "invalid_request",
+                "error_description": "Only S256 PKCE challenge method is allowed (OAuth 2.1 requirement)",
+            },
+            status_code=400,
+        )
+
     if response_type != "code":
         # Only authorization code flow is supported
         return JSONResponse(
@@ -344,6 +373,37 @@ async def authorize_get(
                 "error_description": "Only 'code' response type is supported",
             },
             status_code=400,
+        )
+
+    # CRITICAL: Validate client and redirect URI BEFORE redirecting anywhere
+    logger.info(f"[VALIDATION] Validating client_id={client_id}, redirect_uri={redirect_uri}")
+    try:
+        client = await authorization_service.client_repo.get_by_client_id(client_id)
+        logger.info(f"[VALIDATION] Client lookup result: {client is not None}")
+        if not client:
+            logger.warning(f"[VALIDATION] Client '{client_id}' not found - returning 400")
+            return JSONResponse(
+                content={"error": "invalid_client", "error_description": f"Client '{client_id}' not found"},
+                status_code=400,
+            )
+
+        # Validate redirect URI with exact matching (OAuth 2.1 requirement)
+        redirect_allowed = client.is_redirect_uri_allowed(redirect_uri)
+        logger.info(f"[VALIDATION] Redirect URI allowed: {redirect_allowed}")
+        if not redirect_allowed:
+            logger.warning(
+                f"[VALIDATION] Invalid redirect_uri '{redirect_uri}' for client '{client_id}' - returning 400"
+            )
+            return JSONResponse(
+                content={"error": "invalid_request", "error_description": "Invalid redirect_uri for this client"},
+                status_code=400,
+            )
+        logger.info("[VALIDATION] Client and redirect URI validation passed")
+    except Exception as e:
+        logger.error(f"[VALIDATION] Client validation error: {e}")
+        return JSONResponse(
+            content={"error": "server_error", "error_description": "Unable to validate client"},
+            status_code=500,
         )
 
     # NOW check authentication manually after parameter validation
@@ -470,7 +530,7 @@ async def authorize_post(
     client_id: str = Form(...),
     redirect_uri: str = Form(...),
     scope: str | None = Form(None),
-    state: str | None = Form(None),
+    state: str = Form(...),  # Required for CSRF protection (OAuth 2.1)
     code_challenge: str = Form(...),
     code_challenge_method: str = Form("S256"),
     approved: str = Form(...),  # "true" or "false"
@@ -497,6 +557,36 @@ async def authorize_post(
         # PKCE is required for OAuth 2.1
         return JSONResponse(
             content={"error": "invalid_request", "error_description": "code_challenge is required (PKCE)"},
+            status_code=400,
+        )
+
+    # State parameter is required for CSRF protection (OAuth 2.1)
+    if not state or state.strip() == "":
+        return JSONResponse(
+            content={
+                "error": "invalid_request",
+                "error_description": "state parameter is required for CSRF protection",
+            },
+            status_code=400,
+        )
+
+    # Validate state parameter length (prevent abuse)
+    if len(state) > 2000:
+        return JSONResponse(
+            content={
+                "error": "invalid_request",
+                "error_description": "state parameter is too long (max 2000 characters)",
+            },
+            status_code=400,
+        )
+
+    # OAuth 2.1 requires S256 only - reject plain method explicitly
+    if code_challenge_method and code_challenge_method != "S256":
+        return JSONResponse(
+            content={
+                "error": "invalid_request",
+                "error_description": "Only S256 PKCE challenge method is allowed (OAuth 2.1 requirement)",
+            },
             status_code=400,
         )
 
@@ -612,7 +702,6 @@ async def get_access_token(
     authorization_service: AuthorizationService = Depends(get_authorization_service),
     client_repo: ClientRepository = Depends(get_client_repository),
     scope_repo: ScopeRepository = Depends(get_scope_repository),
-    rate_limiter=Depends(get_rate_limiter),
 ):
     """
     OAuth 2.1 Token Endpoint - supports multiple grant types.
@@ -647,7 +736,7 @@ async def get_access_token(
     )
 
     if request.grant_type == "password":
-        return await _handle_password_grant(request, user_repo, token_service, rate_limiter, login_tracker)
+        return await _handle_password_grant(request, user_repo, token_service, login_tracker)
     elif request.grant_type == "authorization_code":
         return await _handle_authorization_code_grant(request, user_repo, token_service, authorization_service)
     elif request.grant_type == "refresh_token":
@@ -666,7 +755,6 @@ async def _handle_password_grant(
     request: TokenRequest,
     user_repo: UserRepository,
     token_service: TokenService,
-    rate_limiter,
     login_tracker: LoginAttemptTracker,
 ) -> TokenResponse:
     """Handle password grant type (existing functionality)."""
@@ -680,9 +768,6 @@ async def _handle_password_grant(
         if METRICS_ENABLED and metrics:
             metrics.track_oauth_token_request("password", "unknown", "validation_error", 0.0)
         return oauth_error_response("invalid_request", "Username and password are required for password grant")
-
-    # Rate limiting check
-    await rate_limiter.check_rate_limit(f"login:{request.username}")
 
     # Check login attempts
     if not login_tracker.check_and_update(request.username):

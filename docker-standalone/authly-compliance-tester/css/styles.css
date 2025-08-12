@@ -379,6 +379,17 @@ body {
     color: white;
 }
 
+/* Log Entry Types */
+.log-entry.debug {
+    color: #6b7280;
+    font-size: 0.9em;
+}
+
+.log-entry.warning {
+    color: var(--warning);
+    font-weight: 500;
+}
+
 /* Execution Panel */
 .execution-panel {
     position: fixed;
@@ -527,6 +538,34 @@ body {
 .badge-success {
     background: rgba(16, 185, 129, 0.1);
     color: var(--success);
+}
+
+/* Input with icon */
+.input-with-icon {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.input-with-icon input {
+    width: 100%;
+    padding-right: 40px;
+}
+
+.input-icon {
+    position: absolute;
+    right: 5px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 5px;
+    font-size: 1.2em;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.input-icon:hover {
+    opacity: 1;
 }
 
 /* Modal */

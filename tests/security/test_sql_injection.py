@@ -88,7 +88,7 @@ class TestSQLInjectionPrevention:
                     headers={"Content-Type": "application/x-www-form-urlencoded"},
                 )
 
-                assert response.status_code in [400, 401, 404]
+                assert response.status_code in [400, 401, 404, 429]  # 429 = rate limited
 
                 # Test refresh token grant
                 response = await client.post(
@@ -101,7 +101,7 @@ class TestSQLInjectionPrevention:
                     headers={"Content-Type": "application/x-www-form-urlencoded"},
                 )
 
-                assert response.status_code in [400, 401, 404]
+                assert response.status_code in [400, 401, 404, 429]  # 429 = rate limited
 
                 # Test client credentials grant
                 response = await client.post(
@@ -115,7 +115,7 @@ class TestSQLInjectionPrevention:
                     headers={"Content-Type": "application/x-www-form-urlencoded"},
                 )
 
-                assert response.status_code in [400, 401, 404]
+                assert response.status_code in [400, 401, 404, 429]  # 429 = rate limited
 
             print("✓ Token endpoint protected against SQL injection")
 

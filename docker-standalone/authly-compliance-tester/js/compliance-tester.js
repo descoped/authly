@@ -7,14 +7,14 @@ class ComplianceTester {
     constructor() {
         this.config = {
             serverUrl: 'http://localhost:8000',
-            clientId: 'test_client',
-            clientSecret: 'test_secret',
+            clientId: '',  // No default client - will be created via API
+            clientSecret: '',
             redirectUri: `http://${window.location.hostname}:${window.location.port || '8080'}/callback`,
             scopes: 'openid profile email',
             testUsername: 'testuser',
             testPassword: 'TestPassword123!',
-            adminClientId: 'admin_client',
-            adminClientSecret: 'admin_secret'
+            adminClientId: '',  // Not used anymore
+            adminClientSecret: ''  // Not used anymore
         };
         
         this.currentTestSuite = null;
@@ -23,12 +23,22 @@ class ComplianceTester {
         this.isPaused = false;
         this.totalTests = 0;
         this.completedTests = 0;
+        this.initComplete = false;  // Track initialization status
         
         // Initialize modules
         this.apiDiscovery = new APIDiscovery();
         this.adminTester = null;
         this.performanceTester = null;
         this.dynamicSuites = [];
+        
+        // Initialize enhanced logger
+        this.logger = new Logger(document.getElementById('executionLog'));
+        this.logger.configure({
+            logLevel: 'info',
+            showSuccesses: false,
+            maxHttpBodyLength: 200,
+            maxHttpHeadersCount: 3
+        });
         
         this.init();
     }
@@ -37,15 +47,58 @@ class ComplianceTester {
         this.loadConfig();
         this.attachEventListeners();
         this.handleCallbackIfPresent();
+        
+        // Initialize admin client
+        this.adminClient = new AdminClient(this.config, this);
+        
+        // Try to load test client from bootstrap
+        const testClient = await this.adminClient.loadTestClient();
+        if (testClient && testClient.client_id) {
+            this.config.clientId = testClient.client_id;
+            this.config.clientSecret = ''; // Public client has no secret
+            this.updateConfigUI();
+            this.addLog(`Loaded test client: ${testClient.client_id}`, 'success');
+        } else if (!this.config.clientId) {
+            this.addLog('No OAuth client configured yet', 'info');
+            this.addLog('Click the "Client Info" button to create one via API', 'info');
+        }
+        
         await this.loadDiscovery();
+        
+        // Mark initialization as complete
+        this.initComplete = true;
+    }
+    
+    /**
+     * Show current client info and optionally create new client via API
+     */
+    async createNewClient() {
+        this.showExecutionPanel();
+        
+        // Show current client info
+        await this.adminClient.showClientInfo();
+        
+        
+        this.showNotification('Client info displayed in logs', 'info');
     }
     
     loadConfig() {
+        // Check localStorage for saved config
         const savedConfig = localStorage.getItem('authly_compliance_config');
         if (savedConfig) {
-            this.config = { ...this.config, ...JSON.parse(savedConfig) };
-            this.updateConfigUI();
+            const parsed = JSON.parse(savedConfig);
+            // Only use saved config if it has a VALID client ID
+            // Clear empty or invalid client IDs
+            if (parsed.clientId && parsed.clientId !== 'test_client' && parsed.clientId !== '') {
+                this.config = { ...this.config, ...parsed };
+            } else {
+                // Clear invalid config
+                localStorage.removeItem('authly_compliance_config');
+            }
         }
+        
+        // No logging about auto-configured clients - we create them via API
+        this.updateConfigUI();
     }
     
     saveConfig() {
@@ -255,6 +308,35 @@ class ComplianceTester {
             return;
         }
         
+        // Wait for initialization to complete
+        if (!this.initComplete) {
+            this.addLog('Waiting for initialization to complete...', 'info');
+            // Wait up to 5 seconds for init
+            for (let i = 0; i < 50; i++) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+                if (this.initComplete) break;
+            }
+            if (!this.initComplete) {
+                this.showNotification('Initialization timeout. Please refresh the page.', 'error');
+                return;
+            }
+        }
+        
+        // Ensure client is loaded before running tests
+        if (!this.config.clientId) {
+            this.addLog('Loading test client before running tests...', 'info');
+            const testClient = await this.adminClient.loadTestClient();
+            if (testClient && testClient.client_id) {
+                this.config.clientId = testClient.client_id;
+                this.config.clientSecret = ''; // Public client has no secret
+                this.updateConfigUI();
+                this.addLog(`Test client loaded: ${testClient.client_id}`, 'success');
+            } else {
+                this.showNotification('No test client available. Please create one first.', 'error');
+                return;
+            }
+        }
+        
         // Clear ALL previous results
         this.clearResults();
         
@@ -308,6 +390,7 @@ class ComplianceTester {
      */
     async runTest(test) {
         this.addLog(`Running: ${test.name}`, 'info');
+        this.addLog(`  Description: ${test.description || 'No description'}`, 'debug');
         
         const startTime = Date.now();
         const result = {
@@ -327,10 +410,20 @@ class ComplianceTester {
         
         // Capture debug info during test execution
         const originalMakeRequest = this.makeRequest.bind(this);
+        const originalAddLog = this.addLog.bind(this);
+        
+        // Override addLog to capture test-specific logs
+        this.addLog = (message, type = 'info') => {
+            originalAddLog(message, type);
+            result.debug.logs.push({ message, type, timestamp: new Date().toISOString() });
+        };
+        
         this.makeRequest = async (url, options = {}) => {
+            const fullUrl = this.getFullUrl(url);
             const debugEntry = {
                 timestamp: new Date().toISOString(),
                 url: url,
+                fullUrl: fullUrl,
                 method: options.method || 'GET',
                 headers: options.headers || {},
                 body: options.body || null
@@ -338,16 +431,67 @@ class ComplianceTester {
             
             result.debug.requests.push(debugEntry);
             
+            // Log request details
+            this.addLog(`  → ${debugEntry.method} ${url}`, 'debug');
+            if (Object.keys(debugEntry.headers).length > 0) {
+                this.addLog(`    Headers: ${JSON.stringify(debugEntry.headers)}`, 'debug');
+            }
+            if (debugEntry.body) {
+                const bodyPreview = typeof debugEntry.body === 'string' 
+                    ? debugEntry.body.substring(0, 200) 
+                    : JSON.stringify(debugEntry.body).substring(0, 200);
+                this.addLog(`    Body: ${bodyPreview}${bodyPreview.length >= 200 ? '...' : ''}`, 'debug');
+            }
+            
             const response = await originalMakeRequest(url, options);
             
-            result.debug.responses.push({
+            const responseDebug = {
                 timestamp: new Date().toISOString(),
                 url: url,
                 status: response.response?.status || 0,
+                statusText: response.response?.statusText || '',
                 headers: response.response?.headers ? Object.fromEntries(response.response.headers.entries()) : {},
                 data: response.data,
                 error: response.error
-            });
+            };
+            
+            result.debug.responses.push(responseDebug);
+            
+            // Log response details
+            if (response.error) {
+                this.addLog(`  ← Error: ${response.error}`, 'error');
+            } else {
+                this.addLog(`  ← Status: ${responseDebug.status} ${responseDebug.statusText}`, 
+                    responseDebug.status >= 400 ? 'warning' : 'debug');
+                
+                // Log important headers
+                const importantHeaders = ['content-type', 'location', 'x-ratelimit-limit', 'retry-after', 
+                                        'access-control-allow-origin', 'set-cookie'];
+                const relevantHeaders = {};
+                importantHeaders.forEach(header => {
+                    if (responseDebug.headers[header]) {
+                        relevantHeaders[header] = responseDebug.headers[header];
+                    }
+                });
+                if (Object.keys(relevantHeaders).length > 0) {
+                    this.addLog(`    Headers: ${JSON.stringify(relevantHeaders)}`, 'debug');
+                }
+                
+                // Log response data
+                if (responseDebug.data) {
+                    if (typeof responseDebug.data === 'object') {
+                        if (responseDebug.data.error) {
+                            this.addLog(`    Error: ${responseDebug.data.error} - ${responseDebug.data.error_description || ''}`, 'warning');
+                        } else {
+                            const dataPreview = JSON.stringify(responseDebug.data, null, 2).substring(0, 300);
+                            this.addLog(`    Data: ${dataPreview}${dataPreview.length >= 300 ? '...' : ''}`, 'debug');
+                        }
+                    } else {
+                        const dataPreview = String(responseDebug.data).substring(0, 200);
+                        this.addLog(`    Data: ${dataPreview}${dataPreview.length >= 200 ? '...' : ''}`, 'debug');
+                    }
+                }
+            }
             
             return response;
         };
@@ -359,23 +503,49 @@ class ComplianceTester {
             result.details = testResult.details || {};
             result.error = testResult.error || null;
             
-            if (testResult.passed) {
-                this.addLog(`✅ ${test.name}`, 'success');
-            } else {
-                this.addLog(`❌ ${test.name}: ${testResult.error}`, 'error');
-            }
+            // Use enhanced test logging
+            const testDuration = Date.now() - testStartTime;
+            const testStatus = testResult.passed ? 'passed' : 'failed';
+            
+            this.logger.logTest(test.name, testStatus, {
+                duration: testDuration,
+                error: testResult.error,
+                details: testResult.details,
+                endpoint: test.endpoint,
+                suggestion: this.getTestSuggestion(test.name, testResult)
+            });
         } catch (error) {
             result.status = 'failed';
             result.error = error.message;
             result.debug.logs.push(`Exception: ${error.stack || error.message}`);
-            this.addLog(`❌ ${test.name}: ${error.message}`, 'error');
+            
+            this.logger.logTest(test.name, 'failed', {
+                duration: Date.now() - testStartTime,
+                error: error.message,
+                details: { exception: error.stack },
+                endpoint: test.endpoint
+            });
         } finally {
-            // Restore original makeRequest
+            // Restore original methods
             this.makeRequest = originalMakeRequest;
+            this.addLog = originalAddLog;
         }
         
         result.duration = Date.now() - startTime;
         this.addTestResult(result);
+    }
+    
+    /**
+     * Get full URL for logging
+     */
+    getFullUrl(url) {
+        if (url.startsWith('http')) {
+            return url;
+        } else if (url.startsWith('/authly-api')) {
+            return `${this.config.serverUrl}${url.replace('/authly-api', '')}`;
+        } else {
+            return `${this.config.serverUrl}${url}`;
+        }
     }
     
     completeTestSuite() {
@@ -388,8 +558,10 @@ class ComplianceTester {
         const failed = this.testResults.filter(r => r.status === 'failed').length;
         const total = this.testResults.length;
         
-        this.addLog(`Test suite completed: ${passed}/${total} passed`, 
-            failed === 0 ? 'success' : 'warning');
+        // Generate comprehensive test summary
+        const summary = this.logger.generateTestSummary(this.config);
+        this.logger.section('Test Results Summary');
+        this.logger.log(summary, 'summary');
     }
     
     addTestResult(result) {
@@ -567,12 +739,30 @@ class ComplianceTester {
     }
     
     addLog(message, type = 'info') {
-        const logContainer = document.getElementById('executionLog');
-        const logEntry = document.createElement('div');
-        logEntry.className = `log-entry ${type}`;
-        logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
-        logContainer.appendChild(logEntry);
-        logContainer.scrollTop = logContainer.scrollHeight;
+        // Delegate to enhanced logger
+        return this.logger.log(message, type);
+    }
+    
+    /**
+     * Get test-specific suggestion for failures
+     */
+    getTestSuggestion(testName, testResult) {
+        const suggestions = {
+            'State Parameter Preserved': 'Ensure state parameter is passed through authorization flow',
+            'PKCE is Mandatory': 'Add PKCE requirement validation to authorization endpoint',
+            'Only S256 Method Allowed': 'Reject plain PKCE method, only allow S256',
+            'Rate Limiting': 'Implement rate limiting middleware with appropriate limits',
+            'CSRF Protection': 'Add CSRF token validation to login forms'
+        };
+        
+        return suggestions[testName] || 'Check OAuth 2.1 compliance requirements';
+    }
+    
+    /**
+     * Generate enhanced test summary using logger
+     */
+    generateTestSummary() {
+        return this.logger.generateTestSummary(this.config);
     }
     
     showNotification(message, type = 'info') {
@@ -668,6 +858,7 @@ class ComplianceTester {
         report += `${'='.repeat(50)}\n`;
         report += `Timestamp: ${new Date().toISOString()}\n`;
         report += `Server: ${this.config.serverUrl}\n`;
+        report += `Client ID: ${this.config.clientId}\n`;
         report += `${'='.repeat(50)}\n\n`;
         
         report += `📊 Test Summary:\n`;
@@ -694,55 +885,85 @@ class ComplianceTester {
                 if (test.error) {
                     report += ` - ${test.error}`;
                 }
-                report += ` (${test.duration}ms)`;
-                report += `\n`;
-                
-                // Add debug info for failed tests
-                if (test.status === 'failed' && test.debug) {
-                    report += `     Debug Info:\n`;
-                    if (test.debug.requests?.length > 0) {
-                        const lastRequest = test.debug.requests[test.debug.requests.length - 1];
-                        report += `     → Last Request: ${lastRequest.method} ${lastRequest.url}\n`;
-                    }
-                    if (test.debug.responses?.length > 0) {
-                        const lastResponse = test.debug.responses[test.debug.responses.length - 1];
-                        report += `     ← Last Response: Status ${lastResponse.status}\n`;
-                        if (lastResponse.error) {
-                            report += `     ⚠️ Error: ${lastResponse.error}\n`;
-                        }
-                    }
-                }
+                report += ` (${test.duration}ms)\n`;
             });
         });
         
-        // Add failed test debug details section
-        const failedTests = this.testResults.filter(r => r.status === 'failed');
-        if (failedTests.length > 0) {
-            report += `\n${'='.repeat(50)}\n`;
-            report += `🔍 Debug Information for Failed Tests:\n\n`;
+        // Add comprehensive debug section for ALL tests
+        report += `\n${'='.repeat(50)}\n`;
+        report += `🔍 Complete HTTP Transaction Log:\n`;
+        report += `${'='.repeat(50)}\n\n`;
+        
+        this.testResults.forEach(test => {
+            report += `\n━━━ Test: ${test.name} [${test.status.toUpperCase()}] ━━━\n`;
             
-            failedTests.forEach(test => {
-                report += `Test: ${test.name}\n`;
-                report += `Error: ${test.error || 'Unknown'}\n`;
-                
-                if (test.debug?.requests?.length > 0) {
-                    report += `Requests made:\n`;
-                    test.debug.requests.forEach((req, i) => {
-                        report += `  ${i+1}. ${req.method} ${req.url}\n`;
-                    });
-                }
-                
-                if (test.debug?.responses?.length > 0) {
-                    report += `Responses received:\n`;
-                    test.debug.responses.forEach((res, i) => {
-                        report += `  ${i+1}. Status ${res.status} from ${res.url}\n`;
-                        if (res.data && typeof res.data === 'object') {
-                            report += `     Data: ${JSON.stringify(res.data).substring(0, 100)}...\n`;
+            if (test.debug?.requests?.length > 0) {
+                test.debug.requests.forEach((req, i) => {
+                    const res = test.debug.responses?.[i];
+                    
+                    report += `\n▶ Request #${i+1}:\n`;
+                    report += `  Method: ${req.method}\n`;
+                    report += `  URL: ${req.fullUrl || req.url}\n`;
+                    
+                    if (req.headers && Object.keys(req.headers).length > 0) {
+                        report += `  Headers:\n`;
+                        Object.entries(req.headers).forEach(([key, value]) => {
+                            report += `    ${key}: ${value}\n`;
+                        });
+                    }
+                    
+                    if (req.body) {
+                        report += `  Body: ${typeof req.body === 'string' ? req.body : JSON.stringify(req.body, null, 2)}\n`;
+                    }
+                    
+                    if (res) {
+                        report += `\n◀ Response #${i+1}:\n`;
+                        report += `  Status: ${res.status} ${res.statusText || ''}\n`;
+                        
+                        if (res.headers && Object.keys(res.headers).length > 0) {
+                            report += `  Headers:\n`;
+                            Object.entries(res.headers).forEach(([key, value]) => {
+                                report += `    ${key}: ${value}\n`;
+                            });
                         }
-                    });
-                }
-                report += `\n`;
-            });
+                        
+                        if (res.data) {
+                            report += `  Body:\n`;
+                            if (typeof res.data === 'object') {
+                                report += `    ${JSON.stringify(res.data, null, 2).split('\n').join('\n    ')}\n`;
+                            } else {
+                                report += `    ${String(res.data).split('\n').join('\n    ')}\n`;
+                            }
+                        }
+                        
+                        if (res.error) {
+                            report += `  Error: ${res.error}\n`;
+                        }
+                    }
+                });
+            }
+            
+            if (test.error) {
+                report += `\n⚠️ Test Error: ${test.error}\n`;
+            }
+            
+            if (test.details && Object.keys(test.details).length > 0) {
+                report += `\nTest Details:\n`;
+                report += `${JSON.stringify(test.details, null, 2).split('\n').join('\n  ')}\n`;
+            }
+        });
+        
+        // Add execution log at the end
+        const logContainer = document.getElementById('executionLog');
+        if (logContainer && logContainer.textContent.trim()) {
+            report += `\n${'='.repeat(50)}\n`;
+            report += `📝 Full Execution Log:\n`;
+            report += `${'='.repeat(50)}\n\n`;
+            
+            const logEntries = Array.from(logContainer.querySelectorAll('.log-entry'))
+                .map(entry => entry.textContent)
+                .join('\n');
+            report += logEntries;
         }
         
         return report;
@@ -783,23 +1004,36 @@ class ComplianceTester {
     async makeRequest(url, options = {}) {
         // Use proxy for API calls when running in browser to avoid CORS
         let fullUrl;
-        if (url.startsWith('http')) {
-            fullUrl = url;
-        } else if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-            // Route through appropriate proxy based on path
-            if (url.startsWith('/api/v1/')) {
-                // Use authly-api proxy for /api/v1 paths
-                fullUrl = `/authly-api${url}`;
-            } else if (url.startsWith('/.well-known/') || url.startsWith('/auth/') || 
-                       url.startsWith('/oidc/') || url.startsWith('/api/')) {
-                // These are already proxied by nginx
+        if (url.startsWith('http://') || url.startsWith('https://')) {
+            // Absolute URL - don't use it directly, extract path
+            try {
+                const urlObj = new URL(url);
+                const path = urlObj.pathname + urlObj.search;
+                // Now treat it as a relative path
+                url = path;
+            } catch (e) {
+                // If URL parsing fails, use as-is
                 fullUrl = url;
-            } else {
-                // Default to authly-api proxy
-                fullUrl = `/authly-api${url}`;
             }
-        } else {
-            fullUrl = `${this.config.serverUrl}${url}`;
+        }
+        
+        if (!fullUrl) {
+            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                // Route through appropriate proxy based on path
+                if (url.startsWith('/api/v1/')) {
+                    // Use authly-api proxy for /api/v1 paths
+                    fullUrl = `/authly-api${url}`;
+                } else if (url.startsWith('/.well-known/') || url.startsWith('/auth/') || 
+                           url.startsWith('/oidc/') || url.startsWith('/api/')) {
+                    // These are already proxied by nginx
+                    fullUrl = url;
+                } else {
+                    // Default to authly-api proxy
+                    fullUrl = `/authly-api${url}`;
+                }
+            } else {
+                fullUrl = `${this.config.serverUrl}${url}`;
+            }
         }
         
         try {
@@ -907,5 +1141,15 @@ class ComplianceTester {
 
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
+    // Clear bad localStorage data on startup
+    const savedConfig = localStorage.getItem('authly_compliance_config');
+    if (savedConfig) {
+        const parsed = JSON.parse(savedConfig);
+        if (parsed.clientId === 'test_client') {
+            console.log('Clearing invalid test_client from localStorage');
+            localStorage.removeItem('authly_compliance_config');
+        }
+    }
+    
     window.complianceTester = new ComplianceTester();
 });

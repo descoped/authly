@@ -24,6 +24,137 @@ def generate_pkce_pair():
     return code_verifier, code_challenge
 
 
+class TestRedirectUriValidation:
+    """Test OAuth 2.1 redirect URI exact matching requirements."""
+
+    @pytest.mark.asyncio
+    async def test_invalid_redirect_uri_rejected_api_endpoint(
+        self, test_server, committed_user, committed_oauth_client
+    ):
+        """Test that invalid redirect URI is rejected by API endpoint with 400 error."""
+        async with test_server.client as client:
+            code_verifier, code_challenge = generate_pkce_pair()
+
+            # Login the user first
+            login_response = await client.post(
+                "/api/v1/oauth/token",
+                data={"grant_type": "password", "username": committed_user.username, "password": "TestPassword123!"},
+            )
+            assert login_response.status_code == status.HTTP_200_OK
+            login_data = await login_response.json()
+            access_token = login_data["access_token"]
+
+            # Try authorization with INVALID redirect URI (should be exact match)
+            invalid_redirect_uri = committed_oauth_client["redirect_uris"][0] + "/invalid"
+            auth_params = {
+                "response_type": "code",
+                "client_id": committed_oauth_client["client_id"],
+                "redirect_uri": invalid_redirect_uri,  # Invalid URI
+                "code_challenge": code_challenge,
+                "code_challenge_method": "S256",
+                "scope": "read write",
+                "state": "test_state_123",
+            }
+
+            auth_response = await client.get(
+                "/api/v1/oauth/authorize", params=auth_params, headers={"Authorization": f"Bearer {access_token}"}
+            )
+
+            # Should reject with 400 Bad Request (not redirect to invalid URI)
+            assert auth_response.status_code == status.HTTP_400_BAD_REQUEST
+            error_data = await auth_response.json()
+            assert error_data["error"] == "invalid_request"
+            assert "redirect_uri" in error_data["error_description"].lower()
+
+    @pytest.mark.asyncio
+    async def test_invalid_redirect_uri_rejected_session_endpoint(self, test_server, committed_oauth_client):
+        """Test that invalid redirect URI is rejected by session endpoint with 400 error."""
+        async with test_server.client as client:
+            code_verifier, code_challenge = generate_pkce_pair()
+
+            # Try authorization without authentication (session-based endpoint)
+            invalid_redirect_uri = committed_oauth_client["redirect_uris"][0] + "/invalid"
+            auth_params = {
+                "response_type": "code",
+                "client_id": committed_oauth_client["client_id"],
+                "redirect_uri": invalid_redirect_uri,  # Invalid URI
+                "code_challenge": code_challenge,
+                "code_challenge_method": "S256",
+                "scope": "read write",
+                "state": "test_state_123",
+            }
+
+            # This should hit the session-based endpoint (no Authorization header)
+            auth_response = await client.get("/api/v1/oauth/authorize", params=auth_params)
+
+            # Should reject with 400 Bad Request (not redirect to invalid URI)
+            assert auth_response.status_code == status.HTTP_400_BAD_REQUEST
+            error_data = await auth_response.json()
+            assert error_data["error"] == "invalid_request"
+            assert "redirect_uri" in error_data["error_description"].lower()
+
+    @pytest.mark.asyncio
+    async def test_valid_redirect_uri_accepted(self, test_server, committed_user, committed_oauth_client):
+        """Test that exact matching redirect URI is accepted."""
+        async with test_server.client as client:
+            code_verifier, code_challenge = generate_pkce_pair()
+
+            # Login the user first
+            login_response = await client.post(
+                "/api/v1/oauth/token",
+                data={"grant_type": "password", "username": committed_user.username, "password": "TestPassword123!"},
+            )
+            assert login_response.status_code == status.HTTP_200_OK
+            login_data = await login_response.json()
+            access_token = login_data["access_token"]
+
+            # Try authorization with VALID redirect URI (exact match)
+            auth_params = {
+                "response_type": "code",
+                "client_id": committed_oauth_client["client_id"],
+                "redirect_uri": committed_oauth_client["redirect_uris"][0],  # Valid exact match
+                "code_challenge": code_challenge,
+                "code_challenge_method": "S256",
+                "scope": "read write",
+                "state": "test_state_123",
+            }
+
+            auth_response = await client.get(
+                "/api/v1/oauth/authorize", params=auth_params, headers={"Authorization": f"Bearer {access_token}"}
+            )
+
+            # Should show consent form (200 OK) not error
+            assert auth_response.status_code == status.HTTP_200_OK
+            # Should contain consent form HTML
+            content = await auth_response.text()
+            assert "consent" in content.lower() or "authorize" in content.lower()
+
+    @pytest.mark.asyncio
+    async def test_nonexistent_client_rejected(self, test_server):
+        """Test that requests with nonexistent client_id are rejected with 400."""
+        async with test_server.client as client:
+            code_verifier, code_challenge = generate_pkce_pair()
+
+            # Try authorization with nonexistent client
+            auth_params = {
+                "response_type": "code",
+                "client_id": "nonexistent_client_12345",  # Invalid client ID
+                "redirect_uri": "http://localhost:8080/callback",
+                "code_challenge": code_challenge,
+                "code_challenge_method": "S256",
+                "scope": "read write",
+                "state": "test_state_123",
+            }
+
+            auth_response = await client.get("/api/v1/oauth/authorize", params=auth_params)
+
+            # Should reject with 400 Bad Request (not redirect)
+            assert auth_response.status_code == status.HTTP_400_BAD_REQUEST
+            error_data = await auth_response.json()
+            assert error_data["error"] == "invalid_client"
+            assert "not found" in error_data["error_description"].lower()
+
+
 class TestCompleteAuthorizationCodeFlow:
     """Test complete OAuth 2.1 Authorization Code + PKCE flow using HTTP endpoints."""
 
@@ -384,12 +515,10 @@ class TestErrorHandling:
 
             auth_response = await client.get("/api/v1/oauth/authorize", params=auth_params, follow_redirects=False)
 
-            # Without authentication, should redirect with login_required error
-            assert auth_response.status_code == status.HTTP_302_FOUND
-            location = auth_response._response.headers.get("location")
-            assert location is not None
-            # Check that it redirects with login_required error
-            assert "error=login_required" in location
+            # With invalid client_id, should return 400 bad request (client validation fails first)
+            assert auth_response.status_code == status.HTTP_400_BAD_REQUEST
+            error_data = await auth_response.json()
+            assert error_data["error"] in ["invalid_client", "invalid_request"]
 
     @pytest.mark.asyncio
     async def test_invalid_scope_error(self, test_server, committed_oauth_client, committed_user):

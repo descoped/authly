@@ -5,16 +5,19 @@ services:
     build: .
     container_name: authly-compliance-tester
     ports:
-      - "8080:8080"
+      - "8080:80"
     networks:
       - authly-network
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - AUTHLY_SERVER_URL=http://authly:8000
+      - AUTHLY_ADMIN_PASSWORD=${AUTHLY_ADMIN_PASSWORD:-admin}
     labels:
       - "com.authly.component=compliance-tester"
       - "com.authly.description=OAuth 2.1 and OIDC 1.0 compliance testing tool"
 
 networks:
   authly-network:
-    name: authly-network
+    name: authly_authly-net
     external: true

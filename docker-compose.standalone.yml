@@ -13,6 +13,8 @@ services:
       - "6379:6379"  # KeyDB/Redis direct access
     volumes:
       - authly_standalone_data:/data
+      # Shared data directory for exchanging tokens
+      - compliance_tester_data:/app/tester-data
     environment:
       # Override default secrets for production use
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-your-production-secret-key-must-be-at-least-256-bits-long}
@@ -241,11 +243,16 @@ services:
       dockerfile: Dockerfile
     container_name: authly-compliance-tester
     ports:
-      - "8080:8080"  # Web UI
+      - "8080:80"  # Web UI
     networks:
       - authly-net
     environment:
       - AUTHLY_SERVER_URL=http://authly-standalone:8000
+      - AUTHLY_ADMIN_PASSWORD=${AUTHLY_ADMIN_PASSWORD:-admin}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Share data directory for config exchange
+      - compliance_tester_data:/usr/share/nginx/html/data
     depends_on:
       authly-standalone:
         condition: service_healthy
@@ -264,4 +271,6 @@ volumes:
   prometheus_data:
     driver: local
   grafana_data:
+    driver: local
+  compliance_tester_data:
     driver: local

@@ -181,6 +181,38 @@ def patch_oauth_authorization_endpoints():
                 status_code=400,
             )
 
+        # CRITICAL: Validate client and redirect URI BEFORE redirecting anywhere
+        # This prevents redirect URI attack vectors per OAuth 2.1 spec
+        logger.info(f"[SESSION-AUTH-VALIDATION] Validating client_id={client_id}, redirect_uri={redirect_uri}")
+        try:
+            client = await authorization_service.client_repo.get_by_client_id(client_id)
+            logger.info(f"[SESSION-AUTH-VALIDATION] Client lookup result: {client is not None}")
+            if not client:
+                logger.warning(f"[SESSION-AUTH-VALIDATION] Client '{client_id}' not found - returning 400")
+                return JSONResponse(
+                    content={"error": "invalid_client", "error_description": f"Client '{client_id}' not found"},
+                    status_code=400,
+                )
+
+            # Validate redirect URI with exact matching (OAuth 2.1 requirement)
+            redirect_allowed = client.is_redirect_uri_allowed(redirect_uri)
+            logger.info(f"[SESSION-AUTH-VALIDATION] Redirect URI allowed: {redirect_allowed}")
+            if not redirect_allowed:
+                logger.warning(
+                    f"[SESSION-AUTH-VALIDATION] Invalid redirect_uri '{redirect_uri}' for client '{client_id}' - returning 400"
+                )
+                return JSONResponse(
+                    content={"error": "invalid_request", "error_description": "Invalid redirect_uri for this client"},
+                    status_code=400,
+                )
+            logger.info("[SESSION-AUTH-VALIDATION] Client and redirect URI validation passed")
+        except Exception as e:
+            logger.error(f"[SESSION-AUTH-VALIDATION] Client validation error: {e}")
+            return JSONResponse(
+                content={"error": "server_error", "error_description": "Unable to validate client"},
+                status_code=500,
+            )
+
         # Check if user is authenticated
         if not current_user:
             # Redirect to login page with OAuth context

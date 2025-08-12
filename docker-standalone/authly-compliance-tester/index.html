@@ -62,6 +62,9 @@
                 </div>
                 
                 <div class="topbar-right">
+                    <button class="btn btn-secondary" id="createClientBtn" onclick="complianceTester.createNewClient()">
+                        🔑 Client Info
+                    </button>
                     <button class="btn btn-primary" id="quickTest">
                         Quick Test
                     </button>
@@ -248,11 +251,17 @@
                 </div>
                 <div class="form-group">
                     <label>Client ID</label>
-                    <input type="text" id="clientId" value="test_client">
+                    <div class="input-with-icon">
+                        <input type="password" id="clientId" value="" placeholder="Will be created via API">
+                        <button class="input-icon" onclick="toggleVisibility('clientId', this)" title="Show/Hide">👁️</button>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>Client Secret</label>
-                    <input type="password" id="clientSecret" value="test_secret">
+                    <div class="input-with-icon">
+                        <input type="password" id="clientSecret" value="" placeholder="Not required for public clients">
+                        <button class="input-icon" onclick="toggleVisibility('clientSecret', this)" title="Show/Hide">👁️</button>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>Redirect URI</label>
@@ -268,23 +277,30 @@
                 </div>
                 <div class="form-group">
                     <label>Test Password</label>
-                    <input type="password" id="testPassword" value="TestPassword123!">
+                    <div class="input-with-icon">
+                        <input type="password" id="testPassword" value="TestPassword123!">
+                        <button class="input-icon" onclick="toggleVisibility('testPassword', this)" title="Show/Hide">👁️</button>
+                    </div>
                 </div>
             </div>
             <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="complianceTester.adminClient.ensureTestClient().then(() => complianceTester.updateConfigUI())">Create Test Client</button>
                 <button class="btn btn-primary" id="saveConfig">Save Configuration</button>
             </div>
         </div>
     </div>
     
     <!-- Scripts -->
-    <script src="js/oauth-flows-fixed.js"></script>
-    <script src="js/oidc-flows.js"></script>
-    <script src="js/test-suites.js"></script>
-    <script src="js/api-discovery.js"></script>
-    <script src="js/admin-tester.js"></script>
-    <script src="js/performance-tester.js"></script>
-    <script src="js/compliance-tester.js"></script>
+    <script src="js/logger.js?v=20250811-2345"></script>
+    <script src="js/discovery-service.js?v=20250811-2345"></script>
+    <script src="js/oauth-flows-fixed.js?v=20250811-2142"></script>
+    <script src="js/oidc-flows.js?v=20250811-2142"></script>
+    <script src="js/test-suites.js?v=20250811-2142"></script>
+    <script src="js/api-discovery.js?v=20250811-2142"></script>
+    <script src="js/admin-client.js?v=20250811-2345"></script>
+    <script src="js/admin-tester.js?v=20250811-2142"></script>
+    <script src="js/performance-tester.js?v=20250811-2142"></script>
+    <script src="js/compliance-tester.js?v=20250811-2142"></script>
     <script>
         // Navigation handling
         document.querySelectorAll('.nav-item').forEach(item => {
@@ -313,6 +329,17 @@
         
         function closeConfigModal() {
             document.getElementById('configModal').classList.remove('active');
+        }
+        
+        function toggleVisibility(inputId, button) {
+            const input = document.getElementById(inputId);
+            if (input.type === 'password') {
+                input.type = 'text';
+                button.textContent = '🙈';
+            } else {
+                input.type = 'password';
+                button.textContent = '👁️';
+            }
         }
     </script>
 </body>

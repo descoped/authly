@@ -1,73 +1,63 @@
 # Authly Makefile
-.PHONY: help standalone-start standalone-start-all standalone-stop standalone-stop-all standalone-clean standalone-info standalone-logs standalone-full test build clean
+.PHONY: help build start stop clean logs test
 
 # Default target
 help:
 	@echo "Authly - OAuth 2.1 Authorization Server"
 	@echo ""
-	@echo "Available targets:"
-	@echo "  standalone-start     - Start standalone container (core services only)"
-	@echo "  standalone-start-all - Start ALL services (core + tools + monitoring + authz)"
-	@echo "  standalone-stop      - Stop core standalone service only"
-	@echo "  standalone-stop-all  - Stop ALL services (core + tools + monitoring + authz)"
-	@echo "  standalone-clean     - Stop all services and remove all data volumes"
-	@echo "  standalone-info      - Show service URLs and credentials"
-	@echo "  standalone-logs      - Follow standalone container logs"
-	@echo "  test                - Run test suite"
-	@echo "  build               - Build the package"
-	@echo "  clean               - Clean build artifacts"
-	@echo ""
-	@echo "Examples:"
-	@echo "  make standalone-start-all # Start everything"
-	@echo "  make standalone-info      # Show all service URLs"
-	@echo "  make standalone-stop      # Stop core only"
-	@echo "  make standalone-stop-all  # Stop everything (keep data)"
-	@echo "  make standalone-clean     # Stop all and remove data"
-	@echo ""
-	@echo "Legacy targets:"
-	@echo "  standalone-full      - Same as standalone-start-all (deprecated)"
+	@echo "Commands:"
+	@echo "  build     - Build Docker images"
+	@echo "  start     - Start Authly with compliance tester"
+	@echo "  stop      - Stop all services"
+	@echo "  clean     - Stop and clean all containers/volumes"
+	@echo "  logs      - Follow logs"
+	@echo "  test      - Run test suite"
 
-# Standalone targets
-standalone-start:
-	@./scripts/start-standalone.sh
+# Build Docker images
+build:
+	@echo "🔨 Building Docker images..."
+	@docker compose -f docker-compose.standalone.yml build
+	@echo "✅ Build complete!"
 
-standalone-start-all:
-	@./scripts/start-standalone.sh --profile tools --profile monitoring --profile authz
+# Start/run authly-standalone with compliance tester (build first)
+start: build
+	@echo "🚀 Starting Authly standalone with compliance tester..."
+	@docker stop $$(docker ps -q) 2>/dev/null || true
+	@docker rm $$(docker ps -aq) 2>/dev/null || true
+	@echo "🔧 Starting Authly server..."
+	@AUTHLY_ADMIN_PASSWORD=admin docker compose -f docker-compose.standalone.yml up -d authly-standalone
+	@echo "⏳ Waiting for Authly to be ready..."
+	@sleep 15
+	@echo "🧪 Starting compliance tester (will auto-configure OAuth client)..."
+	@AUTHLY_ADMIN_PASSWORD=admin docker compose -f docker-compose.standalone.yml up -d compliance-tester
+	@echo "✅ Services started!"
+	@echo "📍 Authly: http://localhost:8000"
+	@echo "📍 Compliance Tester: http://localhost:8080 (auto-configured)"
+	@echo "📍 Admin: admin / admin"
 
-# Legacy alias for backward compatibility
-standalone-full: standalone-start-all
+# Alias for start command 
+run: start
 
-standalone-stop:
-	@./scripts/stop-standalone.sh
+# Stop all services
+stop:
+	@echo "⏸️  Stopping services..."
+	@docker compose -f docker-compose.standalone.yml down --remove-orphans
+	@docker system prune -f --volumes
+	@echo "✅ Services stopped and cleaned!"
 
-standalone-stop-all:
-	@./scripts/stop-standalone.sh --all
+# Clean everything
+clean:
+	@echo "🧹 Cleaning all containers and volumes..."
+	@docker stop $$(docker ps -q) 2>/dev/null || true
+	@docker rm $$(docker ps -aq) 2>/dev/null || true
+	@docker compose -f docker-compose.standalone.yml down -v
+	@docker system prune -f
+	@echo "✅ Cleanup complete!"
 
-standalone-clean:
-	@./scripts/stop-standalone.sh --all --volumes
-
-standalone-info:
-	@./scripts/show-services-plain.sh
-
-standalone-logs:
+# Follow logs
+logs:
 	@docker logs authly-standalone -f
 
-# Development targets
+# Test suite
 test:
 	uv run pytest
-
-build:
-	uv build
-
-clean:
-	rm -rf dist/ build/ *.egg-info
-	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
-	find . -type f -name "*.pyc" -delete
-
-# Docker management
-docker-build:
-	docker compose -f docker-compose.standalone.yml build
-
-docker-clean:
-	docker compose -f docker-compose.standalone.yml down -v
-	docker system prune -f

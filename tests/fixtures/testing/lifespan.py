@@ -41,6 +41,26 @@ async def resource_manager_test_server(
 
     app = FastAPI(title="Authly Test Server - Resource Manager")
 
+    # Add middleware stack in same order as production
+    from authly.api.rate_limiting_middleware import RateLimitingMiddleware
+    from authly.logging.middleware import LoggingMiddleware
+
+    # Add logging middleware first (to capture all requests)
+    app.add_middleware(LoggingMiddleware)
+
+    # Add rate limiting middleware for OAuth 2.1 compliance
+    app.add_middleware(
+        RateLimitingMiddleware,
+        max_requests=10,  # Allow 10 requests
+        window_seconds=60,  # Per minute
+        paths_to_limit=[
+            "/api/v1/oauth/token",
+            "/api/v1/token",
+            "/oauth/token",
+            "/token",
+        ],
+    )
+
     # Set up admin middleware
     setup_admin_middleware(app)
 
@@ -143,6 +163,26 @@ async def custom_test_server(
     from authly.authentication import auth_router as authentication_router
 
     app = FastAPI(title="Authly Test Server")
+
+    # Add middleware stack in same order as production
+    from authly.api.rate_limiting_middleware import RateLimitingMiddleware
+    from authly.logging.middleware import LoggingMiddleware
+
+    # Add logging middleware first (to capture all requests)
+    app.add_middleware(LoggingMiddleware)
+
+    # Add rate limiting middleware for OAuth 2.1 compliance
+    app.add_middleware(
+        RateLimitingMiddleware,
+        max_requests=10,  # Allow 10 requests
+        window_seconds=60,  # Per minute
+        paths_to_limit=[
+            "/api/v1/oauth/token",
+            "/api/v1/token",
+            "/oauth/token",
+            "/token",
+        ],
+    )
 
     # Set up admin middleware
     setup_admin_middleware(app)

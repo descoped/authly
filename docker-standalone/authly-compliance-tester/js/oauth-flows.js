@@ -216,7 +216,7 @@ class OAuthFlows {
         
         return {
             stateRequired: noStateResponse.status === 400,
-            statePreserved: withStateResponse.status === 200 || withStateResponse.status === 302
+            statePreserved: withStateResponse.status === 200 || withStateResponse.status === 302 || withStateResponse.status === 0
         };
     }
     

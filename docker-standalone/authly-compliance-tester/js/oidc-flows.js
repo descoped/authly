@@ -27,11 +27,21 @@ class OIDCFlows {
             throw new Error('JWKS URI not found in discovery document');
         }
         
-        const jwksUrl = discovery.jwks_uri.replace(config.serverUrl, '');
-        const { response, data } = await tester.makeRequest(jwksUrl);
+        // Extract path from JWKS URI - handle both relative and absolute URLs
+        let jwksPath;
+        if (discovery.jwks_uri.startsWith('http')) {
+            // Absolute URL - extract path
+            const url = new URL(discovery.jwks_uri);
+            jwksPath = url.pathname + url.search + url.hash;
+        } else {
+            // Relative URL - use as-is
+            jwksPath = discovery.jwks_uri;
+        }
+        
+        const { response, data } = await tester.makeRequest(jwksPath);
         
         if (response.status !== 200) {
-            throw new Error('Failed to fetch JWKS');
+            throw new Error(`Failed to fetch JWKS from ${jwksPath}: ${response.status}`);
         }
         
         return data;

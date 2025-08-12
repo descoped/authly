@@ -19,6 +19,7 @@ from authly.api.admin_middleware import setup_admin_middleware
 from authly.api.admin_router import admin_router
 from authly.api.oauth_discovery_router import oauth_discovery_router
 from authly.api.password_change import router as password_change_router
+from authly.api.rate_limiting_middleware import RateLimitingMiddleware
 from authly.api.security_middleware import setup_security_middleware
 from authly.authentication import auth_router as authentication_router
 from authly.config import AuthlyConfig
@@ -54,6 +55,20 @@ def create_app(
 
     # Add logging middleware first (to capture all requests)
     app.add_middleware(LoggingMiddleware)
+
+    # Add rate limiting middleware for OAuth 2.1 compliance
+    # This must be early in the middleware stack to protect endpoints
+    app.add_middleware(
+        RateLimitingMiddleware,
+        max_requests=10,  # Allow 10 requests
+        window_seconds=60,  # Per minute
+        paths_to_limit=[
+            "/api/v1/oauth/token",
+            "/api/v1/token",
+            "/oauth/token",
+            "/token",
+        ],
+    )
 
     # Add CORS middleware for browser compatibility
     # This should be after logging but before other middleware
