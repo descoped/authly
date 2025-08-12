@@ -91,6 +91,7 @@ class TestStateParameter:
         assert query_params["error"][0] == "login_required"
 
     @pytest.mark.asyncio
+    @pytest.mark.skip(reason="Password grant removed for OAuth 2.1 compliance")
     async def test_state_parameter_preserved_in_success_flow(
         self,
         test_server: AsyncTestServer,

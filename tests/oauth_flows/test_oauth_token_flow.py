@@ -69,22 +69,6 @@ class TestOAuth21EndToEndFlow:
         assert "Invalid authorization code" in error_data.get("error_description", "")
 
     @pytest.mark.asyncio
-    async def test_backward_compatibility_password_grant(self, oauth_server: AsyncTestServer, test_user: UserModel):
-        """Test that password grant still works (backward compatibility)."""
-        # Test existing password grant flow
-        token_response = await oauth_server.client.post(
-            "/api/v1/oauth/token",
-            data={"grant_type": "password", "username": test_user.username, "password": "Test123!"},
-        )
-
-        # Should succeed with valid credentials
-        await token_response.expect_status(200)
-        token_data = await token_response.json()
-        assert "access_token" in token_data
-        assert "token_type" in token_data
-        assert token_data["token_type"] == "Bearer"
-
-    @pytest.mark.asyncio
     async def test_invalid_grant_type(self, oauth_server: AsyncTestServer):
         """Test error handling for invalid grant types."""
         token_response = await oauth_server.client.post(

@@ -213,6 +213,101 @@ async def committed_public_client(db_pool: AsyncConnectionPool) -> dict:
 
 
 @pytest.fixture
+async def committed_cli_oauth_client(db_pool: AsyncConnectionPool) -> dict:
+    """
+    Create a CLI OAuth client (public client with PKCE) that is committed to the database.
+
+    This client simulates the authly-cli OAuth client with OAuth 2.1 compliance.
+    Returns a dict with client details.
+    The client is automatically cleaned up after the test.
+    """
+    async with db_pool.connection() as conn:
+        client_repo = ClientRepository(conn)
+
+        # Generate unique client data for CLI
+        client_id = f"authly_cli_test_{uuid4().hex[:8]}"
+
+        client_data = {
+            "client_id": client_id,
+            "client_name": "Authly CLI Test Client",
+            "client_type": ClientType.PUBLIC,  # Public client (no secret)
+            "redirect_uris": [
+                "http://localhost:8899/callback",
+                "http://127.0.0.1:8899/callback",
+            ],
+            "grant_types": [GrantType.AUTHORIZATION_CODE],
+            "response_types": ["code"],
+            "require_pkce": True,  # OAuth 2.1 mandatory PKCE
+            "is_active": True,
+        }
+
+        # Create client with autocommit
+        await conn.set_autocommit(True)
+        created_client = await client_repo.create_client(client_data)
+
+        yield created_client.model_dump()
+
+        # Cleanup: Delete the client
+        with suppress(Exception):
+            await conn.execute("DELETE FROM oauth_clients WHERE client_id = $1", created_client.client_id)
+
+
+@pytest.fixture
+async def committed_admin_user_dict(db_pool: AsyncConnectionPool) -> dict:
+    """
+    Create an admin user that is committed to the database and visible to HTTP endpoints.
+
+    Returns a dict with user details including the unhashed password.
+    The user is automatically cleaned up after the test.
+    """
+    async with db_pool.connection() as conn:
+        # Generate unique admin user data
+        user_id = uuid4()
+        username = f"admin_test_{uuid4().hex[:8]}"
+        password = "TestPassword123!"
+
+        user_data = {
+            "id": user_id,
+            "username": username,
+            "email": f"{username}@test.local",
+            "password_hash": get_password_hash(password),
+            "is_admin": True,
+            "is_active": True,
+            "is_verified": True,
+            "created_at": datetime.now(UTC),
+            "updated_at": datetime.now(UTC),
+        }
+
+        # Create user with autocommit using direct SQL
+        await conn.set_autocommit(True)
+        async with conn.cursor(row_factory=dict_row) as cur:
+            await cur.execute(
+                """
+                INSERT INTO users (id, username, email, password_hash, is_active, is_verified, is_admin, created_at, updated_at)
+                VALUES (%(id)s, %(username)s, %(email)s, %(password_hash)s, %(is_active)s, %(is_verified)s, %(is_admin)s, %(created_at)s, %(updated_at)s)
+                RETURNING *
+            """,
+                user_data,
+            )
+            result = await cur.fetchone()
+
+        # Create UserModel from result
+        created_user = UserModel(**result)
+
+        # Return user dict with unhashed password
+        user_dict = created_user.model_dump()
+        user_dict["username"] = username
+        user_dict["password"] = password  # Add unhashed password for testing
+
+        yield user_dict
+
+        # Cleanup: Delete the user
+        with suppress(Exception):
+            async with conn.cursor() as cur:
+                await cur.execute("DELETE FROM users WHERE id = %s", (created_user.id,))
+
+
+@pytest.fixture
 async def committed_scope(db_pool: AsyncConnectionPool) -> dict:
     """
     Create a scope that is committed to the database and visible to HTTP endpoints.

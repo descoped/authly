@@ -10,6 +10,7 @@ mkdir -p /etc/s6-overlay/s6-rc.d/user/contents.d \
     /etc/s6-overlay/s6-rc.d/keydb/dependencies.d \
     /etc/s6-overlay/s6-rc.d/authly-init/dependencies.d \
     /etc/s6-overlay/s6-rc.d/authly/dependencies.d \
+    /etc/s6-overlay/s6-rc.d/authly-cli-setup/dependencies.d \
     /etc/s6-overlay/s6-rc.d/services-ready/dependencies.d
 
 # Setup user service bundle
@@ -17,6 +18,7 @@ touch /etc/s6-overlay/s6-rc.d/user/contents.d/postgres \
       /etc/s6-overlay/s6-rc.d/user/contents.d/keydb \
       /etc/s6-overlay/s6-rc.d/user/contents.d/authly-init \
       /etc/s6-overlay/s6-rc.d/user/contents.d/authly \
+      /etc/s6-overlay/s6-rc.d/user/contents.d/authly-cli-setup \
       /etc/s6-overlay/s6-rc.d/user/contents.d/services-ready
 
 # Configure service types
@@ -24,6 +26,7 @@ echo "longrun" > /etc/s6-overlay/s6-rc.d/postgres/type
 echo "longrun" > /etc/s6-overlay/s6-rc.d/keydb/type
 echo "oneshot" > /etc/s6-overlay/s6-rc.d/authly-init/type
 echo "longrun" > /etc/s6-overlay/s6-rc.d/authly/type
+echo "oneshot" > /etc/s6-overlay/s6-rc.d/authly-cli-setup/type
 echo "oneshot" > /etc/s6-overlay/s6-rc.d/services-ready/type
 
 # Setup dependencies
@@ -32,7 +35,8 @@ touch /etc/s6-overlay/s6-rc.d/postgres/dependencies.d/base \
       /etc/s6-overlay/s6-rc.d/authly-init/dependencies.d/postgres \
       /etc/s6-overlay/s6-rc.d/authly-init/dependencies.d/keydb \
       /etc/s6-overlay/s6-rc.d/authly/dependencies.d/authly-init \
-      /etc/s6-overlay/s6-rc.d/services-ready/dependencies.d/authly
+      /etc/s6-overlay/s6-rc.d/authly-cli-setup/dependencies.d/authly \
+      /etc/s6-overlay/s6-rc.d/services-ready/dependencies.d/authly-cli-setup
 
 # Create PostgreSQL run script
 cat > /etc/s6-overlay/s6-rc.d/postgres/run << 'EOF'
@@ -77,6 +81,24 @@ cat > /etc/s6-overlay/s6-rc.d/authly/run << 'EOF'
 cd /app
 s6-setuidgid authly
 exec python -m authly serve --host 0.0.0.0 --port 8000
+EOF
+
+# Create CLI OAuth client setup script
+cat > /etc/s6-overlay/s6-rc.d/authly-cli-setup/up << 'EOF'
+#!/command/execlineb -P
+foreground { s6-sleep 5 }
+foreground {
+    s6-setuidgid authly
+    sh -c "
+    # Wait for Authly to be ready
+    timeout 30 sh -c 'until curl -s http://localhost:8000/health >/dev/null 2>&1; do sleep 1; done'
+    
+    # Setup CLI OAuth client
+    cd /app
+    python /docker-standalone/setup-cli-client.py 2>&1 | sed 's/^/[CLI Setup] /'
+    echo '[CLI Setup] CLI OAuth client setup complete'
+    "
+}
 EOF
 
 # Create services-ready notification script
@@ -140,10 +162,15 @@ foreground {
     echo '                       (Requires OAuth token with cache:read/write scopes)'
     
     echo ''
+    echo '🔐 CLI AUTHENTICATION:'
+    echo '  • OAuth Callback Port: ${AUTHLY_CLI_CALLBACK_PORT:-8899}'
+    echo '  • CLI OAuth Client:    authly-cli (configured automatically)'
+    echo '  • Login Command:       authly admin auth login'
+    echo '                         (Opens browser for OAuth authentication)'
+    echo ''
     echo '⚡ QUICK COMMANDS:'
-    echo '  Get OAuth Token:'
-    echo \"    curl -X POST http://localhost:8000/api/v1/oauth/token \\\\\"
-    echo \"      -d 'grant_type=password&username=admin&password=\${AUTHLY_ADMIN_PASSWORD:-admin}'\"
+    echo '  CLI Login (OAuth Flow):'
+    echo '    authly admin auth login'
     echo ''
     echo '  Stop All Services:'
     echo '    docker compose -f docker-compose.standalone.yml down'

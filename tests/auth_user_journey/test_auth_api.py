@@ -94,6 +94,7 @@ async def test_unauthorized_access(auth_server: AsyncTestServer):
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="Password grant removed for OAuth 2.1 compliance")
 async def test_login_unverified(auth_server: AsyncTestServer, create_unverified_user: UserModel):
     response = await auth_server.client.post(
         "/api/v1/oauth/token",
@@ -107,6 +108,7 @@ async def test_login_unverified(auth_server: AsyncTestServer, create_unverified_
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="Password grant removed for OAuth 2.1 compliance")
 async def test_login_success(test_config: AuthlyConfig, auth_server: AsyncTestServer, test_user: UserModel):
     response = await auth_server.client.post(
         "/api/v1/oauth/token", data={"username": test_user.username, "password": "Test123!", "grant_type": "password"}
@@ -125,10 +127,11 @@ async def test_login_success(test_config: AuthlyConfig, auth_server: AsyncTestSe
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="Password grant removed for OAuth 2.1 compliance")
 async def test_login_invalid_credentials(auth_server: AsyncTestServer):
     response = await auth_server.client.post(
         "/api/v1/oauth/token",
-        data={"username": generate_random_identifier(), "password": "wrongpass", "grant_type": "password"},
+        data={"username": "invalid_user", "password": "invalid_password", "grant_type": "password"},
     )
 
     error_response = await response.json()
@@ -138,6 +141,7 @@ async def test_login_invalid_credentials(auth_server: AsyncTestServer):
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="Password grant removed for OAuth 2.1 compliance")
 async def test_refresh_token_flow(auth_server: AsyncTestServer, test_user: UserModel):
     # First login
     login_response = await auth_server.client.post(
@@ -165,6 +169,7 @@ async def test_refresh_token_flow(auth_server: AsyncTestServer, test_user: UserM
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="Password grant removed for OAuth 2.1 compliance")
 async def test_logout(auth_server: AsyncTestServer, test_user: UserModel):
     # First login
     login_response = await auth_server.client.post(
@@ -185,6 +190,7 @@ async def test_logout(auth_server: AsyncTestServer, test_user: UserModel):
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="Password grant removed for OAuth 2.1 compliance")
 async def test_login_stores_tokens(
     test_config: AuthlyConfig, auth_server: AsyncTestServer, test_user: UserModel, token_repository: TokenRepository
 ):
@@ -215,6 +221,7 @@ async def test_login_stores_tokens(
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="Password grant removed for OAuth 2.1 compliance")
 async def test_refresh_invalidates_old_token(
     test_config: AuthlyConfig, auth_server: AsyncTestServer, test_user: UserModel, token_repository: TokenRepository
 ):
@@ -252,6 +259,7 @@ async def test_refresh_invalidates_old_token(
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="Password grant removed for OAuth 2.1 compliance")
 async def test_logout_invalidates_all_tokens(
     auth_server: AsyncTestServer, test_user: UserModel, token_repository: TokenRepository
 ):
@@ -284,6 +292,7 @@ async def test_logout_invalidates_all_tokens(
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="Password grant removed for OAuth 2.1 compliance")
 async def test_refresh_token_reuse(auth_server: AsyncTestServer, test_user: UserModel):
     """Test that reusing a refresh token after refresh fails."""
     # Initial login

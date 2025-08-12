@@ -7,7 +7,6 @@ using the AdminAPIClient.
 
 import asyncio
 import os
-from getpass import getpass
 
 import click
 
@@ -50,8 +49,6 @@ def auth_group():
 
 
 @auth_group.command()
-@click.option("--username", "-u", prompt=True, help="Admin username")
-@click.option("--password", "-p", help="Admin password (will prompt if not provided)")
 @click.option(
     "--scope",
     "-s",
@@ -59,30 +56,34 @@ def auth_group():
     help="OAuth scopes to request (space-separated)",
 )
 @click.option("--api-url", help="API URL (default: http://localhost:8000 or AUTHLY_API_URL env var)")
+@click.option("--browser/--no-browser", default=True, help="Open browser automatically for authentication")
 @click.option("--show-token", is_flag=True, help="Display the access token (use with caution)")
-def login(username: str, password: str | None, scope: str, api_url: str | None, show_token: bool):
+def login(scope: str, api_url: str | None, browser: bool, show_token: bool):
     """
-    Login to the Authly Admin API.
+    Login to the Authly Admin API using OAuth 2.0.
 
     \b
-    Authenticates with admin credentials and stores tokens securely
-    for subsequent commands. Tokens are saved to ~/.authly/tokens.json.
+    Uses secure OAuth 2.0 Authorization Code Flow with PKCE.
+    A browser window will open for authentication.
+    Tokens are saved to ~/.authly/tokens.json.
 
     \b
     Examples:
-      # Interactive login (prompts for password)
-      $ authly auth login -u admin
-      Password: ***
-      ✅ Successfully logged in as admin
+      # Standard login (opens browser)
+      $ authly auth login
+      Opening browser for authentication...
+      ✅ Successfully authenticated
+
+      # Login without auto-opening browser
+      $ authly auth login --no-browser
+      Please visit: http://localhost:8000/oauth/authorize?...
+      Waiting for authentication...
 
       # Login with specific scopes
-      $ authly auth login -u admin --scope "admin:clients:read admin:scopes:read"
-
-      # Login with password (not recommended for security)
-      $ authly auth login -u admin -p mypassword
+      $ authly auth login --scope "admin:clients:read admin:users:read"
 
       # Login to custom API endpoint
-      $ authly auth login -u admin --api-url https://auth.example.com
+      $ authly auth login --api-url https://auth.example.com
 
     \b
     Available Scopes:
@@ -95,7 +96,8 @@ def login(username: str, password: str | None, scope: str, api_url: str | None, 
 
     \b
     Security Notes:
-      - Avoid using -p flag; let the command prompt for password
+      - Uses OAuth 2.0 Authorization Code Flow with PKCE
+      - No passwords handled by CLI
       - Tokens expire after 60 minutes by default
       - Use 'authly auth refresh' to renew tokens
     """
@@ -104,15 +106,14 @@ def login(username: str, password: str | None, scope: str, api_url: str | None, 
         # Get API URL
         base_url = api_url or get_api_url()
 
-        # Get password if not provided
-        password_input = password if password else getpass("Password: ")
-
         async with AdminAPIClient(base_url=base_url) as client:
             try:
-                # Attempt login
-                token_info = await client.login(username=username, password=password_input, scope=scope)
+                click.echo("Starting OAuth authentication flow...")
 
-                click.echo(f"✅ Successfully logged in as {username}")
+                # Attempt OAuth login
+                token_info = await client.login_oauth_flow(scope=scope, auto_open_browser=browser)
+
+                click.echo("✅ Successfully authenticated")
                 click.echo(f"   API URL: {base_url}")
                 click.echo(f"   Token expires: {token_info.expires_at.strftime('%Y-%m-%d %H:%M:%S UTC')}")
                 click.echo(f"   Granted scopes: {token_info.scope}")

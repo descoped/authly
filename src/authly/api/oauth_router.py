@@ -5,7 +5,6 @@ Provides OAuth 2.1 endpoints including discovery, authorization, and token opera
 
 import logging
 import os
-from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
 from urllib.parse import urlencode
 from uuid import UUID
@@ -25,7 +24,7 @@ from authly.api.auth_dependencies import (
     get_token_service_with_client,
 )
 from authly.api.users_dependencies import get_current_user, get_user_repository
-from authly.auth import decode_token, verify_password
+from authly.auth import decode_token
 from authly.config import AuthlyConfig
 from authly.oauth.authorization_service import AuthorizationService
 from authly.oauth.client_repository import ClientRepository
@@ -129,46 +128,6 @@ class TokenRevocationRequest:
 
 # Create OAuth router
 oauth_router = APIRouter(prefix="/oauth", tags=["OAuth 2.1"])
-
-
-class LoginAttemptTracker:
-    def __init__(self, config: AuthlyConfig | None = None):
-        self.attempts: dict[str, dict[str, int | datetime | None]] = {}
-        if config:
-            self.lockout_duration = config.lockout_duration_seconds
-            self.max_attempts = config.lockout_max_attempts
-        else:
-            self.lockout_duration = 300
-            self.max_attempts = 5
-
-    def check_and_update(self, username: str) -> bool:
-        now = datetime.now(UTC)
-        user_attempts = self.attempts.get(username, {"count": 0, "lockout_until": None})
-
-        if isinstance(user_attempts["lockout_until"], datetime) and now < user_attempts["lockout_until"]:
-            return False
-
-        if user_attempts["count"] >= self.max_attempts:
-            user_attempts["lockout_until"] = now + timedelta(seconds=self.lockout_duration)
-            user_attempts["count"] = 0
-            self.attempts[username] = user_attempts
-            return False
-
-        user_attempts["count"] += 1
-        self.attempts[username] = user_attempts
-        return True
-
-
-# Global login tracker instance - will be initialized with config via dependency
-_login_tracker: LoginAttemptTracker | None = None
-
-
-def get_login_tracker(config: AuthlyConfig = Depends(get_config)) -> LoginAttemptTracker:
-    """Get login tracker instance with configuration."""
-    global _login_tracker
-    if _login_tracker is None:
-        _login_tracker = LoginAttemptTracker(config)
-    return _login_tracker
 
 
 # Configure template directories - OAuth templates and shared core templates
@@ -704,22 +663,18 @@ async def get_access_token(
     scope_repo: ScopeRepository = Depends(get_scope_repository),
 ):
     """
-    OAuth 2.1 Token Endpoint - supports multiple grant types.
+    OAuth 2.1 Token Endpoint.
 
     Accepts application/x-www-form-urlencoded as per OAuth 2.0 specification.
 
     Supported grant types:
-    - password: Username/password authentication (existing)
     - authorization_code: OAuth 2.1 authorization code flow with PKCE
     - refresh_token: Refresh an access token
     """
 
     # Create repositories from database connection
     user_repo = UserRepository(db_connection)
-    token_repo = TokenRepository(db_connection)
-
-    # Create login tracker
-    login_tracker = LoginAttemptTracker()
+    TokenRepository(db_connection)
 
     # Create a TokenRequest object from form data for backward compatibility
     request = TokenRequest(
@@ -735,116 +690,14 @@ async def get_access_token(
         refresh_token=refresh_token,
     )
 
-    if request.grant_type == "password":
-        return await _handle_password_grant(request, user_repo, token_service, login_tracker)
-    elif request.grant_type == "authorization_code":
+    if request.grant_type == "authorization_code":
         return await _handle_authorization_code_grant(request, user_repo, token_service, authorization_service)
     elif request.grant_type == "refresh_token":
         return await _handle_refresh_token_grant(request, user_repo, token_service)
-    elif request.grant_type == "client_credentials":
-        return await _handle_client_credentials_grant(
-            request, client_repo, scope_repo, token_repo, token_service._config
-        )
     else:
         return oauth_error_response(
             "unsupported_grant_type", f"The authorization grant type '{request.grant_type}' is not supported"
         )
-
-
-async def _handle_password_grant(
-    request: TokenRequest,
-    user_repo: UserRepository,
-    token_service: TokenService,
-    login_tracker: LoginAttemptTracker,
-) -> TokenResponse:
-    """Handle password grant type (existing functionality)."""
-    import time
-
-    start_time = time.time()
-
-    # Validate required fields for password grant
-    if not request.username or not request.password:
-        # Track validation error
-        if METRICS_ENABLED and metrics:
-            metrics.track_oauth_token_request("password", "unknown", "validation_error", 0.0)
-        return oauth_error_response("invalid_request", "Username and password are required for password grant")
-
-    # Check login attempts
-    if not login_tracker.check_and_update(request.username):
-        # Track rate limit hit
-        if METRICS_ENABLED and metrics:
-            duration = time.time() - start_time
-            metrics.track_oauth_token_request("password", request.username, "rate_limited", duration)
-            metrics.track_rate_limit_hit(request.username, "password_grant")
-        return oauth_error_response(
-            "invalid_grant", "Too many failed attempts. Account temporarily locked.", status_code=429
-        )
-
-    # Validate user
-    user = await user_repo.get_by_username(request.username)
-    if not user or not verify_password(request.password, user.password_hash):
-        # Track authentication failure
-        if METRICS_ENABLED and metrics:
-            duration = time.time() - start_time
-            metrics.track_oauth_token_request("password", request.username, "invalid_credentials", duration)
-            metrics.track_login_attempt("failed", "password", request.username)
-        return oauth_error_response("invalid_grant", "Incorrect username or password")
-
-    if not user.is_active:
-        # Track inactive user attempt
-        if METRICS_ENABLED and metrics:
-            duration = time.time() - start_time
-            metrics.track_oauth_token_request("password", request.username, "user_inactive", duration)
-        return oauth_error_response("invalid_grant", "Account is deactivated")
-
-    if not user.is_verified:
-        # Track unverified user attempt
-        if METRICS_ENABLED and metrics:
-            duration = time.time() - start_time
-            metrics.track_oauth_token_request("password", request.username, "user_unverified", duration)
-        return oauth_error_response("invalid_grant", "Account not verified")
-
-    try:
-        # Create token pair using TokenService
-        token_response = await token_service.create_token_pair(user, request.scope)
-
-        # Clear failed attempts on successful login
-        if request.username in login_tracker.attempts:
-            del login_tracker.attempts[request.username]
-
-        # Update last login
-        await user_repo.update_last_login(user.id)
-
-        # Check if password change is required
-        response = TokenResponse(
-            access_token=token_response.access_token,
-            refresh_token=token_response.refresh_token,
-            token_type=token_response.token_type,
-            expires_in=token_response.expires_in,
-            scope=token_response.scope,
-        )
-
-        if user.requires_password_change:
-            logger.info(f"User {user.username} requires password change on login")
-            response.requires_password_change = True
-
-        # Track successful authentication
-        if METRICS_ENABLED and metrics:
-            duration = time.time() - start_time
-            metrics.track_oauth_token_request("password", request.username, "success", duration)
-            metrics.track_login_attempt("success", "password", request.username)
-
-        return response
-
-    except HTTPException:
-        # Let HTTPExceptions from TokenService pass through
-        raise
-    except Exception:
-        # Track general authentication error
-        if METRICS_ENABLED and metrics:
-            duration = time.time() - start_time
-            metrics.track_oauth_token_request("password", request.username, "error", duration)
-        return oauth_error_response("invalid_grant", "Could not create authentication tokens")
 
 
 async def _handle_authorization_code_grant(
@@ -1021,78 +874,6 @@ async def _handle_refresh_token_grant(
             metrics.track_oauth_token_request("refresh_token", request.client_id or "unknown", "error", duration)
         logger.error(f"Error handling refresh token grant: {e}")
         return oauth_error_response("invalid_grant", "Could not process refresh token")
-
-
-async def _handle_client_credentials_grant(
-    request: TokenRequest,
-    client_repo: ClientRepository,
-    scope_repo: ScopeRepository,
-    token_repo: TokenRepository,
-    config,
-) -> TokenResponse:
-    """Handle client_credentials grant type for machine-to-machine authentication."""
-    import time
-
-    from authly.api.oauth_client_credentials import handle_client_credentials_grant
-
-    start_time = time.time()
-
-    # Validate required fields for client credentials grant
-    if not request.client_id or not request.client_secret:
-        # Track validation error
-        if METRICS_ENABLED and metrics:
-            metrics.track_oauth_token_request(
-                "client_credentials", request.client_id or "unknown", "validation_error", 0.0
-            )
-        return oauth_error_response(
-            "invalid_request", "client_id and client_secret are required for client_credentials grant"
-        )
-
-    try:
-        # Handle the client credentials grant
-        token_data = await handle_client_credentials_grant(
-            client_id=request.client_id,
-            client_secret=request.client_secret,
-            scope=request.scope,
-            client_repo=client_repo,
-            scope_repo=scope_repo,
-            token_repo=token_repo,
-            config=config,
-        )
-
-        # Return token response (no refresh token for client credentials)
-        return TokenResponse(
-            access_token=token_data["access_token"],
-            token_type=token_data["token_type"],
-            expires_in=token_data["expires_in"],
-            scope=token_data.get("scope"),
-        )
-
-    except HTTPException as he:
-        # Track client credentials grant error
-        if METRICS_ENABLED and metrics:
-            duration = time.time() - start_time
-            metrics.track_oauth_token_request("client_credentials", request.client_id, "invalid_client", duration)
-
-        # Map HTTP exceptions to OAuth errors
-        if he.status_code == status.HTTP_401_UNAUTHORIZED:
-            return oauth_error_response("invalid_client", he.detail, status_code=401)
-        elif he.status_code == status.HTTP_400_BAD_REQUEST:
-            # Check if this is an invalid_scope error
-            if isinstance(he.detail, dict) and he.detail.get("error") == "invalid_scope":
-                return oauth_error_response("invalid_scope", he.detail.get("error_description", "Invalid scope"))
-            else:
-                return oauth_error_response("invalid_request", str(he.detail))
-        else:
-            return oauth_error_response("invalid_grant", he.detail)
-
-    except Exception as e:
-        # Track general error
-        if METRICS_ENABLED and metrics:
-            duration = time.time() - start_time
-            metrics.track_oauth_token_request("client_credentials", request.client_id or "unknown", "error", duration)
-        logger.error(f"Error handling client credentials grant: {e}")
-        return oauth_error_response("server_error", "Internal server error")
 
 
 @oauth_router.post("/introspect")

@@ -10,7 +10,6 @@ from authly.api.health_router import (
 )
 from authly.api.metrics_router import router as metrics_router
 from authly.api.oauth_router import (
-    LoginAttemptTracker,
     RefreshRequest,
     TokenRequest,
     TokenResponse,
@@ -46,7 +45,6 @@ from authly.api.users_router import (
 )
 
 __all__ = [
-    "LoginAttemptTracker",
     "RateLimiter",
     "RefreshRequest",
     "TokenRequest",

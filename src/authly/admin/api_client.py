@@ -5,13 +5,20 @@ This module provides an HTTP client for all admin API endpoints, supporting
 authentication, token management, and secure credential storage.
 """
 
+import base64
+import hashlib
 import json
 import logging
 import os
+import secrets
+import socket
+import threading
+import webbrowser
 from datetime import UTC, datetime, timedelta
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Any
-from urllib.parse import urljoin
+from urllib.parse import parse_qs, urlencode, urljoin, urlparse
 
 import httpx
 from pydantic import BaseModel
@@ -44,6 +51,59 @@ class TokenInfo(BaseModel):
     expires_at: datetime
     token_type: str = "Bearer"
     scope: str | None = None
+
+
+class OAuthCallbackHandler(BaseHTTPRequestHandler):
+    """Handler for OAuth callback with authorization code."""
+
+    def do_GET(self):
+        """Handle callback with authorization code."""
+        parsed = urlparse(self.path)
+        params = parse_qs(parsed.query)
+
+        if "code" in params:
+            self.server.auth_code = params["code"][0]
+            self.server.state = params.get("state", [None])[0]
+
+            # Send success response to browser
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html")
+            self.end_headers()
+            success_html = """
+                <html>
+                <head><title>Authentication Successful</title></head>
+                <body style="font-family: sans-serif; text-align: center; padding: 50px;">
+                    <h1 style="color: #28a745;">✅ Authentication Successful</h1>
+                    <p>You can now close this window and return to the CLI.</p>
+                    <script>window.setTimeout(function(){window.close();}, 3000);</script>
+                </body>
+                </html>
+            """
+            self.wfile.write(success_html.encode())
+        elif "error" in params:
+            self.server.error = params["error"][0]
+            self.server.error_description = params.get("error_description", [""])[0]
+
+            # Send error response to browser
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html")
+            self.end_headers()
+            error_html = f"""
+                <html>
+                <head><title>Authentication Failed</title></head>
+                <body style="font-family: sans-serif; text-align: center; padding: 50px;">
+                    <h1 style="color: #dc3545;">❌ Authentication Failed</h1>
+                    <p><strong>Error:</strong> {params["error"][0]}</p>
+                    <p>{params.get("error_description", [""])[0]}</p>
+                    <p>Please return to the CLI and try again.</p>
+                </body>
+                </html>
+            """
+            self.wfile.write(error_html.encode())
+
+    def log_message(self, format_string, *args):
+        """Suppress request logging."""
+        pass
 
 
 class AdminAPIClient:
@@ -122,6 +182,34 @@ class AdminAPIClient:
                 logger.debug("Cleared tokens from %s", self.token_file)
             except Exception as e:
                 logger.warning("Failed to delete token file: %s", e)
+
+    def _get_callback_port(self) -> int:
+        """Get the callback port for OAuth flow."""
+        # Use configured port from environment or default to 8899
+        port = int(os.getenv("AUTHLY_CLI_CALLBACK_PORT", "8899"))
+
+        # Verify port is available
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            try:
+                s.bind(("", port))
+                return port
+            except OSError as e:
+                raise AdminAPIError(
+                    f"Port {port} is not available for OAuth callback. "
+                    f"Set AUTHLY_CLI_CALLBACK_PORT environment variable to use a different port.",
+                    status_code=None,
+                ) from e
+
+    def _generate_pkce_pair(self) -> tuple[str, str]:
+        """Generate PKCE code verifier and challenge."""
+        # Code verifier: 43-128 characters, URL-safe
+        code_verifier = base64.urlsafe_b64encode(secrets.token_bytes(32)).decode("utf-8").rstrip("=")
+
+        # Code challenge: SHA256 hash of verifier, base64url encoded
+        digest = hashlib.sha256(code_verifier.encode("utf-8")).digest()
+        code_challenge = base64.urlsafe_b64encode(digest).decode("utf-8").rstrip("=")
+
+        return code_verifier, code_challenge
 
     @property
     def is_authenticated(self) -> bool:
@@ -308,47 +396,140 @@ class AdminAPIClient:
 
         return "unknown"
 
-    async def login(self, username: str, password: str, scope: str | None = None) -> TokenInfo:
+    async def login_oauth_flow(self, scope: str | None = None, auto_open_browser: bool = True) -> TokenInfo:
         """
-        Authenticate with username and password.
+        Authenticate using OAuth 2.0 Authorization Code Flow with PKCE.
+
+        This is OAuth 2.1 compliant and replaces the deprecated password grant.
 
         Args:
-            username: Admin username
-            password: Admin password
+            scope: Optional OAuth scopes to request
+            auto_open_browser: Whether to automatically open the browser
+
+        Returns:
+            Token information
+
+        Raises:
+            AdminAPIError: If authentication fails
+        """
+        # Get configured callback port
+        callback_port = self._get_callback_port()
+        redirect_uri = f"http://localhost:{callback_port}/callback"
+
+        # Generate PKCE pair
+        code_verifier, code_challenge = self._generate_pkce_pair()
+
+        # Generate state for CSRF protection
+        state = base64.urlsafe_b64encode(secrets.token_bytes(16)).decode("utf-8").rstrip("=")
+
+        # We need a special CLI client that's registered with this redirect URI
+        client_id = "authly-cli"  # This needs to be pre-registered
+
+        # Build authorization URL
+        auth_params = {
+            "response_type": "code",
+            "client_id": client_id,
+            "redirect_uri": redirect_uri,
+            "code_challenge": code_challenge,
+            "code_challenge_method": "S256",
+            "state": state,
+        }
+        if scope:
+            auth_params["scope"] = scope
+
+        auth_url = f"{self.base_url}/api/v1/oauth/authorize?{urlencode(auth_params)}"
+
+        # Start callback server in background thread
+        server = HTTPServer(("localhost", callback_port), OAuthCallbackHandler)
+        server.auth_code = None
+        server.error = None
+        server.state = None
+        server.timeout = 120  # 2 minute timeout
+
+        def run_server():
+            server.handle_request()  # Handle single request then stop
+
+        server_thread = threading.Thread(target=run_server, daemon=True)
+        server_thread.start()
+
+        # Open browser for user authentication
+        print("Opening browser for authentication...")
+        print(f"If browser doesn't open, visit: {auth_url}")
+
+        if auto_open_browser:
+            webbrowser.open(auth_url)
+
+        # Wait for callback (with timeout)
+        server_thread.join(timeout=120)
+
+        if server.error:
+            raise AdminAPIError(
+                f"OAuth authentication failed: {server.error} - {server.error_description}", status_code=400
+            )
+
+        if not server.auth_code:
+            raise AdminAPIError("Authentication timeout - no authorization code received", status_code=408)
+
+        if server.state != state:
+            raise AdminAPIError("State mismatch - possible CSRF attack", status_code=400)
+
+        # Exchange authorization code for tokens
+        token_data = {
+            "grant_type": "authorization_code",
+            "code": server.auth_code,
+            "redirect_uri": redirect_uri,
+            "client_id": client_id,
+            "code_verifier": code_verifier,
+        }
+
+        response = await self._request("POST", "/api/v1/oauth/token", form_data=token_data, authenticated=False)
+
+        token_response = response.json()
+
+        # Calculate expiration time
+        expires_in = token_response.get("expires_in", 3600)
+        expires_at = datetime.now(UTC) + timedelta(seconds=expires_in)
+
+        self._token_info = TokenInfo(
+            access_token=token_response["access_token"],
+            refresh_token=token_response.get("refresh_token"),
+            expires_at=expires_at,
+            token_type=token_response.get("token_type", "Bearer"),
+            scope=token_response.get("scope"),
+        )
+
+        self._save_tokens()
+        logger.info("Successfully authenticated via OAuth flow")
+
+        return self._token_info
+
+    async def login(
+        self, username: str | None = None, password: str | None = None, scope: str | None = None
+    ) -> TokenInfo:
+        """
+        Authenticate with the Authly Admin API.
+
+        This method now uses OAuth 2.0 Authorization Code Flow with PKCE.
+        Username and password parameters are deprecated and ignored.
+
+        Args:
+            username: (Deprecated) Not used - OAuth flow will handle authentication
+            password: (Deprecated) Not used - OAuth flow will handle authentication
             scope: Optional OAuth scopes to request
 
         Returns:
             Token information
 
         Raises:
-            httpx.HTTPStatusError: If authentication fails
+            AdminAPIError: If authentication fails
         """
-        # Use Resource Owner Password Credentials flow
-        data = {"grant_type": "password", "username": username, "password": password}
+        if username or password:
+            logger.warning(
+                "Password authentication is no longer supported. Using OAuth 2.0 Authorization Code Flow instead."
+            )
 
-        if scope:
-            data["scope"] = scope
-
-        response = await self._request("POST", "/api/v1/oauth/token", form_data=data, authenticated=False)
-
-        token_data = response.json()
-
-        # Calculate expiration time
-        expires_in = token_data.get("expires_in", 3600)  # Default 1 hour
-        expires_at = datetime.now(UTC) + timedelta(seconds=expires_in)
-
-        self._token_info = TokenInfo(
-            access_token=token_data["access_token"],
-            refresh_token=token_data.get("refresh_token"),
-            expires_at=expires_at,
-            token_type=token_data.get("token_type", "Bearer"),
-            scope=token_data.get("scope"),
-        )
-
-        self._save_tokens()
-        logger.info("Successfully authenticated as %s", username)
-
-        return self._token_info
+        # Use OAuth flow for authentication
+        return await self.login_oauth_flow(scope=scope)
 
     async def logout(self) -> None:
         """
