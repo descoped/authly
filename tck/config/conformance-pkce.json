@@ -1,0 +1,20 @@
+{
+  "alias": "authly-pkce-certification",
+  "description": "Authly OAuth 2.1 PKCE Certification Testing",
+  "server": {
+    "discoveryUrl": "http://host.docker.internal:8000/.well-known/openid-configuration"
+  },
+  "client": {
+    "client_id": "conformance-test-public",
+    "redirect_uri": "https://localhost:8443/test/a/authly/callback",
+    "scope": "openid profile email"
+  },
+  "test_plan": "oidcc-pkce-certification-test-plan",
+  "variant": {
+    "client_auth_type": "none",
+    "response_type": "code",
+    "response_mode": "query",
+    "request_type": "plain_http_request",
+    "pkce_method": "S256"
+  }
+}

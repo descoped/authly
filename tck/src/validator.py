@@ -25,6 +25,10 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Tuple
 import sys
 from pathlib import Path
+import urllib3
+
+# Disable SSL warnings for self-signed certificates in test environment
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 class OIDCConformanceValidator:
@@ -35,6 +39,18 @@ class OIDCConformanceValidator:
         self.discovery = None
         self.jwks = None
         self.results = {"discovery": {}, "jwks": {}, "id_token": {}, "endpoints": {}, "security": {}}
+        # For HTTPS with self-signed certificates
+        self.session = requests.Session()
+        self.session.verify = False  # Disable SSL verification for test environment
+        
+    def _translate_url_for_docker(self, url: str) -> str:
+        """Translate localhost URLs to Docker-accessible URLs when running in container."""
+        # Only translate if we're in a Docker container (base_url has host.docker.internal)
+        if "host.docker.internal" in self.base_url:
+            # Replace localhost with host.docker.internal for Docker networking
+            url = url.replace("https://localhost:", "https://host.docker.internal:")
+            url = url.replace("http://localhost:", "http://host.docker.internal:")
+        return url
 
     def validate_all(self) -> tuple[bool, dict]:
         """Run all conformance validations"""
@@ -64,7 +80,7 @@ class OIDCConformanceValidator:
     def validate_discovery_document(self):
         """Validate OIDC Discovery Document per spec section 4"""
         try:
-            resp = requests.get(f"{self.base_url}/.well-known/openid-configuration")
+            resp = self.session.get(f"{self.base_url}/.well-known/openid-configuration")
             self.discovery = resp.json()
 
             # Required fields per OIDC Core 1.0 Section 4.2
@@ -123,7 +139,9 @@ class OIDCConformanceValidator:
         """Validate JWKS per RFC 7517"""
         try:
             jwks_uri = self.discovery.get("jwks_uri", f"{self.base_url}/.well-known/jwks.json")
-            resp = requests.get(jwks_uri)
+            # Translate URL for Docker networking if needed
+            jwks_uri = self._translate_url_for_docker(jwks_uri)
+            resp = self.session.get(jwks_uri)
             self.jwks = resp.json()
 
             # Must have 'keys' array
@@ -171,7 +189,7 @@ class OIDCConformanceValidator:
 
         # Test token endpoint error response format (OAuth 2.0 Section 5.2)
         try:
-            resp = requests.post(
+            resp = self.session.post(
                 f"{self.base_url}/api/v1/oauth/token",
                 data={"grant_type": "invalid_grant"},
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
@@ -212,7 +230,7 @@ class OIDCConformanceValidator:
 
         # Test authorization endpoint with missing parameters
         try:
-            resp = requests.get(
+            resp = self.session.get(
                 f"{self.base_url}/api/v1/oauth/authorize", params={"client_id": "invalid"}, allow_redirects=False
             )
 
@@ -230,7 +248,7 @@ class OIDCConformanceValidator:
 
         # Test UserInfo endpoint requires authentication
         try:
-            resp = requests.get(f"{self.base_url}/oidc/userinfo")
+            resp = self.session.get(f"{self.base_url}/oidc/userinfo")
             requires_auth = resp.status_code == 401
             self.results["endpoints"]["userinfo_requires_auth"] = requires_auth
             print(
@@ -263,7 +281,7 @@ class OIDCConformanceValidator:
         # Check if state parameter is required
         try:
             # Try authorization without state (should fail or warn)
-            resp = requests.get(
+            resp = self.session.get(
                 f"{self.base_url}/api/v1/oauth/authorize",
                 params={"client_id": "test", "response_type": "code", "redirect_uri": "http://localhost/callback"},
                 allow_redirects=False,

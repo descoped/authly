@@ -36,6 +36,10 @@ def _build_issuer_url(request: Request) -> str:
     # Get host, handling the case where it might include port
     host_header = request.headers.get("x-forwarded-host", request.headers.get("host"))
 
+    # Handle multiple comma-separated values in X-Forwarded-Host (take the first one)
+    if host_header and "," in host_header:
+        host_header = host_header.split(",")[0].strip()
+
     if host_header:
         # Host header might include port (e.g., "localhost:8000")
         # Parse it to separate hostname and port

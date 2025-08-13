@@ -45,7 +45,10 @@ def get_base_url(request: Request) -> str:
         scheme = request.url.scheme
 
     if request.headers.get("x-forwarded-host"):
-        host = request.headers.get("x-forwarded-host")
+        # Handle multiple comma-separated values (take the first one)
+        forwarded_host = request.headers.get("x-forwarded-host")
+        # Split on comma and take the first value, strip whitespace
+        host = forwarded_host.split(",")[0].strip() if forwarded_host else request.url.netloc
     else:
         host = request.headers.get("host", request.url.netloc)
 

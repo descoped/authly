@@ -5,6 +5,7 @@
 pyjwt>=2.10.1        # JWT token parsing and validation
 requests>=2.32.4      # HTTP client for endpoint testing  
 urllib3>=2.5.0        # HTTP utilities and connection pooling
+pydantic>=2.10.0      # Data validation for models
 
 # Optional dependencies for extended functionality
 # Uncomment as needed:

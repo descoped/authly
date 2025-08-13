@@ -1,0 +1,120 @@
+# Test Profiles for Conformance Suite
+# Defines different testing profiles with their requirements and modules
+
+profiles:
+  basic:
+    name: "Basic OpenID Provider Certification"
+    description: "Core OIDC functionality required for basic certification"
+    required_score: 90
+    config_file: "conformance-basic.json"
+    test_modules:
+      - oidcc-server
+      - oidcc-discovery-openid-configuration
+      - oidcc-discovery-jwks
+      - oidcc-userinfo-get
+      - oidcc-id-token-aud
+      - oidcc-id-token-iat
+      - oidcc-id-token-sub
+      - oidcc-scope-profile
+      - oidcc-scope-email
+    optional_modules:
+      - oidcc-scope-address
+      - oidcc-scope-phone
+      - oidcc-userinfo-post-header
+      - oidcc-userinfo-post-body
+  
+  pkce:
+    name: "OAuth 2.1 PKCE Certification"
+    description: "Proof Key for Code Exchange compliance"
+    required_score: 100
+    config_file: "conformance-pkce.json"
+    test_modules:
+      - oidcc-ensure-pkce-required
+      - oidcc-ensure-pkce-code-verifier-required
+      - oidcc-ensure-pkce-code-challenge-method-s256
+      - oidcc-ensure-pkce-plain-not-supported
+    optional_modules:
+      - oidcc-ensure-pkce-invalid-code-verifier
+      - oidcc-ensure-pkce-missing-code-verifier
+      - oidcc-codereuse-30seconds
+      - oidcc-codereuse
+  
+  security:
+    name: "Security Best Practices"
+    description: "Advanced security requirements and attack prevention"
+    required_score: 95
+    config_file: "conformance-security.json"
+    test_modules:
+      - oidcc-ensure-pkce-required
+      - oidcc-codereuse
+      - oidcc-nonce-invalid
+      - oidcc-state-invalid
+    optional_modules:
+      - oidcc-codereuse-30seconds
+      - oidcc-redirect-uri-query-added
+      - oidcc-redirect-uri-query-missing
+      - oidcc-ensure-pkce-plain-not-supported
+  
+  advanced:
+    name: "Advanced Features"
+    description: "Optional advanced OIDC features"
+    required_score: 80
+    config_file: "conformance-advanced.json"
+    test_modules:
+      - oidcc-request-object
+      - oidcc-encrypted-id-token
+      - oidcc-session-management
+      - oidcc-frontchannel-logout
+      - oidcc-backchannel-logout
+    optional_modules:
+      - oidcc-claims-parameter
+      - oidcc-acr-values
+      - oidcc-max-age
+  
+  interoperability:
+    name: "Interoperability Testing"
+    description: "Tests with different client configurations"
+    required_score: 85
+    test_variants:
+      - client_auth_type: ["client_secret_basic", "client_secret_post", "private_key_jwt"]
+      - response_type: ["code", "id_token", "id_token token", "code id_token"]
+      - response_mode: ["query", "fragment", "form_post"]
+      - algorithms: ["RS256", "ES256", "PS256"]
+
+# Certification paths
+certification_paths:
+  basic_op:
+    name: "Basic OpenID Provider"
+    description: "Minimum requirements for OIDC certification"
+    required_profiles:
+      - basic
+    optional_profiles:
+      - security
+    
+  oauth21_compliant:
+    name: "OAuth 2.1 Compliant"
+    description: "Full OAuth 2.1 compliance including PKCE"
+    required_profiles:
+      - basic
+      - pkce
+      - security
+    
+  enterprise_ready:
+    name: "Enterprise Ready"
+    description: "Full featured enterprise OIDC provider"
+    required_profiles:
+      - basic
+      - pkce
+      - security
+      - advanced
+      - interoperability
+
+# Test execution settings
+settings:
+  timeout_per_test: 60  # seconds
+  retry_failed_tests: true
+  max_retries: 2
+  parallel_execution: false  # Run tests sequentially for now
+  save_artifacts: true
+  generate_reports: true
+  fail_fast: false  # Continue even if tests fail

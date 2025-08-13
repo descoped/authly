@@ -21,6 +21,7 @@ services:
       retries: 5
     profiles:
       - github-ci
+      - full-suite  # Also available for full suite testing
 
   # Conformance suite HTTPS server
   httpd:
@@ -36,23 +37,25 @@ services:
       - conformance-suite
     profiles:
       - github-ci
+      - full-suite  # Also available for full suite testing
 
   # Conformance suite server (CI builds from source, Local uses pre-built)
   conformance-suite:
     image: ${CONFORMANCE_IMAGE:-ghcr.io/descoped/oidc-conformance-suite:latest}
     container_name: tck-conformance-suite
     ports:
-      - "9999:9999"  # Conformance suite API port
+      - "9999:8080"  # Conformance suite API port (internal 8080 -> external 9999)
     environment:
-      - JAVA_OPTS=-Xmx2g -XX:MaxMetaspaceSize=512m
-      - BASE_URL=https://localhost.emobix.co.uk:8443
+      - JAVA_OPTS=-Xmx2g -XX:MaxMetaspaceSize=512m --add-opens java.base/java.lang=ALL-UNNAMED --add-opens java.base/java.util=ALL-UNNAMED --add-opens java.base/java.lang.reflect=ALL-UNNAMED --add-opens java.base/java.text=ALL-UNNAMED --add-opens java.desktop/java.awt.font=ALL-UNNAMED
+      - BASE_URL=https://host.docker.internal:8443
       - DEVMODE=true
-      - STARTREDIR=true
+      - STARTREDIR=false
+      - fintechlabs.devmode=true
+      - fintechlabs.startredir=false
     networks:
       - tck-network
     extra_hosts:
       - "host.docker.internal:host-gateway"
-      - "localhost.emobix.co.uk:127.0.0.1"
     depends_on:
       - mongodb
     logging:
@@ -62,6 +65,33 @@ services:
         max-file: "5"
     profiles:
       - github-ci
+      - full-suite  # Also available for full suite testing
+
+  # =================================================================
+  # AUTHLY HTTPS PROXY
+  # Provides HTTPS access to Authly for OIDC compliance
+  # =================================================================
+  
+  authly-https:
+    build:
+      context: ./httpd-authly
+      dockerfile: Dockerfile
+    container_name: tck-authly-https
+    ports:
+      - "8002:8443"  # HTTPS port for Authly (https://localhost:8002)
+    networks:
+      - tck-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    profiles:
+      - validator
+      - full-suite
+      - authly-https
+    healthcheck:
+      test: ["CMD", "httpd", "-t"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
   # =================================================================
   # TCK VALIDATOR (PRIMARY SERVICE)
@@ -77,15 +107,19 @@ services:
     volumes:
       - ./reports:/tck/reports
       - ./config:/tck/config:ro
+      - ./src:/tck/src:ro  # Allow live code updates for development
     networks:
       - tck-network
     environment:
-      - AUTHLY_BASE_URL=http://host.docker.internal:8000
+      - AUTHLY_BASE_URL=https://host.docker.internal:8002  # Use HTTPS proxy
+      - AUTHLY_HTTP_URL=http://host.docker.internal:8000   # Fallback to HTTP
+      - CONFORMANCE_SUITE_URL=https://host.docker.internal:8443
       - TCK_REPORTS_DIR=/tck/reports/latest
     extra_hosts:
       - "host.docker.internal:host-gateway"
     profiles:
       - validator  # Default profile for lightweight validation
+      - full-suite  # Also used for full suite testing
     restart: "no"  # Run once and exit
     command: python src/validator.py
 

@@ -33,6 +33,7 @@ class AuthlyConfig:
     _access_token_expire_minutes: int
     _refresh_token_expire_days: int
     _database_url: str
+    _rate_limit_enabled: bool
     _rate_limit_max_requests: int
     _rate_limit_window_seconds: int
     _rsa_key_size: int
@@ -132,6 +133,7 @@ class AuthlyConfig:
             _algorithm=os.getenv("JWT_ALGORITHM", "HS256"),
             _access_token_expire_minutes=int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60")),
             _refresh_token_expire_days=int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7")),
+            _rate_limit_enabled=os.getenv("AUTHLY_RATE_LIMIT_ENABLED", "true").lower() == "true",
             _rate_limit_max_requests=int(os.getenv("RATE_LIMIT_MAX_REQUESTS", "5")),
             _rate_limit_window_seconds=int(os.getenv("RATE_LIMIT_WINDOW_SECONDS", "60")),
             _rsa_key_size=int(os.getenv("RSA_KEY_SIZE", "2048")),
@@ -213,6 +215,10 @@ class AuthlyConfig:
     @property
     def refresh_token_expire_days(self) -> int:
         return self._refresh_token_expire_days
+
+    @property
+    def rate_limit_enabled(self) -> bool:
+        return self._rate_limit_enabled
 
     @property
     def rate_limit_max_requests(self) -> int:
@@ -431,8 +437,8 @@ class AuthlyConfig:
         if self._refresh_token_expire_days <= 0:
             raise ValueError("Refresh token expiration must be positive")
 
-        # Validate rate limiting values
-        if self._rate_limit_max_requests <= 0:
+        # Validate rate limiting values (only if enabled)
+        if self._rate_limit_enabled and self._rate_limit_max_requests <= 0:
             raise ValueError("Rate limit max requests must be positive")
 
         if self._rate_limit_window_seconds <= 0:

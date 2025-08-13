@@ -58,19 +58,32 @@ def create_app(
     # Add logging middleware first (to capture all requests)
     app.add_middleware(LoggingMiddleware)
 
-    # Add rate limiting middleware for OAuth 2.1 compliance
+    # Add rate limiting middleware for OAuth 2.1 compliance (if enabled)
     # This must be early in the middleware stack to protect endpoints
-    app.add_middleware(
-        RateLimitingMiddleware,
-        max_requests=10,  # Allow 10 requests
-        window_seconds=60,  # Per minute
-        paths_to_limit=[
-            "/api/v1/oauth/token",
-            "/api/v1/token",
-            "/oauth/token",
-            "/token",
-        ],
-    )
+    # Get config to check if rate limiting is enabled
+    from authly.config import AuthlyConfig
+
+    rate_limit_enabled = True  # Default to enabled
+    rate_limit_max_requests = 10
+    rate_limit_window_seconds = 60
+
+    if config and isinstance(config, AuthlyConfig):
+        rate_limit_enabled = config.rate_limit_enabled
+        rate_limit_max_requests = config.rate_limit_max_requests
+        rate_limit_window_seconds = config.rate_limit_window_seconds
+
+    if rate_limit_enabled:
+        app.add_middleware(
+            RateLimitingMiddleware,
+            max_requests=rate_limit_max_requests,
+            window_seconds=rate_limit_window_seconds,
+            paths_to_limit=[
+                "/api/v1/oauth/token",
+                "/api/v1/token",
+                "/oauth/token",
+                "/token",
+            ],
+        )
 
     # Add CORS middleware for browser compatibility
     # This should be after logging but before other middleware

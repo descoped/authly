@@ -1,0 +1,188 @@
+#!/usr/bin/env python3
+"""
+Run all conformance tests and generate consolidated report
+"""
+
+import json
+import os
+from pathlib import Path
+from typing import Dict, List, Any
+import subprocess
+import sys
+
+def run_conformance_test(config_file: str) -> dict[str, Any]:
+    """Run a single conformance test configuration"""
+    config_name = Path(config_file).stem
+    print(f"\n🧪 Running {config_name}...")
+    
+    # Import test runner
+    sys.path.insert(0, str(Path(__file__).parent))
+    from test_plans import TestPlanRunner
+    
+    try:
+        # Run the test
+        runner = TestPlanRunner(config_file)
+        results = runner.run()
+        
+        # Generate and save report
+        report = runner.generate_report()
+        report_dir = Path(__file__).parent.parent / "reports" / "test-plans"
+        report_dir.mkdir(parents=True, exist_ok=True)
+        
+        report_file = report_dir / f"{config_name}_report.md"
+        with open(report_file, "w") as f:
+            f.write(report)
+        
+        return results
+    except Exception as e:
+        print(f"   ❌ Error running {config_name}: {e}")
+        return {
+            "summary": {
+                "total": 0,
+                "passed": 0,
+                "failed": 0,
+                "skipped": 0
+            }
+        }
+
+def main():
+    """Run all conformance tests"""
+    print("=" * 60)
+    print("🚀 RUNNING ALL CONFORMANCE TEST CONFIGURATIONS")
+    print("=" * 60)
+    
+    # Find all conformance configs
+    config_dir = Path(__file__).parent.parent / "config"
+    configs = sorted(config_dir.glob("conformance-*.json"))
+    
+    # Skip profiles.json as it's a meta config
+    configs = [c for c in configs if "profiles" not in c.name]
+    
+    all_results = {}
+    total_stats = {
+        "total": 0,
+        "passed": 0,
+        "failed": 0,
+        "skipped": 0
+    }
+    
+    # Run each configuration
+    for config in configs:
+        results = run_conformance_test(str(config))
+        all_results[config.stem] = results
+        
+        # Aggregate stats
+        summary = results.get("summary", {})
+        total_stats["total"] += summary.get("total", 0)
+        total_stats["passed"] += summary.get("passed", 0)
+        total_stats["failed"] += summary.get("failed", 0)
+        total_stats["skipped"] += summary.get("skipped", 0)
+    
+    # Generate consolidated report
+    print("\n" + "=" * 60)
+    print("📊 CONSOLIDATED RESULTS")
+    print("=" * 60)
+    
+    report = f"""# Consolidated Conformance Test Report
+
+## Overall Summary
+- **Test Configurations Run**: {len(configs)}
+- **Total Tests**: {total_stats['total']}
+- **Passed**: {total_stats['passed']} ✅
+- **Failed**: {total_stats['failed']} ❌
+- **Skipped**: {total_stats['skipped']} ⏭️
+- **Overall Pass Rate**: {(total_stats['passed'] / max(1, total_stats['total']) * 100):.1f}%
+
+## Results by Configuration
+
+"""
+    
+    for config_name, results in all_results.items():
+        summary = results.get("summary", {})
+        total = summary.get("total", 0)
+        passed = summary.get("passed", 0)
+        failed = summary.get("failed", 0)
+        skipped = summary.get("skipped", 0)
+        pass_rate = (passed / max(1, total)) * 100
+        
+        report += f"""### {config_name}
+- **Total Tests**: {total}
+- **Passed**: {passed} ✅
+- **Failed**: {failed} ❌
+- **Skipped**: {skipped} ⏭️
+- **Pass Rate**: {pass_rate:.1f}%
+
+"""
+        
+        print(f"\n{config_name}:")
+        print(f"  Total: {total}, Passed: {passed}, Failed: {failed}, Skipped: {skipped}")
+        print(f"  Pass Rate: {pass_rate:.1f}%")
+    
+    # Add detailed test coverage
+    report += """## Test Coverage
+
+### Configurations Tested
+"""
+    
+    for config in configs:
+        report += f"- ✅ {config.stem}\n"
+    
+    report += """
+### Test Categories Covered
+- **Basic OIDC Certification**: Core OpenID Connect flows
+- **PKCE Certification**: OAuth 2.1 PKCE requirements  
+- **Security Testing**: Security best practices and vulnerabilities
+
+## Certification Readiness
+
+"""
+    
+    overall_pass_rate = (total_stats['passed'] / max(1, total_stats['total'])) * 100
+    
+    if overall_pass_rate >= 90:
+        report += "### ✅ **READY FOR CERTIFICATION**\n"
+        report += "The implementation meets the requirements for OpenID certification.\n"
+    elif overall_pass_rate >= 70:
+        report += "### ⚠️ **NEARLY READY**\n"
+        report += "Some issues need to be addressed before certification.\n"
+    else:
+        report += "### ❌ **NOT READY**\n"
+        report += "Significant work is needed to meet certification requirements.\n"
+    
+    report += f"""
+## Next Steps
+
+1. Review individual test reports in `reports/test-plans/`
+2. Address failing tests by priority (required tests first)
+3. Run `make comprehensive` for detailed 7000+ test coverage
+4. Use `make validate` for quick specification compliance check
+
+---
+*Generated by Conformance Test Runner*
+"""
+    
+    # Save consolidated report
+    report_dir = Path(__file__).parent.parent / "reports" / "all-conformance"
+    report_dir.mkdir(parents=True, exist_ok=True)
+    
+    report_file = report_dir / "CONSOLIDATED_REPORT.md"
+    with open(report_file, "w") as f:
+        f.write(report)
+    
+    print(f"\n📄 Consolidated report saved to: {report_file}")
+    
+    # Save JSON results
+    json_file = report_dir / "all_results.json"
+    with open(json_file, "w") as f:
+        json.dump(all_results, f, indent=2, default=str)
+    
+    print(f"📄 JSON results saved to: {json_file}")
+    
+    print("\n" + "=" * 60)
+    print("✅ ALL CONFORMANCE TESTS COMPLETED")
+    print("=" * 60)
+    
+    return 0 if overall_pass_rate >= 70 else 1
+
+if __name__ == "__main__":
+    sys.exit(main())

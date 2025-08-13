@@ -3,8 +3,8 @@
   "description": "Basic OpenID Connect certification test plan for authorization code flow",
   "version": "1.0",
   "server": {
-    "discoveryUrl": "http://localhost:8000/.well-known/openid-configuration",
-    "issuer": "http://localhost:8000"
+    "discoveryUrl": "https://localhost:8002/.well-known/openid-configuration",
+    "issuer": "https://localhost:8002"
   },
   "client": {
     "client_id": "oidc-conformance-test",

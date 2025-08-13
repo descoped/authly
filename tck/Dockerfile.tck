@@ -26,8 +26,8 @@ COPY src/ src/
 COPY scripts/ scripts/
 COPY config/ config/
 
-# Create reports directory with proper permissions
-RUN mkdir -p reports/latest && \
+# Create reports directories with proper permissions
+RUN mkdir -p reports/latest reports/conformance-suite reports/test-plans && \
     chown -R tck:tck /tck
 
 # Switch to non-root user

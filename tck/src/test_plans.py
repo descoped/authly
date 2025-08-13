@@ -14,6 +14,10 @@ import secrets
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, Any, Tuple
+import urllib3
+
+# Disable SSL warnings for self-signed certificates in test environment
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 class TestPlanRunner:
@@ -34,8 +38,24 @@ class TestPlanRunner:
             "modules": {},
             "summary": {"total": 0, "passed": 0, "failed": 0, "skipped": 0},
         }
+        # Create session with SSL verification disabled for test environment
+        self.session = requests.Session()
+        self.session.verify = False
+        
+        # Initialize test registry
+        self._init_test_registry()
+        
+    def _translate_url_for_docker(self, url: str) -> str:
+        """Translate localhost URLs to Docker-accessible URLs when running in container."""
+        # Only translate if we're in a Docker container (base_url has host.docker.internal)
+        if "host.docker.internal" in self.base_url:
+            # Replace localhost with host.docker.internal for Docker networking
+            url = url.replace("https://localhost:", "https://host.docker.internal:")
+            url = url.replace("http://localhost:", "http://host.docker.internal:")
+        return url
 
-        # Test module registry - maps test names to methods
+    def _init_test_registry(self):
+        """Initialize test module registry - maps test names to methods"""
         self.test_registry = {
             # Discovery tests
             "oidcc-server": self.test_server_discovery,
@@ -101,14 +121,16 @@ class TestPlanRunner:
         """Load discovery document and JWKS"""
         try:
             # Try hyphen version (spec-compliant)
-            resp = requests.get(f"{self.base_url}/.well-known/openid-configuration")
+            resp = self.session.get(f"{self.base_url}/.well-known/openid-configuration")
             if resp.status_code == 200:
                 self.discovery = resp.json()
 
                 # Load JWKS
                 jwks_uri = self.discovery.get("jwks_uri")
                 if jwks_uri:
-                    jwks_resp = requests.get(jwks_uri)
+                    # Translate URL for Docker networking if needed
+                    jwks_uri = self._translate_url_for_docker(jwks_uri)
+                    jwks_resp = self.session.get(jwks_uri)
                     if jwks_resp.status_code == 200:
                         self.jwks = jwks_resp.json()
         except Exception as e:
@@ -147,7 +169,7 @@ class TestPlanRunner:
     def test_userinfo_get(self) -> bool:
         """Test UserInfo endpoint with GET method"""
         # Without a real token, we can only test that it requires auth
-        resp = requests.get(f"{self.base_url}/oidc/userinfo")
+        resp = self.session.get(f"{self.base_url}/oidc/userinfo")
 
         # Should return 401 without token
         if resp.status_code != 401:
@@ -159,7 +181,11 @@ class TestPlanRunner:
     def test_userinfo_post_header(self) -> bool:
         """Test UserInfo endpoint with POST method and Bearer header"""
         # Test that POST is also supported
-        resp = requests.post(f"{self.base_url}/oidc/userinfo", headers={"Authorization": "Bearer invalid"})
+        resp = self.session.post(
+            f"{self.base_url}/oidc/userinfo", 
+            headers={"Authorization": "Bearer invalid"},
+            data={}  # POST requires a body
+        )
 
         # Should return 401 with invalid token
         return resp.status_code == 401
@@ -179,7 +205,7 @@ class TestPlanRunner:
             # Remove base URL if it's included
             path = auth_endpoint.replace(self.base_url, "") if auth_endpoint.startswith("http") else auth_endpoint
 
-            resp = requests.get(
+            resp = self.session.get(
                 f"{self.base_url}{path}",
                 params={
                     "client_id": "test",
@@ -198,7 +224,7 @@ class TestPlanRunner:
     def test_pkce_verifier_required(self) -> bool:
         """Test that code_verifier is required at token endpoint"""
         # Try token exchange without code_verifier
-        resp = requests.post(
+        resp = self.session.post(
             f"{self.base_url}/api/v1/oauth/token",
             data={"grant_type": "authorization_code", "code": "invalid_code", "client_id": "test"},
         )
@@ -258,10 +284,16 @@ class TestPlanRunner:
 
         auth_endpoint = self.discovery.get("authorization_endpoint")
         if auth_endpoint:
-            path = auth_endpoint.replace(self.base_url, "") if auth_endpoint.startswith("http") else auth_endpoint
+            # Parse the authorization endpoint URL properly
+            if auth_endpoint.startswith("http"):
+                # It's an absolute URL, use it directly
+                auth_url = auth_endpoint
+            else:
+                # It's a relative path, append to base URL
+                auth_url = f"{self.base_url}{auth_endpoint}"
 
-            resp = requests.get(
-                f"{self.base_url}{path}",
+            resp = self.session.get(
+                auth_url,
                 params={
                     "client_id": "test",
                     "response_type": "code",

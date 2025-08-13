@@ -16,7 +16,7 @@
     "subject_types_supported_type_correct": true,
     "id_token_signing_alg_values_supported_present": true,
     "id_token_signing_alg_values_supported_type_correct": true,
-    "issuer_https": false,
+    "issuer_https": true,
     "authorization_endpoint_absolute": true,
     "token_endpoint_absolute": true,
     "userinfo_endpoint_absolute": true,

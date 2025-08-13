@@ -1,0 +1,26 @@
+{
+  "alias": "authly-basic-certification",
+  "description": "Authly Basic OIDC Certification Testing",
+  "server": {
+    "discoveryUrl": "http://host.docker.internal:8000/.well-known/openid-configuration"
+  },
+  "client": {
+    "client_id": "conformance-test",
+    "client_secret": "test-secret",
+    "redirect_uri": "https://localhost:8443/test/a/authly/callback",
+    "scope": "openid profile email"
+  },
+  "test_plan": "oidcc-basic-certification-test-plan",
+  "variant": {
+    "client_auth_type": "client_secret_basic",
+    "response_type": "code",
+    "response_mode": "query",
+    "request_type": "plain_http_request"
+  },
+  "skip_test_modules": [
+    "oidcc-scope-address",
+    "oidcc-scope-phone",
+    "oidcc-userinfo-post-body",
+    "oidcc-id-token-kid-absent-single-jwks"
+  ]
+}

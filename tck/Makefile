@@ -25,6 +25,7 @@ help: ## Show this help message
 	@echo ""
 	@echo "$(GREEN)Quick Start (Local Development):$(NC)"
 	@echo "  make validate      # Run lightweight TCK validation (98% compliance)"
+	@echo "  make comprehensive # Run 1000+ comprehensive tests"
 	@echo "  make actionable    # Generate list of issues to fix for compliance"
 	@echo "  make show-reports  # List all generated reports"
 	@echo "  make build-tck     # Build TCK container"
@@ -182,11 +183,22 @@ show-reports: ## Show all available reports
 		echo "$(RED)❌ No reports found. Run 'make validate' first.$(NC)"; \
 	fi
 
+comprehensive: build-tck setup ## Run 1000+ comprehensive tests
+	@echo "$(GREEN)🚀 Running Comprehensive Test Suite (1000+ tests)...$(NC)"
+	@mkdir -p reports/comprehensive
+	@docker compose --profile validator run --rm \
+		-v $(PWD)/reports:/tck/reports \
+		-e AUTHLY_BASE_URL=https://host.docker.internal:8002 \
+		validator python src/comprehensive_test_suite.py https://host.docker.internal:8002 20
+	@echo ""
+	@echo "$(GREEN)📄 Comprehensive test results saved to: reports/comprehensive/$(NC)"
+	@echo "$(YELLOW)View report: cat reports/comprehensive/report.md$(NC)"
+
 # ===== CONFORMANCE SUITE COMMANDS =====
 
 suite-start: ## Start full conformance suite with UI
 	@echo "$(GREEN)Starting full conformance suite...$(NC)"
-	@export CONFORMANCE_IMAGE=$(CONFORMANCE_IMAGE) && docker compose --profile github-ci up -d
+	@export CONFORMANCE_IMAGE=$(CONFORMANCE_IMAGE) && docker compose --profile full-suite up -d
 	@echo "$(YELLOW)Waiting for services to start (30 seconds)...$(NC)"
 	@sleep 30
 	@echo "$(GREEN)✅ Conformance suite available at:$(NC)"
@@ -200,24 +212,44 @@ suite-start: ## Start full conformance suite with UI
 
 suite-test: suite-start ## Run conformance suite tests
 	@echo "$(GREEN)Running conformance suite tests...$(NC)"
-	@./scripts/run-suite-tests.sh oidcc-basic-certification-test-plan
+	@docker compose --profile validator run --rm \
+		-e CONFORMANCE_SUITE_URL=https://host.docker.internal:8443 \
+		-e AUTHLY_BASE_URL=http://host.docker.internal:8000 \
+		validator python src/conformance_suite.py conformance-basic.json
 
 suite-test-pkce: suite-start ## Run PKCE conformance tests
 	@echo "$(GREEN)Running PKCE conformance tests...$(NC)"
-	@./scripts/run-suite-tests.sh oidcc-pkce-test-plan
+	@docker compose --profile validator run --rm \
+		-e CONFORMANCE_SUITE_URL=https://host.docker.internal:8443 \
+		-e AUTHLY_BASE_URL=http://host.docker.internal:8000 \
+		validator python src/conformance_suite.py conformance-pkce.json
+
+suite-test-security: suite-start ## Run security conformance tests
+	@echo "$(GREEN)Running security conformance tests...$(NC)"
+	@docker compose --profile validator run --rm \
+		-e CONFORMANCE_SUITE_URL=https://host.docker.internal:8443 \
+		-e AUTHLY_BASE_URL=http://host.docker.internal:8000 \
+		validator python src/conformance_suite.py conformance-security.json
+
+suite-test-all: suite-start ## Run all conformance suite tests
+	@echo "$(GREEN)Running all conformance suite tests...$(NC)"
+	@make suite-test || true
+	@make suite-test-pkce || true
+	@make suite-test-security || true
+	@echo "$(GREEN)All suite tests complete. Check reports/conformance-suite/$(NC)"
 
 suite-stop: ## Stop conformance suite
 	@echo "$(YELLOW)Stopping conformance suite...$(NC)"
-	@docker compose --profile github-ci down
+	@docker compose --profile full-suite down
 	@echo "$(GREEN)Suite stopped$(NC)"
 
 suite-logs: ## Show conformance suite logs
 	@echo "$(GREEN)Conformance Suite Logs:$(NC)"
-	@docker compose --profile github-ci logs -f conformance-suite
+	@docker compose --profile full-suite logs -f conformance-suite
 
 suite-status: ## Check conformance suite status
 	@echo "$(GREEN)Conformance Suite Status:$(NC)"
-	@docker compose --profile github-ci ps
+	@docker compose --profile full-suite ps
 	@echo ""
 	@echo "$(GREEN)Testing endpoints:$(NC)"
 	@curl -sk https://localhost:8443/api/runner/available > /dev/null 2>&1 && \

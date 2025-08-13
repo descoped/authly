@@ -1,0 +1,30 @@
+{
+  "alias": "authly-security-testing",
+  "description": "Authly Security Best Practices Testing",
+  "server": {
+    "discoveryUrl": "https://localhost:8002/.well-known/openid-configuration",
+    "issuer": "https://localhost:8002"
+  },
+  "client": {
+    "client_id": "conformance-test",
+    "client_secret": "test-secret",
+    "redirect_uri": "https://localhost:8443/test/a/authly/callback",
+    "scope": "openid profile email"
+  },
+  "test_plan": "oidcc-security-certification-test-plan",
+  "variant": {
+    "client_auth_type": "client_secret_post",
+    "response_type": "code",
+    "response_mode": "query",
+    "request_type": "plain_http_request"
+  },
+  "test_modules": [
+    "oidcc-ensure-pkce-required",
+    "oidcc-codereuse-30seconds",
+    "oidcc-codereuse",
+    "oidcc-nonce-invalid",
+    "oidcc-state-invalid",
+    "oidcc-ensure-pkce-plain-not-supported",
+    "oidcc-ensure-pkce-invalid-code-verifier"
+  ]
+}
