@@ -1,24 +1,29 @@
+
 services:
   # =================================================================
-  # CONFORMANCE SUITE SERVICES
+  # CONFORMANCE SUITE SERVICES (profile: github-ci)
+  # Used by CI to build/test conformance suite from source
+  # Local development uses pre-built images via CONFORMANCE_IMAGE env var
   # =================================================================
   
   # MongoDB for conformance suite storage
-  tck-mongodb:
+  mongodb:
     image: mongo:8.0.12
     container_name: tck-mongodb
     volumes:
-      - tck_mongo_data:/data/db
+      - mongo_data:/data/db
     networks:
-      - authly-network
+      - tck-network
     healthcheck:
       test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
       interval: 10s
       timeout: 5s
       retries: 5
+    profiles:
+      - github-ci
 
   # Conformance suite HTTPS server
-  tck-httpd:
+  httpd:
     build:
       context: ./httpd-ci
       dockerfile: Dockerfile
@@ -26,15 +31,16 @@ services:
     ports:
       - "8443:8443"
     networks:
-      - authly-network
+      - tck-network
     depends_on:
-      - tck-server
+      - conformance-suite
+    profiles:
+      - github-ci
 
-  # Conformance suite server (using pre-built image from GitHub Packages)
-  tck-server:
-    # Use image from GitHub Container Registry if available, otherwise build locally
+  # Conformance suite server (CI builds from source, Local uses pre-built)
+  conformance-suite:
     image: ${CONFORMANCE_IMAGE:-ghcr.io/descoped/oidc-conformance-suite:latest}
-    container_name: tck-server
+    container_name: tck-conformance-suite
     ports:
       - "9999:9999"  # Conformance suite API port
     environment:
@@ -43,20 +49,26 @@ services:
       - DEVMODE=true
       - STARTREDIR=true
     networks:
-      - authly-network
+      - tck-network
     extra_hosts:
       - "host.docker.internal:host-gateway"
       - "localhost.emobix.co.uk:127.0.0.1"
     depends_on:
-      - tck-mongodb
+      - mongodb
     logging:
       driver: "json-file"
       options:
         max-size: "500k"
         max-file: "5"
+    profiles:
+      - github-ci
+
+  # =================================================================
+  # TCK VALIDATOR (PRIMARY SERVICE)
+  # =================================================================
 
   # TCK Conformance Validator (isolated Python environment)
-  tck-validator:
+  validator:
     build:
       context: .
       dockerfile: Dockerfile.tck
@@ -64,28 +76,32 @@ services:
     container_name: tck-validator
     volumes:
       - ./reports:/tck/reports
+      - ./config:/tck/config:ro
     networks:
-      - authly-network
+      - tck-network
     environment:
       - AUTHLY_BASE_URL=http://host.docker.internal:8000
+      - TCK_REPORTS_DIR=/tck/reports/latest
     extra_hosts:
       - "host.docker.internal:host-gateway"
     profiles:
-      - validator  # Only start when explicitly requested
+      - validator  # Default profile for lightweight validation
     restart: "no"  # Run once and exit
+    command: python src/validator.py
 
   # =================================================================
-  # AUTHLY SERVICES (extends from main docker-compose)
+  # NETWORK CONFIGURATION  
   # =================================================================
-  
-  # These services are defined in the main docker-compose files
-  # and are extended here to add the TCK network
-  
+
 networks:
+  tck-network:
+    driver: bridge
+    external: false
+  # Connect to external Authly network if available
   authly-network:
     external: true
     name: authly_authly-net
 
 volumes:
-  tck_mongo_data:
+  mongo_data:
     driver: local

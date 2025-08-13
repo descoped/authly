@@ -19,9 +19,11 @@ from typing import Dict, Any, Tuple
 class TestPlanRunner:
     """Run OIDC conformance tests from JSON test plans"""
 
-    def __init__(self, test_plan_path: str, base_url: str = "http://localhost:8000"):
+    def __init__(self, test_plan_path: str, base_url: str = None):
         """Initialize with test plan and target server"""
-        self.base_url = base_url
+        import os
+
+        self.base_url = base_url or os.getenv("AUTHLY_BASE_URL", "http://localhost:8000")
         self.test_plan = json.load(open(test_plan_path))
         self.discovery = None
         self.jwks = None
