@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class AdminUserResponse(BaseModel):
@@ -58,8 +58,8 @@ class AdminUserResponse(BaseModel):
     # Admin-specific metadata
     active_sessions: int | None = Field(None, description="Number of active sessions for this user")
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "id": "123e4567-e89b-12d3-a456-426614174000",
                 "username": "john.doe",
@@ -95,6 +95,7 @@ class AdminUserResponse(BaseModel):
                 },
             }
         }
+    )
 
 
 class AdminUserListResponse(BaseModel):
@@ -110,8 +111,8 @@ class AdminUserListResponse(BaseModel):
     page_info: dict[str, Any] = Field(..., description="Pagination information")
     filters_applied: dict[str, Any] | None = Field(None, description="Applied filters")
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "users": [
                     {
@@ -137,6 +138,7 @@ class AdminUserListResponse(BaseModel):
                 "filters_applied": {"is_active": True, "is_verified": None},
             }
         }
+    )
 
 
 class AdminUserFilters(BaseModel):
@@ -169,8 +171,8 @@ class AdminUserFilters(BaseModel):
     locale: str | None = Field(None, description="Filter by locale")
     zoneinfo: str | None = Field(None, description="Filter by timezone")
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "username": "john",
                 "email": "@example.com",
@@ -182,6 +184,7 @@ class AdminUserFilters(BaseModel):
                 "locale": "en-US",
             }
         }
+    )
 
 
 class AdminUserCreateRequest(BaseModel):
@@ -256,8 +259,8 @@ class AdminSessionResponse(BaseModel):
     is_invalidated: bool = Field(..., description="Whether session was invalidated")
     invalidated_at: datetime | None = Field(None, description="When session was invalidated")
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "session_id": "123e4567-e89b-12d3-a456-426614174000",
                 "token_jti": "abc123def456ghi789",
@@ -273,6 +276,7 @@ class AdminSessionResponse(BaseModel):
                 "invalidated_at": None,
             }
         }
+    )
 
 
 class AdminSessionListResponse(BaseModel):
@@ -288,8 +292,8 @@ class AdminSessionListResponse(BaseModel):
     active_count: int = Field(..., description="Number of currently active sessions")
     page_info: dict[str, Any] = Field(..., description="Pagination information")
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "sessions": [
                     {
@@ -316,6 +320,7 @@ class AdminSessionListResponse(BaseModel):
                 },
             }
         }
+    )
 
 
 class AdminUserCreateResponse(AdminUserResponse):
@@ -329,8 +334,8 @@ class AdminUserCreateResponse(AdminUserResponse):
         None, description="Generated temporary password (only included when generated)"
     )
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "id": "123e4567-e89b-12d3-a456-426614174000",
                 "username": "john.doe",
@@ -345,6 +350,7 @@ class AdminUserCreateResponse(AdminUserResponse):
                 "active_sessions": 0,
             }
         }
+    )
 
 
 class AdminUserUpdateRequest(BaseModel):
@@ -382,50 +388,3 @@ class AdminUserUpdateRequest(BaseModel):
     phone_number: str | None = Field(None, description="Phone number")
     phone_number_verified: bool | None = Field(None, description="Phone verification status")
     address: dict[str, Any] | None = Field(None, description="Structured address")
-
-
-class AdminSessionResponse(BaseModel):
-    """
-    Session information response for admin operations.
-
-    This model provides detailed session information including
-    token details, client information, and activity data.
-    """
-
-    # Session identification
-    session_id: UUID = Field(..., description="Unique session identifier (token ID)")
-    token_jti: str = Field(..., description="JWT token identifier")
-    token_type: str = Field(..., description="Token type (access/refresh)")
-
-    # Session metadata
-    created_at: datetime = Field(..., description="Session creation timestamp")
-    expires_at: datetime = Field(..., description="Session expiration timestamp")
-    last_activity: datetime = Field(..., description="Last activity timestamp")
-    is_active: bool = Field(..., description="Whether session is currently active")
-
-    # Client and scope information
-    client_id: UUID | None = Field(None, description="OAuth client ID")
-    scope: str | None = Field(None, description="Granted scopes")
-
-    # Security information
-    is_expired: bool = Field(..., description="Whether session is expired")
-    is_invalidated: bool = Field(..., description="Whether session was invalidated")
-    invalidated_at: datetime | None = Field(None, description="When session was invalidated")
-
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "session_id": "123e4567-e89b-12d3-a456-426614174000",
-                "token_jti": "abc123def456ghi789",
-                "token_type": "access",
-                "created_at": "2023-01-01T00:00:00Z",
-                "expires_at": "2023-01-01T01:00:00Z",
-                "last_activity": "2023-01-01T00:30:00Z",
-                "is_active": True,
-                "client_id": "456e7890-e12b-34d5-a678-901234567890",
-                "scope": "openid profile email",
-                "is_expired": False,
-                "is_invalidated": False,
-                "invalidated_at": None,
-            }
-        }

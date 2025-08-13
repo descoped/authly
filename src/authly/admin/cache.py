@@ -15,7 +15,7 @@ Cache Keys:
 import hashlib
 import json
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
@@ -76,7 +76,8 @@ class AdminCacheService:
         """Enable caching."""
         self._enabled = True
 
-    def _generate_filters_hash(self, filters: dict[str, Any] | None) -> str:
+    @staticmethod
+    def _generate_filters_hash(filters: dict[str, Any] | None) -> str:
         """
         Generate a stable hash for filter parameters.
 
@@ -244,7 +245,7 @@ class AdminCacheService:
                 "users": users,
                 "total_count": total_count,
                 "active_count": active_count,
-                "cached_at": datetime.utcnow().isoformat(),
+                "cached_at": datetime.now(UTC).isoformat(),
             }
             await self.cache.set(key, json.dumps(cache_data, default=str), ttl=self.ttl_user_listing)
             logger.debug(f"Cached user listing: {len(users)} users, filters={filters_hash}")

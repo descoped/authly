@@ -122,7 +122,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         for header_name, header_value in self.custom_headers.items():
             response.headers[header_name] = header_value
 
-    def _get_default_csp(self) -> str:
+    @staticmethod
+    def _get_default_csp() -> str:
         """Get default Content Security Policy for Authly."""
         # OAuth UI and API-focused CSP policy
         # Allows inline styles for OAuth templates but restricts scripts
@@ -154,7 +155,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         # Use default CSP for all other paths
         return self.csp_policy
 
-    def _get_docs_csp(self) -> str:
+    @staticmethod
+    def _get_docs_csp() -> str:
         """Get CSP policy for documentation endpoints (/docs, /redoc)."""
         # Relaxed CSP for Swagger UI and ReDoc that need external CDN resources
         return (
@@ -176,7 +178,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "upgrade-insecure-requests"
         )
 
-    def _get_default_permissions_policy(self) -> str:
+    @staticmethod
+    def _get_default_permissions_policy() -> str:
         """Get default Permissions Policy for Authly."""
         # Restrictive permissions policy for OAuth server
         # Disables most browser features that aren't needed
@@ -203,15 +206,18 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "xr-spatial-tracking=()"
         )
 
-    def _is_hsts_enabled(self) -> bool:
+    @staticmethod
+    def _is_hsts_enabled() -> bool:
         """Check if HSTS is enabled via environment variable."""
         return os.getenv("AUTHLY_SECURITY_HSTS_ENABLED", "true").lower() == "true"
 
-    def _is_csp_enabled(self) -> bool:
+    @staticmethod
+    def _is_csp_enabled() -> bool:
         """Check if CSP is enabled via environment variable."""
         return os.getenv("AUTHLY_SECURITY_CSP_ENABLED", "true").lower() == "true"
 
-    def _is_development(self) -> bool:
+    @staticmethod
+    def _is_development() -> bool:
         """Check if running in development mode."""
         return os.getenv("AUTHLY_ENVIRONMENT", "production").lower() in ("development", "dev", "local")
 

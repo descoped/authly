@@ -117,6 +117,9 @@ async def run_embedded_server(host: str = "0.0.0.0", port: int = 8000, seed: boo
     # Start the container
     postgres.start()
 
+    # Define signals early for finally block
+    signals = (signal.SIGTERM, signal.SIGINT)
+
     try:
         # Get dynamic port assignment from container
         # Use standard PostgreSQL port for embedded containers
@@ -195,31 +198,29 @@ async def run_embedded_server(host: str = "0.0.0.0", port: int = 8000, seed: boo
             # Close resource manager and database connections
             logger.info("Cleaning up resource manager and database connections...")
             try:
-                # Cleanup resource manager first
+                # Cleanup resource manager's Redis connections
                 if resource_manager:
                     await resource_manager.cleanup_redis()
-                    await resource_manager.cleanup()
 
                 # Clean up database with timeout from config
                 cleanup_timeout = config.db_cleanup_timeout_seconds
                 await asyncio.wait_for(db.cleanup(), timeout=cleanup_timeout)
             except TimeoutError:
                 logger.warning("Database cleanup timed out")
-            except Exception as e:
-                logger.error(f"Error during database cleanup: {e}")
+            except Exception as cleanup_error:
+                logger.error(f"Error during database cleanup: {cleanup_error}")
 
             # Stop PostgreSQL container
             logger.info("Stopping PostgreSQL container...")
             try:
                 postgres.stop()
-            except Exception as e:
-                logger.error(f"Error stopping container: {e}")
+            except Exception as stop_error:
+                logger.error(f"Error stopping container: {stop_error}")
 
             logger.info("Shutdown complete")
 
         # Setup signal handlers
         loop = asyncio.get_event_loop()
-        signals = (signal.SIGTERM, signal.SIGINT)
 
         for sig in signals:
             loop.add_signal_handler(sig, lambda: asyncio.create_task(shutdown_handler()))

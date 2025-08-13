@@ -4,7 +4,7 @@ Based on RFC 8414: OAuth 2.0 Authorization Server Metadata
 and OAuth 2.1 specifications.
 """
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class OAuthServerMetadata(BaseModel):
@@ -65,10 +65,8 @@ class OAuthServerMetadata(BaseModel):
         default=["en"], description="Languages and scripts supported for the user interface"
     )
 
-    class Config:
-        """Pydantic configuration."""
-
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "issuer": "https://auth.example.com",
                 "authorization_endpoint": "https://auth.example.com/api/v1/oauth/authorize",
@@ -84,3 +82,4 @@ class OAuthServerMetadata(BaseModel):
                 "ui_locales_supported": ["en"],
             }
         }
+    )

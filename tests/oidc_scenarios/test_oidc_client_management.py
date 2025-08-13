@@ -196,6 +196,7 @@ class TestOIDCClientValidation:
             client_service = ClientService(client_repo, scope_repo, config)
 
             # Test with non-HTTPS request_uri
+            # noinspection HttpUrlsUsage
             request = OAuthClientCreateRequest(
                 client_name="Test OIDC Client",
                 client_type=ClientType.CONFIDENTIAL,

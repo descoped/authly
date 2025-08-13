@@ -208,7 +208,7 @@ class TestPKCECompliance:
 
         # Check for CORS headers in redirect response
         # These are needed for browser JavaScript to see the redirect
-        headers = response._response.headers if hasattr(response, "_response") else response.headers
+        headers = response._response.headers
         print(f"Headers in redirect response: {dict(headers)}")
 
         # CORS headers should NOT be present yet (we need to add them)

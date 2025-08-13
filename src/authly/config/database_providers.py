@@ -23,7 +23,7 @@ class DatabaseConfig:
                 masked_url = self.database_url.replace(parsed.netloc, masked_netloc)
                 return masked_url
             return self.database_url
-        except Exception:
+        except (AttributeError, TypeError, ValueError):
             # If URL parsing fails, just mask anything that looks like a password
             return re.sub(r":([^:@]+)@", ":***@", self.database_url)
 
@@ -41,7 +41,7 @@ class DatabaseConfig:
                 raise ValueError("Database URL must include hostname")
             if not parsed.path or parsed.path == "/":
                 raise ValueError("Database URL must include database name") from None
-        except Exception as e:
+        except (AttributeError, TypeError, ValueError) as e:
             raise ValueError(f"Invalid database URL format: {e}") from e
 
 

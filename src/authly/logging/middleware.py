@@ -149,7 +149,8 @@ class LoggingMiddleware(BaseHTTPMiddleware):
                 # Re-raise the exception
                 raise
 
-    def _get_client_ip(self, request: Request) -> str:
+    @staticmethod
+    def _get_client_ip(request: Request) -> str:
         """Extract client IP address from request."""
         # Check for forwarded headers (common in production behind load balancers)
         forwarded_for = request.headers.get("x-forwarded-for")

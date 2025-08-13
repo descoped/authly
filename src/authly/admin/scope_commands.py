@@ -140,9 +140,9 @@ def create_scope(ctx: click.Context, name: str, description: str | None, is_defa
         return
 
     async def run_create():
-        async with get_api_client() as client:
+        async with get_api_client() as api_client:
             try:
-                result = await client.create_scope(name=name, description=description, is_default=is_default)
+                result = await api_client.create_scope(name=name, description=description, is_default=is_default)
 
                 if output == "json":
                     click.echo(json.dumps(result.model_dump(), indent=2, default=str))
@@ -154,17 +154,17 @@ def create_scope(ctx: click.Context, name: str, description: str | None, is_defa
                     click.echo(f"  Active: {'✅ Yes' if result.is_active else '❌ No'}")
                     click.echo(f"  Created: {result.created_at}")
 
-            except AdminAPIError as e:
-                click.echo(f"❌ {e.message}", err=True)
+            except AdminAPIError as api_err:
+                click.echo(f"❌ {api_err.message}", err=True)
                 sys.exit(1)
-            except Exception as e:
-                click.echo(f"❌ Error creating scope: {e}", err=True)
+            except Exception as create_err:
+                click.echo(f"❌ Error creating scope: {create_err}", err=True)
                 sys.exit(1)
 
     try:
         asyncio.run(run_create())
-    except Exception as e:
-        click.echo(f"❌ Unexpected error: {e}", err=True)
+    except Exception as unexpected_err:
+        click.echo(f"❌ Unexpected error: {unexpected_err}", err=True)
         sys.exit(1)
 
 
@@ -228,15 +228,15 @@ def list_scopes(ctx: click.Context, limit: int, offset: int, output: str, show_i
         click.echo(f"Listing OAuth scopes (limit: {limit}, offset: {offset})")
 
     async def run_list():
-        async with get_api_client() as client:
+        async with get_api_client() as api_client:
             try:
                 if default_only:
-                    scopes = await client.get_default_scopes()
+                    scopes = await api_client.get_default_scopes()
                 else:
-                    scopes = await client.list_scopes(active_only=not show_inactive, limit=limit, offset=offset)
+                    scopes = await api_client.list_scopes(active_only=not show_inactive, limit=limit, offset=offset)
 
                 if output == "json":
-                    click.echo(json.dumps([scope.model_dump() for scope in scopes], indent=2, default=str))
+                    click.echo(json.dumps([s.model_dump() for s in scopes], indent=2, default=str))
                 else:
                     if not scopes:
                         click.echo("No scopes found.")
@@ -262,17 +262,17 @@ def list_scopes(ctx: click.Context, limit: int, offset: int, output: str, show_i
 
                     click.echo(f"\nTotal: {len(scopes)} scope(s)")
 
-            except AdminAPIError as e:
-                click.echo(f"❌ {e.message}", err=True)
+            except AdminAPIError as api_err:
+                click.echo(f"❌ {api_err.message}", err=True)
                 sys.exit(1)
-            except Exception as e:
-                click.echo(f"❌ Error listing scopes: {e}", err=True)
+            except Exception as list_err:
+                click.echo(f"❌ Error listing scopes: {list_err}", err=True)
                 sys.exit(1)
 
     try:
         asyncio.run(run_list())
-    except Exception as e:
-        click.echo(f"❌ Unexpected error: {e}", err=True)
+    except Exception as unexpected_err:
+        click.echo(f"❌ Unexpected error: {unexpected_err}", err=True)
         sys.exit(1)
 
 
@@ -333,36 +333,36 @@ def show_scope(ctx: click.Context, scope_name: str, output: str):
         click.echo(f"Getting scope details: {scope_name}")
 
     async def run_show():
-        async with get_api_client() as client:
+        async with get_api_client() as api_client:
             try:
-                scope = await client.get_scope(scope_name)
+                scope_detail = await api_client.get_scope(scope_name)
 
                 if output == "json":
-                    click.echo(json.dumps(scope.model_dump(), indent=2, default=str))
+                    click.echo(json.dumps(scope_detail.model_dump(), indent=2, default=str))
                 else:
                     click.echo("Scope Details")
                     click.echo("=" * 50)
-                    click.echo(f"Scope Name: {scope.scope_name}")
-                    click.echo(f"Description: {scope.description or 'None'}")
-                    click.echo(f"Default: {'✅ Yes' if scope.is_default else '❌ No'}")
-                    click.echo(f"Active: {'✅ Yes' if scope.is_active else '❌ No'}")
-                    click.echo(f"Created: {scope.created_at}")
-                    click.echo(f"Updated: {scope.updated_at}")
+                    click.echo(f"Scope Name: {scope_detail.scope_name}")
+                    click.echo(f"Description: {scope_detail.description or 'None'}")
+                    click.echo(f"Default: {'✅ Yes' if scope_detail.is_default else '❌ No'}")
+                    click.echo(f"Active: {'✅ Yes' if scope_detail.is_active else '❌ No'}")
+                    click.echo(f"Created: {scope_detail.created_at}")
+                    click.echo(f"Updated: {scope_detail.updated_at}")
 
-            except AdminAPIError as e:
-                click.echo(f"❌ {e.message}", err=True)
+            except AdminAPIError as api_err:
+                click.echo(f"❌ {api_err.message}", err=True)
                 sys.exit(1)
-            except Exception as e:
-                if "404" in str(e):
+            except Exception as show_err:
+                if "404" in str(show_err):
                     click.echo(f"❌ Scope not found: {scope_name}", err=True)
                 else:
-                    click.echo(f"❌ Error getting scope details: {e}", err=True)
+                    click.echo(f"❌ Error getting scope details: {show_err}", err=True)
                 sys.exit(1)
 
     try:
         asyncio.run(run_show())
-    except Exception as e:
-        click.echo(f"❌ Unexpected error: {e}", err=True)
+    except Exception as unexpected_err:
+        click.echo(f"❌ Unexpected error: {unexpected_err}", err=True)
         sys.exit(1)
 
 
@@ -488,9 +488,9 @@ def update_scope(
         return
 
     async def run_update():
-        async with get_api_client() as client:
+        async with get_api_client() as api_client:
             try:
-                updated_scope = await client.update_scope(
+                updated_scope = await api_client.update_scope(
                     scope_name,
                     description=update_data.get("description"),
                     is_default=update_data.get("is_default"),
@@ -503,17 +503,17 @@ def update_scope(
                 click.echo(f"  Default: {'✅ Yes' if updated_scope.is_default else '❌ No'}")
                 click.echo(f"  Active: {'✅ Yes' if updated_scope.is_active else '❌ No'}")
 
-            except AdminAPIError as e:
-                click.echo(f"❌ {e.message}", err=True)
+            except AdminAPIError as api_err:
+                click.echo(f"❌ {api_err.message}", err=True)
                 sys.exit(1)
-            except Exception as e:
-                click.echo(f"❌ Error updating scope: {e}", err=True)
+            except Exception as update_err:
+                click.echo(f"❌ Error updating scope: {update_err}", err=True)
                 sys.exit(1)
 
     try:
         asyncio.run(run_update())
-    except Exception as e:
-        click.echo(f"❌ Unexpected error: {e}", err=True)
+    except Exception as unexpected_err:
+        click.echo(f"❌ Unexpected error: {unexpected_err}", err=True)
         sys.exit(1)
 
 
@@ -579,27 +579,27 @@ def delete_scope(ctx: click.Context, scope_name: str, confirm: bool):
         return
 
     async def run_delete():
-        async with get_api_client() as client:
+        async with get_api_client() as api_client:
             try:
-                result = await client.delete_scope(scope_name)
+                result = await api_client.delete_scope(scope_name)
 
                 click.echo("✅ Scope deactivated successfully!")
                 click.echo(f"  Message: {result.get('message', 'Scope deleted')}")
 
-            except AdminAPIError as e:
-                click.echo(f"❌ {e.message}", err=True)
+            except AdminAPIError as api_err:
+                click.echo(f"❌ {api_err.message}", err=True)
                 sys.exit(1)
-            except Exception as e:
-                if "404" in str(e):
+            except Exception as delete_err:
+                if "404" in str(delete_err):
                     click.echo("❌ Scope not found or cannot be deactivated", err=True)
                 else:
-                    click.echo(f"❌ Error deleting scope: {e}", err=True)
+                    click.echo(f"❌ Error deleting scope: {delete_err}", err=True)
                 sys.exit(1)
 
     try:
         asyncio.run(run_delete())
-    except Exception as e:
-        click.echo(f"❌ Unexpected error: {e}", err=True)
+    except Exception as unexpected_err:
+        click.echo(f"❌ Unexpected error: {unexpected_err}", err=True)
         sys.exit(1)
 
 
@@ -677,12 +677,12 @@ def show_defaults(ctx: click.Context, output: str):
         click.echo("Getting default scopes")
 
     async def run_defaults():
-        async with get_api_client() as client:
+        async with get_api_client() as api_client:
             try:
-                default_scopes = await client.get_default_scopes()
+                default_scopes = await api_client.get_default_scopes()
 
                 if output == "json":
-                    click.echo(json.dumps([scope.model_dump() for scope in default_scopes], indent=2, default=str))
+                    click.echo(json.dumps([s.model_dump() for s in default_scopes], indent=2, default=str))
                 else:
                     if not default_scopes:
                         click.echo("No default scopes configured.")
@@ -700,15 +700,15 @@ def show_defaults(ctx: click.Context, output: str):
 
                     click.echo(f"Total: {len(default_scopes)} default scope(s)")
 
-            except AdminAPIError as e:
-                click.echo(f"❌ {e.message}", err=True)
+            except AdminAPIError as api_err:
+                click.echo(f"❌ {api_err.message}", err=True)
                 sys.exit(1)
-            except Exception as e:
-                click.echo(f"❌ Error getting default scopes: {e}", err=True)
+            except Exception as defaults_err:
+                click.echo(f"❌ Error getting default scopes: {defaults_err}", err=True)
                 sys.exit(1)
 
     try:
         asyncio.run(run_defaults())
-    except Exception as e:
-        click.echo(f"❌ Unexpected error: {e}", err=True)
+    except Exception as unexpected_err:
+        click.echo(f"❌ Unexpected error: {unexpected_err}", err=True)
         sys.exit(1)

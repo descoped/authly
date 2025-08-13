@@ -5,9 +5,11 @@ This module provides validation and processing utilities for OIDC requests,
 including scope validation, parameter validation, and flow validation.
 """
 
+import json
 import logging
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any
 
 from authly.config.config import AuthlyConfig
 
@@ -234,8 +236,6 @@ class OIDCValidator:
         # Validate claims parameter (if provided)
         if claims:
             try:
-                import json
-
                 claims_obj = json.loads(claims)
                 if not isinstance(claims_obj, dict):
                     scope_result.errors.append("claims parameter must be a JSON object")
@@ -257,7 +257,7 @@ class OIDCScopeProcessor:
     """
 
     @staticmethod
-    def get_oidc_scope_registration_data() -> list[dict[str, any]]:
+    def get_oidc_scope_registration_data() -> list[dict[str, Any]]:
         """
         Get OIDC scope data for registration in the database.
 
@@ -319,7 +319,7 @@ class OIDCScopeProcessor:
         return oauth_scopes, oidc_scopes
 
     @staticmethod
-    def validate_scope_combination(scopes: list[str]) -> dict[str, any]:
+    def validate_scope_combination(scopes: list[str]) -> dict[str, Any]:
         """
         Validate combination of OAuth and OIDC scopes.
 

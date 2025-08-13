@@ -99,7 +99,8 @@ class StructuredFormatter(logging.Formatter):
 
         return json.dumps(log_entry, ensure_ascii=False, separators=(",", ":"))
 
-    def _format_exception(self, exc_info) -> dict[str, Any]:
+    @staticmethod
+    def _format_exception(exc_info) -> dict[str, Any]:
         """Format exception information."""
         exc_type, exc_value, exc_traceback = exc_info
 
@@ -109,7 +110,8 @@ class StructuredFormatter(logging.Formatter):
             "traceback": traceback.format_exception(exc_type, exc_value, exc_traceback),
         }
 
-    def _extract_extra_fields(self, record: logging.LogRecord) -> dict[str, Any]:
+    @staticmethod
+    def _extract_extra_fields(record: logging.LogRecord) -> dict[str, Any]:
         """Extract extra fields from the log record."""
         # Standard fields that should not be included in extra
         standard_fields = {

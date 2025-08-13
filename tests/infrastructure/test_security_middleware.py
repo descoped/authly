@@ -15,8 +15,15 @@ import unittest.mock
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from starlette.types import Receive, Scope, Send
 
 from authly.api.security_middleware import SecurityHeadersMiddleware, get_security_config, setup_security_middleware
+
+
+# Dummy ASGI app for testing middleware in isolation
+async def dummy_app(scope: Scope, receive: Receive, send: Send) -> None:
+    """Dummy ASGI app that does nothing - used for testing middleware initialization."""
+    pass
 
 
 class TestSecurityHeadersMiddleware:
@@ -305,7 +312,7 @@ class TestSecurityPolicyContent:
 
     def test_default_csp_restrictive(self):
         """Test that default CSP is appropriately restrictive."""
-        middleware = SecurityHeadersMiddleware(None)
+        middleware = SecurityHeadersMiddleware(dummy_app)
         csp = middleware._get_default_csp()
 
         # Verify restrictive policies
@@ -323,7 +330,7 @@ class TestSecurityPolicyContent:
 
     def test_default_permissions_policy_restrictive(self):
         """Test that default permissions policy is appropriately restrictive."""
-        middleware = SecurityHeadersMiddleware(None)
+        middleware = SecurityHeadersMiddleware(dummy_app)
         permissions = middleware._get_default_permissions_policy()
 
         # Verify key permissions are disabled
@@ -343,7 +350,7 @@ class TestSecurityPolicyContent:
 
     def test_environment_detection(self):
         """Test environment detection logic."""
-        middleware = SecurityHeadersMiddleware(None)
+        middleware = SecurityHeadersMiddleware(dummy_app)
 
         # Test development environments
         with unittest.mock.patch.dict(os.environ, {"AUTHLY_ENVIRONMENT": "development"}):

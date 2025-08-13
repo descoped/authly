@@ -13,6 +13,8 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request, sta
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.templating import Jinja2Templates
+from jose.exceptions import JWTError
+from psycopg_toolkit import RecordNotFoundError
 from pydantic import BaseModel, Field, model_serializer
 
 from authly.api.auth_dependencies import (
@@ -379,7 +381,7 @@ async def authorize_get(
                 current_user = await user_repo.get_by_id(user_id)
                 if current_user and not current_user.is_active:
                     current_user = None
-        except Exception:
+        except (ValueError, JWTError, RecordNotFoundError, KeyError, TypeError):
             # Invalid token, treat as not authenticated
             pass
 
@@ -431,9 +433,9 @@ async def authorize_get(
 
         # Render the authorization consent template
         return templates.TemplateResponse(
-            request=request,
-            name="authorize.html",
-            context={
+            request,
+            "authorize.html",
+            {
                 "client": client,
                 "client_id": client_id,
                 "redirect_uri": redirect_uri,
@@ -644,7 +646,7 @@ async def authorize_post(
             ) from e
 
 
-@oauth_router.post("/token")
+@oauth_router.post("/token", response_model=None)
 async def get_access_token(
     grant_type: str = Form(..., description="The grant type"),
     username: str | None = Form(None, description="Username for password grant"),
@@ -661,7 +663,7 @@ async def get_access_token(
     authorization_service: AuthorizationService = Depends(get_authorization_service),
     client_repo: ClientRepository = Depends(get_client_repository),
     scope_repo: ScopeRepository = Depends(get_scope_repository),
-):
+) -> TokenResponse | JSONResponse:
     """
     OAuth 2.1 Token Endpoint.
 
@@ -705,7 +707,7 @@ async def _handle_authorization_code_grant(
     user_repo: UserRepository,
     token_service: TokenService,
     authorization_service: AuthorizationService,
-) -> TokenResponse:
+) -> TokenResponse | JSONResponse:
     """Handle authorization_code grant type with PKCE verification."""
     import time
 
@@ -818,7 +820,7 @@ async def _handle_refresh_token_grant(
     request: TokenRequest,
     user_repo: UserRepository,
     token_service: TokenService,
-) -> TokenResponse:
+) -> TokenResponse | JSONResponse:
     """Handle refresh_token grant type."""
     import time
 
@@ -980,12 +982,12 @@ async def revoke_token(
         return {"message": "Token revocation processed successfully"}
 
 
-@oauth_router.post("/refresh", response_model=TokenResponse)
+@oauth_router.post("/refresh", response_model=None)
 async def refresh_access_token(
     request: RefreshRequest,
     user_repo: UserRepository = Depends(get_user_repository),
     token_service: TokenService = Depends(get_token_service_with_client),
-):
+) -> TokenResponse | JSONResponse:
     """Create new token pair while invalidating old refresh token"""
     import time
 
@@ -1029,7 +1031,7 @@ async def refresh_access_token(
             return oauth_error_response("invalid_request", he.detail)
         else:
             return oauth_error_response("invalid_grant", he.detail)
-    except Exception:
+    except (ValueError, JWTError, RecordNotFoundError, AttributeError, KeyError, TypeError):
         # Track token refresh error
         if METRICS_ENABLED and metrics:
             duration = time.time() - start_time

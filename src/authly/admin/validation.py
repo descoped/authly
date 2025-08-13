@@ -423,7 +423,8 @@ class AdminUserValidation:
         admin_users = await self.user_repository.get_admin_users()
         return len(admin_users)
 
-    def _validate_username_format(self, username: str) -> ErrorDetail | None:
+    @staticmethod
+    def _validate_username_format(username: str) -> ErrorDetail | None:
         """
         Validate username format.
 
@@ -467,7 +468,8 @@ class AdminUserValidation:
 
         return None
 
-    def _validate_email_format(self, email: str) -> ErrorDetail | None:
+    @staticmethod
+    def _validate_email_format(email: str) -> ErrorDetail | None:
         """
         Validate email format.
 
@@ -504,7 +506,8 @@ class AdminUserValidation:
 
         return None
 
-    def _validate_password_strength(self, password: str) -> list[ErrorDetail]:
+    @staticmethod
+    def _validate_password_strength(password: str) -> list[ErrorDetail]:
         """
         Validate password strength.
 
@@ -628,7 +631,8 @@ class AdminClientValidation:
                 details=errors,
             )
 
-    def _validate_redirect_uris(self, redirect_uris: list[str]) -> list[ErrorDetail]:
+    @staticmethod
+    def _validate_redirect_uris(redirect_uris: list[str]) -> list[ErrorDetail]:
         """
         Validate redirect URIs.
 
@@ -659,7 +663,8 @@ class AdminScopeValidation:
     Validation rules for admin scope management operations.
     """
 
-    def validate_scope_creation(self, scope_data: dict[str, Any]) -> None:
+    @staticmethod
+    def validate_scope_creation(scope_data: dict[str, Any]) -> None:
         """
         Validate OAuth scope creation request.
 

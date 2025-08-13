@@ -12,7 +12,9 @@ from typing import Any
 # Context variables for correlation tracking
 correlation_id_var: contextvars.ContextVar[str | None] = contextvars.ContextVar("correlation_id", default=None)
 
-request_context_var: contextvars.ContextVar[dict[str, Any]] = contextvars.ContextVar("request_context", default=None)
+request_context_var: contextvars.ContextVar[dict[str, Any] | None] = contextvars.ContextVar(
+    "request_context", default=None
+)
 
 
 class LoggingContext:

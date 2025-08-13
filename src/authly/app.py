@@ -6,7 +6,9 @@ for different deployment scenarios (production, development, embedded).
 """
 
 import os
-from collections.abc import AsyncGenerator
+from collections.abc import Callable
+from contextlib import AbstractAsyncContextManager
+from typing import Any
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -31,7 +33,7 @@ def create_app(
     title: str = "Authly Authentication Service",
     version: str = __version__,
     description: str = "Production-ready authentication and authorization service with OAuth 2.1 support",
-    lifespan: AsyncGenerator | None = None,
+    lifespan: Callable[[FastAPI], AbstractAsyncContextManager[Any]] | None = None,
     static_path: str | None = None,
     api_prefix: str | None = None,
 ) -> FastAPI:
@@ -214,7 +216,7 @@ def create_app(
     return app
 
 
-def create_production_app(lifespan: AsyncGenerator) -> FastAPI:
+def create_production_app(lifespan: Callable[[FastAPI], AbstractAsyncContextManager[Any]]) -> FastAPI:
     """
     Create a production-ready FastAPI application.
 

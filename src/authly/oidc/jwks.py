@@ -227,6 +227,19 @@ class JWKSService:
         logger.info(f"Generated RSA key pair synchronously with ID: {key_id}")
         return key_pair
 
+    def generate_rsa_key_pair_sync(self, key_size: int = 2048, algorithm: str = "RS256") -> RSAKeyPair:
+        """
+        Public synchronous method for RSA key pair generation.
+
+        Args:
+            key_size: RSA key size in bits (default 2048)
+            algorithm: JWT algorithm (RS256, RS384, RS512)
+
+        Returns:
+            RSAKeyPair: New key pair with unique key ID
+        """
+        return self._generate_rsa_key_pair_sync(key_size=key_size, algorithm=algorithm)
+
     def get_current_key_pair(self) -> RSAKeyPair | None:
         """
         Get the current active key pair for signing.
@@ -349,7 +362,8 @@ class JWKSService:
 
         return False
 
-    def _generate_key_id(self) -> str:
+    @staticmethod
+    def _generate_key_id() -> str:
         """
         Generate a unique key ID.
 
@@ -360,7 +374,8 @@ class JWKSService:
         timestamp = datetime.now(UTC).strftime("%Y%m%d%H%M%S%f")
         return f"key_{timestamp}"
 
-    def _int_to_base64url(self, value: int) -> str:
+    @staticmethod
+    def _int_to_base64url(value: int) -> str:
         """
         Convert integer to base64url encoded string.
 
@@ -405,7 +420,7 @@ class JWKSManager:
         """Ensure at least one key pair exists."""
         if not self.service.get_current_key_pair():
             logger.info("No key pairs found, generating initial key pair")
-            self.service._generate_rsa_key_pair_sync()
+            self.service.generate_rsa_key_pair_sync()
 
     def get_jwks_response(self) -> dict[str, Any]:
         """

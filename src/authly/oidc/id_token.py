@@ -241,7 +241,8 @@ class IDTokenGenerator:
 
         return user_claims
 
-    def _get_user_name(self, user: UserModel) -> str | None:
+    @staticmethod
+    def _get_user_name(user: UserModel) -> str | None:
         """
         Get user's full name from the user model.
 
@@ -370,7 +371,8 @@ class IDTokenGenerator:
         if datetime.now(UTC).timestamp() > exp:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token has expired")
 
-    def extract_user_id(self, token: str) -> UUID:
+    @staticmethod
+    def extract_user_id(token: str) -> UUID:
         """
         Extract user ID from ID token without full validation.
 

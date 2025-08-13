@@ -23,23 +23,22 @@ async def get_token_repository(db_connection=Depends(get_database_connection)) -
 
 
 async def get_token_service(
-    repository: TokenRepository = Depends(get_token_repository),
+    _repository: TokenRepository = Depends(get_token_repository),
     config: AuthlyConfig = Depends(get_config),
 ) -> TokenService:
     """Get TokenService instance with required dependencies."""
-    return TokenService(repository, config, None)
+    return TokenService(_repository, config, None)
 
 
 async def get_token_service_with_client(
-    repository: TokenRepository = Depends(get_token_repository),
+    db_connection=Depends(get_database_connection),
     config: AuthlyConfig = Depends(get_config),
 ) -> TokenService:
     """Get TokenService instance with client repository for ID token generation."""
-    from authly.api.auth_dependencies import get_client_repository
-    from authly.core.dependencies import get_database_connection
+    from authly.oauth.client_repository import ClientRepository
+    from authly.tokens.repository import TokenRepository
 
-    # Get client repository for ID token generation
-    db_connection = await get_database_connection()
-    client_repo = await get_client_repository(db_connection)
+    token_repo = TokenRepository(db_connection)
+    client_repo = ClientRepository(db_connection)
 
-    return TokenService(repository, config, client_repo)
+    return TokenService(token_repo, config, client_repo)

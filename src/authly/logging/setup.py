@@ -100,8 +100,8 @@ def _configure_logger_levels(log_level: str) -> None:
 def get_service_version() -> str | None:
     """Get the service version from package metadata."""
     try:
-        from importlib.metadata import version
+        from importlib.metadata import PackageNotFoundError, version
 
         return version("authly")
-    except Exception:
+    except (PackageNotFoundError, ImportError):
         return None

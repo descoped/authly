@@ -126,14 +126,14 @@ def login(scope: str, api_url: str | None, browser: bool, show_token: bool):
 
                 # Test the connection
                 try:
-                    status = await client.get_status()
-                    click.echo(f"   Database connected: {status.get('database', {}).get('connected', 'unknown')}")
-                except Exception as e:
-                    click.echo(f"   ⚠️  Warning: Could not verify API connection: {e}")
+                    api_status = await client.get_status()
+                    click.echo(f"   Database connected: {api_status.get('database', {}).get('connected', 'unknown')}")
+                except Exception as conn_error:
+                    click.echo(f"   ⚠️  Warning: Could not verify API connection: {conn_error}")
 
-            except Exception as e:
-                click.echo(f"❌ Login failed: {e}")
-                raise click.ClickException(f"Authentication failed: {e}") from e
+            except Exception as login_error:
+                click.echo(f"❌ Login failed: {login_error}")
+                raise click.ClickException(f"Authentication failed: {login_error}") from login_error
 
     asyncio.run(run_login())
 
@@ -174,8 +174,8 @@ def logout():
                     click.echo("   Tokens have been revoked and cleared")
                 else:
                     click.echo("i  Already logged out")
-            except Exception as e:
-                click.echo(f"⚠️  Logout warning: {e}")
+            except Exception as logout_error:
+                click.echo(f"⚠️  Logout warning: {logout_error}")
                 # Still clear tokens locally even if server logout fails
                 client._clear_tokens()
                 click.echo("   Local tokens cleared")
@@ -233,7 +233,7 @@ def whoami(verbose: bool):
 
             try:
                 # Get system status to verify authentication
-                status = await client.get_status()
+                system_status = await client.get_status()
 
                 click.echo("✅ Authenticated")
                 click.echo(f"   API URL: {get_api_url()}")
@@ -247,21 +247,21 @@ def whoami(verbose: bool):
                     click.echo(f"   Token file: {client.token_file}")
 
                 # Show some system info
-                db_info = status.get("database", {})
+                db_info = system_status.get("database", {})
                 click.echo(f"   Database connected: {db_info.get('connected', 'unknown')}")
 
-                clients_info = status.get("clients", {})
+                clients_info = system_status.get("clients", {})
                 if clients_info:
                     click.echo(f"   Total OAuth clients: {clients_info.get('total', 'unknown')}")
 
-                scopes_info = status.get("scopes", {})
+                scopes_info = system_status.get("scopes", {})
                 if scopes_info:
                     click.echo(f"   Total OAuth scopes: {scopes_info.get('total', 'unknown')}")
 
-            except Exception as e:
-                click.echo(f"❌ Authentication verification failed: {e}")
+            except Exception as auth_error:
+                click.echo(f"❌ Authentication verification failed: {auth_error}")
                 click.echo("   Your token may have expired. Try logging in again.")
-                raise click.ClickException(f"Authentication verification failed: {e}") from e
+                raise click.ClickException(f"Authentication verification failed: {auth_error}") from auth_error
 
     asyncio.run(run_whoami())
 
@@ -314,9 +314,9 @@ def status(verbose: bool):
                 health = await client.get_health()
                 click.echo(f"✅ API Health: {health.get('status', 'unknown')}")
                 click.echo(f"   API URL: {api_url}")
-            except Exception as e:
+            except Exception as health_error:
                 click.echo(f"❌ API Health: Failed to connect to {api_url}")
-                click.echo(f"   Error: {e}")
+                click.echo(f"   Error: {health_error}")
                 return
 
             # Check authentication status
@@ -346,9 +346,9 @@ def status(verbose: bool):
                     click.echo(f"   OAuth clients: {clients_info.get('total', 0)}")
                     click.echo(f"   OAuth scopes: {scopes_info.get('total', 0)}")
 
-            except Exception as e:
+            except Exception as status_error:
                 click.echo("⚠️  Authentication: Token may be expired")
-                click.echo(f"   Error: {e}")
+                click.echo(f"   Error: {status_error}")
                 click.echo("   Try logging in again with 'authly-admin auth login'")
 
     asyncio.run(run_auth_status())
@@ -378,7 +378,6 @@ def info():
       Environment: development
       Version: 0.5.8
     """
-    import os
     from pathlib import Path
 
     async def run_info():
@@ -485,12 +484,12 @@ def refresh():
                 try:
                     await client.get_status()
                     click.echo("   Token verified - authentication active")
-                except Exception as e:
-                    click.echo(f"   ⚠️  Warning: Could not verify new token: {e}")
+                except Exception as verify_error:
+                    click.echo(f"   ⚠️  Warning: Could not verify new token: {verify_error}")
 
-            except Exception as e:
-                click.echo(f"❌ Token refresh failed: {e}")
+            except Exception as refresh_error:
+                click.echo(f"❌ Token refresh failed: {refresh_error}")
                 click.echo("   Use 'authly admin auth login' to authenticate")
-                raise click.ClickException(f"Token refresh failed: {e}") from e
+                raise click.ClickException(f"Token refresh failed: {refresh_error}") from refresh_error
 
     asyncio.run(run_refresh())

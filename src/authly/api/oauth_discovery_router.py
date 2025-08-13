@@ -115,7 +115,7 @@ def _build_issuer_url(request: Request) -> str:
 )
 async def oauth_discovery(
     request: Request, discovery_service: DiscoveryService = Depends(get_discovery_service)
-) -> OAuthServerMetadata:
+) -> OAuthServerMetadata | JSONResponse:
     """
     OAuth 2.1 Authorization Server Discovery endpoint.
 
@@ -135,7 +135,7 @@ async def oauth_discovery(
         try:
             config = get_config()
             api_prefix = config.fastapi_api_version_prefix
-        except Exception:
+        except (RuntimeError, AttributeError, KeyError):
             # Fallback for testing or when Authly not initialized
             api_prefix = "/api/v1"
 
@@ -149,7 +149,7 @@ async def oauth_discovery(
 
         return metadata
 
-    except Exception as e:
+    except (ValueError, TypeError, AttributeError) as e:
         logger.error(f"Error generating OAuth discovery metadata: {e}")
         # Return a minimal static response on error
         try:
@@ -164,7 +164,7 @@ async def oauth_discovery(
             logger.warning("Returned static OAuth discovery metadata due to error")
             return static_metadata
 
-        except Exception as fallback_error:
+        except (ValueError, TypeError, AttributeError) as fallback_error:
             logger.error(f"Failed to generate fallback discovery metadata: {fallback_error}")
             # This should rarely happen, but we need to handle it gracefully
             return JSONResponse(

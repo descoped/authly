@@ -8,7 +8,8 @@ import logging
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from jose.exceptions import JWTError
 
 from authly.api.auth_dependencies import get_client_repository
 from authly.api.oauth_router import get_discovery_service
@@ -102,7 +103,7 @@ def get_base_url(request: Request) -> str:
 )
 async def oidc_discovery(
     request: Request, oauth_discovery_service: DiscoveryService = Depends(get_discovery_service)
-) -> OIDCServerMetadata:
+) -> OIDCServerMetadata | JSONResponse:
     """
     OpenID Connect Discovery endpoint.
 
@@ -135,7 +136,7 @@ async def oidc_discovery(
         logger.info(f"OIDC discovery request from {request.client.host if request.client else 'unknown'}")
         return metadata
 
-    except Exception as e:
+    except (ValueError, TypeError, AttributeError) as e:
         logger.error(f"Error generating OIDC discovery metadata: {e}")
 
         # Fallback to static metadata to prevent service disruption
@@ -147,11 +148,15 @@ async def oidc_discovery(
             logger.warning("Returned static OIDC discovery metadata due to error")
             return static_metadata
 
-        except Exception as fallback_error:
+        except (ValueError, TypeError, AttributeError) as fallback_error:
             logger.error(f"Failed to generate fallback OIDC discovery metadata: {fallback_error}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unable to generate OIDC discovery metadata"
-            ) from fallback_error
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "error": "internal_server_error",
+                    "error_description": "Unable to generate OIDC discovery metadata",
+                },
+            )
 
 
 @oidc_router.get(
@@ -242,7 +247,7 @@ async def userinfo_endpoint(
     except HTTPException:
         # Re-raise HTTP exceptions without modification
         raise
-    except Exception as e:
+    except (AttributeError, ValueError, TypeError, KeyError) as e:
         logger.error(f"Error generating UserInfo response for user {current_user.id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unable to generate UserInfo response"
@@ -366,7 +371,7 @@ async def update_userinfo_endpoint(
     except HTTPException:
         # Re-raise HTTP exceptions without modification
         raise
-    except Exception as e:
+    except (AttributeError, ValueError, TypeError, KeyError) as e:
         logger.error(f"Error updating UserInfo for user {current_user.id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unable to update UserInfo"
@@ -451,7 +456,7 @@ async def jwks_endpoint():
 
             config = get_config()
             cache_max_age = config.jwks_cache_max_age_seconds
-        except Exception:
+        except (ImportError, AttributeError, KeyError):
             # Fallback for tests or when config is not available
             cache_max_age = 3600
 
@@ -462,7 +467,7 @@ async def jwks_endpoint():
             },
         )
 
-    except Exception as e:
+    except (AttributeError, ValueError, TypeError, KeyError, RuntimeError) as e:
         logger.error(f"Error generating JWKS response: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unable to generate JWKS response"
@@ -562,7 +567,7 @@ async def oidc_end_session(
                     user_id = unverified_claims["sub"]
                     logger.info(f"OIDC logout for user: {user_id}")
 
-            except Exception as e:
+            except (JWTError, ValueError, KeyError, TypeError) as e:
                 logger.warning(f"Invalid id_token_hint provided: {e}")
                 # Continue with logout even if token hint is invalid
                 pass
@@ -581,7 +586,7 @@ async def oidc_end_session(
                             status_code=status.HTTP_400_BAD_REQUEST,
                             detail="Invalid post_logout_redirect_uri for this client",
                         )
-                except Exception:
+                except (AttributeError, ValueError, TypeError, KeyError):
                     # If we can't validate, be conservative and reject
                     logger.warning(f"Could not validate redirect URI for client {client_id}")
                     raise HTTPException(
@@ -611,7 +616,7 @@ async def oidc_end_session(
 
                 logger.info(f"OIDC logout: invalidated {invalidated_count} tokens for user {user_id}")
 
-            except Exception as e:
+            except (AttributeError, ValueError, TypeError, RuntimeError) as e:
                 logger.error(f"Error during OIDC logout for user {user_id}: {e}")
                 # Continue to show success page even if token invalidation fails
                 # This prevents information disclosure about token existence
@@ -662,7 +667,7 @@ async def oidc_end_session(
     except HTTPException:
         # Re-raise HTTP exceptions without modification
         raise
-    except Exception as e:
+    except (AttributeError, ValueError, TypeError, KeyError, RuntimeError) as e:
         logger.error(f"Unexpected error during OIDC logout: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unable to complete logout request"
@@ -845,7 +850,7 @@ async def oidc_session_iframe(request: Request):
             },
         )
 
-    except Exception as e:
+    except (AttributeError, ValueError, TypeError, KeyError, RuntimeError) as e:
         logger.error(f"Error serving OIDC session iframe: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unable to serve session management iframe"
@@ -953,7 +958,7 @@ async def oidc_session_check(
 
         return session_status
 
-    except Exception as e:
+    except (JWTError, ValueError, TypeError, KeyError, AttributeError) as e:
         logger.error(f"Error during OIDC session check: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unable to check session status"
@@ -1127,7 +1132,7 @@ async def oidc_frontchannel_logout(
     except HTTPException:
         # Re-raise HTTP exceptions without modification
         raise
-    except Exception as e:
+    except (AttributeError, ValueError, TypeError, KeyError, RuntimeError) as e:
         logger.error(f"Error during OIDC front-channel logout: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unable to process front-channel logout"

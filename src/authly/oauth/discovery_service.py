@@ -88,8 +88,9 @@ class DiscoveryService:
         logger.info(f"Generated OAuth 2.1 server metadata for issuer: {base_url}")
         return metadata
 
+    @staticmethod
     def get_static_metadata(
-        self, issuer_url: str, api_prefix: str = "/api/v1", scopes: list[str] | None = None
+        issuer_url: str, api_prefix: str = "/api/v1", scopes: list[str] | None = None
     ) -> OAuthServerMetadata:
         """
         Generate static server metadata without database access.

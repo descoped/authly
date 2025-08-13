@@ -331,7 +331,7 @@ class AuthorizationService:
             return False, None, "Server error"
 
     async def create_authorization_response(
-        self, request: OAuthAuthorizationRequest, auth_code: str | None = None, error: str | None = None
+        self, request: OAuthAuthorizationRequest, auth_code: str | None = None, error: AuthorizationError | None = None
     ) -> OAuthAuthorizationResponse:
         """
         Create authorization response (success or error).
@@ -354,7 +354,7 @@ class AuthorizationService:
             )
 
     async def create_authorization_error_response(
-        self, error: str, description: str | None = None, state: str | None = None
+        self, error: AuthorizationError, description: str | None = None, state: str | None = None
     ) -> OAuthAuthorizationErrorResponse:
         """
         Create authorization error response.
@@ -397,7 +397,8 @@ class AuthorizationService:
             default_scopes = await self.scope_repo.get_default_scopes()
             return [scope.scope_name for scope in default_scopes]
 
-    def _verify_pkce_challenge(self, code_verifier: str, code_challenge: str) -> bool:
+    @staticmethod
+    def _verify_pkce_challenge(code_verifier: str, code_challenge: str) -> bool:
         """
         Verify PKCE code challenge using S256 method.
 
@@ -433,7 +434,8 @@ class AuthorizationService:
         except Exception:
             return None
 
-    def _get_error_description(self, error: str | None) -> str:
+    @staticmethod
+    def _get_error_description(error: AuthorizationError | None) -> str:
         """Get human-readable error description."""
         error_descriptions = {
             AuthorizationError.INVALID_REQUEST: "The request is missing a required parameter, includes an invalid parameter value, or is otherwise malformed.",

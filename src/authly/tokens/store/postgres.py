@@ -2,6 +2,7 @@ from datetime import datetime
 from uuid import UUID
 
 from psycopg import AsyncConnection
+from psycopg_toolkit import OperationError
 
 from authly.tokens.models import TokenModel, TokenType
 from authly.tokens.repository import TokenRepository
@@ -41,7 +42,7 @@ class PostgresTokenStore(TokenStore):
         try:
             await self._repo.invalidate_token(token_jti)
             return True
-        except Exception:
+        except OperationError:
             return False
 
     async def invalidate_user_tokens(self, user_id: UUID, token_type: TokenType | None = None) -> int:

@@ -3,7 +3,7 @@ from uuid import UUID
 
 from psycopg import AsyncConnection
 from psycopg.rows import dict_row
-from psycopg.sql import SQL, Identifier, Placeholder
+from psycopg.sql import SQL, Composed, Identifier, Placeholder
 from psycopg_toolkit import BaseRepository, OperationError
 
 from authly.tokens.models import TokenModel, TokenType
@@ -54,7 +54,9 @@ class TokenRepository(BaseRepository[TokenModel, UUID]):
         """Get a token by its JTI."""
         with DatabaseTimer("token_read_by_jti"):
             try:
-                query = SQL("SELECT * FROM tokens WHERE {} = {}").format(Identifier("token_jti"), Placeholder())
+                query: Composed = SQL("SELECT * FROM tokens WHERE {} = {}").format(
+                    Identifier("token_jti"), Placeholder()
+                )
 
                 async with self.db_connection.cursor(row_factory=dict_row) as cur:
                     await cur.execute(query, [token_jti])
@@ -69,18 +71,18 @@ class TokenRepository(BaseRepository[TokenModel, UUID]):
         """Get all tokens for a user with optional filtering."""
         with DatabaseTimer("token_list_user"):
             try:
-                conditions = [SQL("{} = {}").format(Identifier("user_id"), Placeholder())]
-                params = [user_id]
+                conditions: list[Composed | SQL] = [SQL("{} = {}").format(Identifier("user_id"), Placeholder())]
+                params: list[UUID | str] = [user_id]
 
                 if token_type:
                     conditions.append(SQL("{} = {}").format(Identifier("token_type"), Placeholder()))
-                    params.append(token_type.value)
+                    params.append(str(token_type.value))
 
                 if valid_only:
                     conditions.append(SQL("NOT invalidated"))
                     conditions.append(SQL("expires_at > CURRENT_TIMESTAMP"))
 
-                query = SQL("SELECT * FROM tokens WHERE {} ORDER BY created_at DESC").format(
+                query: Composed = SQL("SELECT * FROM tokens WHERE {} ORDER BY created_at DESC").format(
                     SQL(" AND ").join(conditions)
                 )
 
@@ -94,22 +96,22 @@ class TokenRepository(BaseRepository[TokenModel, UUID]):
     async def get_invalidated_token_count(self, user_id: UUID, token_type: TokenType | None = None) -> int:
         """Count invalidated tokens for a user."""
         try:
-            conditions = [
+            conditions: list[Composed | SQL] = [
                 SQL("{} = {}").format(Identifier("user_id"), Placeholder()),
                 SQL("{} = {}").format(Identifier("invalidated"), Placeholder()),
             ]
-            params = [user_id, True]
+            params: list[UUID | bool | str] = [user_id, True]
 
             if token_type:
                 conditions.append(SQL("{} = {}").format(Identifier("token_type"), Placeholder()))
-                params.append(token_type.value)
+                params.append(str(token_type.value))
 
-            query = SQL("SELECT COUNT(*) FROM tokens WHERE {}").format(SQL(" AND ").join(conditions))
+            query: Composed = SQL("SELECT COUNT(*) FROM tokens WHERE {}").format(SQL(" AND ").join(conditions))
 
             async with self.db_connection.cursor() as cur:
                 await cur.execute(query, params)
                 result = await cur.fetchone()
-                return result[0]
+                return int(result[0]) if result else 0
         except Exception as e:
             raise OperationError(f"Failed to count invalidated tokens: {e!s}") from e
 
@@ -117,7 +119,7 @@ class TokenRepository(BaseRepository[TokenModel, UUID]):
         """Count active sessions (valid access tokens) for a user."""
         with DatabaseTimer("token_count_active_sessions"):
             try:
-                query = SQL(
+                query: Composed = SQL(
                     """
                     SELECT COUNT(*) FROM tokens
                     WHERE {} = {}
@@ -138,7 +140,7 @@ class TokenRepository(BaseRepository[TokenModel, UUID]):
                 async with self.db_connection.cursor() as cur:
                     await cur.execute(query, params)
                     result = await cur.fetchone()
-                    return result[0]
+                    return int(result[0]) if result else 0
             except Exception as e:
                 raise OperationError(f"Failed to count active sessions: {e!s}") from e
 
@@ -146,7 +148,7 @@ class TokenRepository(BaseRepository[TokenModel, UUID]):
         """Invalidate a specific token by its JTI."""
         with DatabaseTimer("token_invalidate"):
             try:
-                query = SQL(
+                query: Composed = SQL(
                     """
                     UPDATE tokens
                     SET invalidated = {}, invalidated_at = {}
@@ -171,17 +173,17 @@ class TokenRepository(BaseRepository[TokenModel, UUID]):
         """Invalidate all tokens for a user, optionally filtered by type."""
         with DatabaseTimer("token_invalidate_user"):
             try:
-                conditions = [
+                conditions: list[Composed | SQL] = [
                     SQL("{} = {}").format(Identifier("user_id"), Placeholder()),
                     SQL("{} = {}").format(Identifier("invalidated"), Placeholder()),
                 ]
-                params = [user_id, False]
+                params: list[UUID | bool | str] = [user_id, False]
 
                 if token_type:
                     conditions.append(SQL("{} = {}").format(Identifier("token_type"), Placeholder()))
                     params.append(token_type)
 
-                query = SQL(
+                query: Composed = SQL(
                     """
                     UPDATE tokens
                     SET invalidated = {}, invalidated_at = {}
@@ -202,7 +204,7 @@ class TokenRepository(BaseRepository[TokenModel, UUID]):
             try:
                 async with self.db_connection.cursor() as cur:
                     # First count active sessions that will be invalidated
-                    count_query = SQL(
+                    count_query: Composed = SQL(
                         """
                         SELECT COUNT(*) FROM tokens
                         WHERE {} = {}
@@ -223,7 +225,7 @@ class TokenRepository(BaseRepository[TokenModel, UUID]):
 
                     # Then invalidate the sessions
                     if count > 0:
-                        update_query = SQL(
+                        update_query: Composed = SQL(
                             """
                             UPDATE tokens
                             SET invalidated = {}, invalidated_at = {}
@@ -254,8 +256,8 @@ class TokenRepository(BaseRepository[TokenModel, UUID]):
         """Get paginated list of user sessions (tokens) with optional filtering."""
         with DatabaseTimer("token_get_user_sessions"):
             try:
-                conditions = [SQL("{} = {}").format(Identifier("user_id"), Placeholder())]
-                params = [user_id]
+                conditions: list[Composed | SQL] = [SQL("{} = {}").format(Identifier("user_id"), Placeholder())]
+                params: list[UUID | int] = [user_id]
 
                 if not include_inactive:
                     conditions.extend(
@@ -265,7 +267,7 @@ class TokenRepository(BaseRepository[TokenModel, UUID]):
                         ]
                     )
 
-                query = SQL(
+                query: Composed = SQL(
                     """
                     SELECT * FROM tokens
                     WHERE {}
@@ -291,8 +293,8 @@ class TokenRepository(BaseRepository[TokenModel, UUID]):
         """Count total number of user sessions with optional filtering."""
         with DatabaseTimer("token_count_user_sessions"):
             try:
-                conditions = [SQL("{} = {}").format(Identifier("user_id"), Placeholder())]
-                params = [user_id]
+                conditions: list[Composed | SQL] = [SQL("{} = {}").format(Identifier("user_id"), Placeholder())]
+                params: list[UUID] = [user_id]
 
                 if not include_inactive:
                     conditions.extend(
@@ -302,7 +304,7 @@ class TokenRepository(BaseRepository[TokenModel, UUID]):
                         ]
                     )
 
-                query = SQL(
+                query: Composed = SQL(
                     """
                     SELECT COUNT(*) FROM tokens
                     WHERE {}
@@ -312,7 +314,7 @@ class TokenRepository(BaseRepository[TokenModel, UUID]):
                 async with self.db_connection.cursor() as cur:
                     await cur.execute(query, params)
                     result = await cur.fetchone()
-                    return result[0] if result else 0
+                    return int(result[0]) if result else 0
             except Exception as e:
                 raise OperationError(f"Failed to count user sessions: {e!s}") from e
 
@@ -320,7 +322,7 @@ class TokenRepository(BaseRepository[TokenModel, UUID]):
         """Check if a token is valid (not invalidated and not expired)."""
         with DatabaseTimer("token_validate"):
             try:
-                query = SQL(
+                query: Composed = SQL(
                     """
                     SELECT EXISTS(
                         SELECT 1 FROM tokens
@@ -334,30 +336,30 @@ class TokenRepository(BaseRepository[TokenModel, UUID]):
                 async with self.db_connection.cursor(row_factory=dict_row) as cur:
                     await cur.execute(query, [token_jti])
                     result = await cur.fetchone()
-                    return result["exists"] if result else False
+                    return bool(result["exists"]) if result else False
             except Exception as e:
                 raise OperationError(f"Failed to check token validity: {e!s}") from e
 
     async def count_user_valid_tokens(self, user_id: UUID, token_type: TokenType | None = None) -> int:
         """Count valid (not invalidated and not expired) tokens for a user."""
         try:
-            conditions = [
+            conditions: list[Composed | SQL] = [
                 SQL("{} = {}").format(Identifier("user_id"), Placeholder()),
                 SQL("NOT invalidated"),
                 SQL("expires_at > CURRENT_TIMESTAMP"),
             ]
-            params = [user_id]
+            params: list[UUID | str] = [user_id]
 
             if token_type:
                 conditions.append(SQL("{} = {}").format(Identifier("token_type"), Placeholder()))
-                params.append(token_type.value)
+                params.append(str(token_type.value))
 
-            query = SQL("SELECT COUNT(*) FROM tokens WHERE {}").format(SQL(" AND ").join(conditions))
+            query: Composed = SQL("SELECT COUNT(*) FROM tokens WHERE {}").format(SQL(" AND ").join(conditions))
 
             async with self.db_connection.cursor() as cur:
                 await cur.execute(query, params)
                 result = await cur.fetchone()
-                return result[0]
+                return int(result[0]) if result else 0
         except Exception as e:
             raise OperationError(f"Failed to count valid tokens: {e!s}") from e
 
@@ -365,7 +367,9 @@ class TokenRepository(BaseRepository[TokenModel, UUID]):
         """Remove expired tokens from the database."""
         with DatabaseTimer("token_cleanup"):
             try:
-                query = SQL("DELETE FROM tokens WHERE {} < {}").format(Identifier("expires_at"), Placeholder())
+                query: Composed = SQL("DELETE FROM tokens WHERE {} < {}").format(
+                    Identifier("expires_at"), Placeholder()
+                )
 
                 async with self.db_connection.cursor() as cur:
                     await cur.execute(query, [before_datetime])

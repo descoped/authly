@@ -6,8 +6,10 @@ This module provides a comprehensive CLI for managing OAuth 2.1 clients and scop
 import asyncio
 import os
 from pathlib import Path
+from typing import cast
 
 import click
+from click import Command
 
 from authly.admin.api_client import AdminAPIClient
 
@@ -117,10 +119,10 @@ def status_impl(verbose: bool):
                     return
 
                 # Get detailed status (requires authentication)
-                status = await client.get_status()
+                api_status = await client.get_status()
 
                 # Database connection
-                db_info = status.get("database", {})
+                db_info = api_status.get("database", {})
                 if db_info.get("connected"):
                     click.echo("✅ Database: Connected")
                     if verbose and db_info.get("version"):
@@ -155,7 +157,7 @@ def status_impl(verbose: bool):
                         click.echo(f"  {var_name}: {status_text}")
 
                 # Service statistics
-                stats = status.get("statistics", {})
+                stats = api_status.get("statistics", {})
 
                 click.echo("\nService Statistics:")
                 click.echo(f"  OAuth Clients: {stats.get('oauth_clients', 'Unknown')}")
@@ -166,12 +168,12 @@ def status_impl(verbose: bool):
                     click.echo("   python -m authly admin scope create --name read --description 'Read access'")
                     click.echo("   python -m authly admin scope create --name write --description 'Write access'")
 
-            except Exception as e:
-                if "401" in str(e) or "403" in str(e):
+            except Exception as api_error:
+                if "401" in str(api_error) or "403" in str(api_error):
                     click.echo("❌ Authentication: Invalid or expired credentials")
                     click.echo("   Use 'python -m authly admin auth login' to authenticate")
                 else:
-                    click.echo(f"❌ Error connecting to API: {e}")
+                    click.echo(f"❌ Error connecting to API: {api_error}")
                     click.echo(f"   Check that the API server is running at {api_url}")
 
     return asyncio.run(run_status())
@@ -220,14 +222,13 @@ from authly.admin.client_commands import client_group  # noqa: E402
 from authly.admin.scope_commands import scope_group  # noqa: E402
 
 # Add command groups
-main.add_command(auth_group)
-main.add_command(client_group)
-main.add_command(scope_group)
+main.add_command(cast(Command, auth_group))
+main.add_command(cast(Command, client_group))
+main.add_command(cast(Command, scope_group))
 
 
 def entry_point():
     """Entry point for authly-admin that handles shell completion."""
-    import os
     import sys
 
     # Check if shell completion is being requested

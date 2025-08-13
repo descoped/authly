@@ -154,21 +154,25 @@ class UserInfoService:
         if hasattr(user, "updated_at") and user.updated_at:
             userinfo.updated_at = int(user.updated_at.timestamp())
 
-    def _add_email_claims(self, userinfo: UserInfoResponse, user: UserModel) -> None:
+    @staticmethod
+    def _add_email_claims(userinfo: UserInfoResponse, user: UserModel) -> None:
         """Add email-related claims to UserInfo response."""
         userinfo.email = user.email
         userinfo.email_verified = user.is_verified
 
-    def _add_phone_claims(self, userinfo: UserInfoResponse, user: UserModel) -> None:
+    @staticmethod
+    def _add_phone_claims(userinfo: UserInfoResponse, user: UserModel) -> None:
         """Add phone-related claims to UserInfo response."""
         userinfo.phone_number = getattr(user, "phone_number", None)
         userinfo.phone_number_verified = getattr(user, "phone_number_verified", False)
 
-    def _add_address_claims(self, userinfo: UserInfoResponse, user: UserModel) -> None:
+    @staticmethod
+    def _add_address_claims(userinfo: UserInfoResponse, user: UserModel) -> None:
         """Add address-related claims to UserInfo response."""
         userinfo.address = getattr(user, "address", None)
 
-    def _get_full_name(self, user: UserModel) -> str | None:
+    @staticmethod
+    def _get_full_name(user: UserModel) -> str | None:
         """
         Generate full name from user data.
 
@@ -191,7 +195,8 @@ class UserInfoService:
             # Fall back to username if no name components
             return user.username
 
-    def validate_userinfo_request(self, granted_scopes: list[str]) -> bool:
+    @staticmethod
+    def validate_userinfo_request(granted_scopes: list[str]) -> bool:
         """
         Validate UserInfo request.
 
@@ -208,7 +213,8 @@ class UserInfoService:
 
         return True
 
-    def get_supported_claims(self, granted_scopes: list[str]) -> set[str]:
+    @staticmethod
+    def get_supported_claims(granted_scopes: list[str]) -> set[str]:
         """
         Get supported claims based on granted scopes.
 

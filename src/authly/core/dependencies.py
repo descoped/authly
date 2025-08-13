@@ -35,7 +35,7 @@ def create_resource_manager_provider(resource_manager: AuthlyResourceManager) ->
         A callable that returns the resource manager when invoked
     """
 
-    def get_resource_manager() -> AuthlyResourceManager:
+    def _get_resource_manager_provider() -> AuthlyResourceManager:
         """Get the resource manager instance.
 
         Returns:
@@ -55,7 +55,7 @@ def create_resource_manager_provider(resource_manager: AuthlyResourceManager) ->
     global _resource_manager_instance
     _resource_manager_instance = resource_manager
 
-    return get_resource_manager
+    return _get_resource_manager_provider
 
 
 # Default provider that will be overridden during app initialization

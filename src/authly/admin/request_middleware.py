@@ -120,7 +120,8 @@ class AdminRequestIDMiddleware(BaseHTTPMiddleware):
             # Re-raise the exception to let error handlers deal with it
             raise
 
-    def _get_or_create_request_id(self, request: Request) -> str:
+    @staticmethod
+    def _get_or_create_request_id(request: Request) -> str:
         """
         Get request ID from headers or generate a new one.
 
@@ -147,7 +148,8 @@ class AdminRequestIDMiddleware(BaseHTTPMiddleware):
         # Generate a new request ID
         return str(uuid4())
 
-    def _get_client_ip(self, request: Request) -> str:
+    @staticmethod
+    def _get_client_ip(request: Request) -> str:
         """
         Extract client IP address from request.
 
@@ -226,7 +228,8 @@ class AdminRequestContextMiddleware(BaseHTTPMiddleware):
         # Process the request
         return await call_next(request)
 
-    def _get_client_ip(self, request: Request) -> str:
+    @staticmethod
+    def _get_client_ip(request: Request) -> str:
         """Extract client IP address from request."""
         # Check for forwarded headers
         forwarded_for = request.headers.get("X-Forwarded-For")

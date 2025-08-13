@@ -10,6 +10,7 @@ import time
 from uuid import uuid4
 
 import pytest
+from fastapi_testing import AsyncTestResponse
 
 from authly.core.resource_manager import AuthlyResourceManager
 
@@ -289,11 +290,13 @@ class TestLoadPerformance:
                 tasks.append(task)
 
             start = time.time()
-            responses = await asyncio.gather(*tasks, return_exceptions=True)
+            responses: list[AsyncTestResponse | Exception] = await asyncio.gather(*tasks, return_exceptions=True)
             elapsed = time.time() - start
 
-            errors = sum(1 for r in responses if isinstance(r, Exception))
-            server_errors = sum(1 for r in responses if not isinstance(r, Exception) and r.status_code >= 500)
+            errors = sum(1 for resp in responses if isinstance(resp, Exception))
+            server_errors = sum(
+                1 for resp in responses if isinstance(resp, AsyncTestResponse) and resp.status_code >= 500
+            )
 
             return {
                 "burst_size": burst_size,
@@ -317,11 +320,13 @@ class TestLoadPerformance:
         print(f"{'Burst Size':<12} {'Time (s)':<10} {'Throughput':<15} {'Errors':<10}")
         print("-" * 50)
 
-        for r in results:
-            print(f"{r['burst_size']:<12} {r['time']:<10.2f} {r['throughput']:<15.2f} {r['errors']:<10}")
+        for result in results:
+            print(
+                f"{result['burst_size']:<12} {result['time']:<10.2f} {result['throughput']:<15.2f} {result['errors']:<10}"
+            )
 
         # Check if system handles bursts
-        max_errors = max(r["errors"] + r["server_errors"] for r in results)
+        max_errors = max(result["errors"] + result["server_errors"] for result in results)
         if max_errors == 0:
             print("✓ System handles burst loads without errors")
         else:

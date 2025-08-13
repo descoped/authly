@@ -4,7 +4,7 @@ from uuid import UUID
 
 from psycopg import AsyncConnection
 from psycopg.rows import dict_row
-from psycopg.sql import SQL
+from psycopg.sql import SQL, Identifier
 from psycopg_toolkit import BaseRepository, OperationError, RecordNotFoundError
 from psycopg_toolkit.utils import PsycopgHelper
 
@@ -50,7 +50,8 @@ class ClientRepository(BaseRepository[OAuthClientModel, UUID]):
             date_fields={"created_at", "updated_at"},
         )
 
-    def _process_client_result(self, result: dict) -> dict:
+    @staticmethod
+    def _process_client_result(result: dict) -> dict:
         """Process database result to handle missing OIDC fields"""
         # Handle missing OIDC fields with defaults
         if "id_token_signed_response_alg" not in result or result["id_token_signed_response_alg"] is None:
@@ -69,7 +70,7 @@ class ClientRepository(BaseRepository[OAuthClientModel, UUID]):
         with DatabaseTimer("client_read_by_id"):
             try:
                 # Explicitly cast parameter to varchar to avoid UUID conversion issues
-                query = "SELECT * FROM oauth_clients WHERE client_id = %s::varchar AND is_active = true"
+                query = SQL("SELECT * FROM oauth_clients WHERE client_id = %s::varchar AND is_active = true")
                 async with self.db_connection.cursor(row_factory=dict_row) as cur:
                     await cur.execute(query, [str(client_id)])  # Ensure it's a string
                     result = await cur.fetchone()
@@ -156,13 +157,20 @@ class ClientRepository(BaseRepository[OAuthClientModel, UUID]):
                 insert_data.pop("updated_at", None)
 
                 # Build columns and values for the insert
-                columns = [*list(insert_data.keys()), "created_at", "updated_at"]
-                values_placeholders = ["%s"] * len(insert_data) + ["NOW()", "NOW()"]
+                columns = list(insert_data.keys())
                 values = list(insert_data.values())
 
+                # Build column identifiers
+                column_identifiers = [Identifier(col) for col in columns]
+                column_identifiers.extend([Identifier("created_at"), Identifier("updated_at")])
+
+                # Build value placeholders
+                value_placeholders = [SQL("%s")] * len(values)
+                value_placeholders.extend([SQL("NOW()"), SQL("NOW()")])
+
                 insert_query = SQL("INSERT INTO oauth_clients ({}) VALUES ({})").format(
-                    SQL(", ").join(SQL(f'"{col}"') for col in columns),
-                    SQL(", ").join(SQL(placeholder) for placeholder in values_placeholders),
+                    SQL(", ").join(column_identifiers),
+                    SQL(", ").join(value_placeholders),
                 )
 
                 async with self.db_connection.cursor(row_factory=dict_row) as cur:
@@ -203,18 +211,16 @@ class ClientRepository(BaseRepository[OAuthClientModel, UUID]):
             values = []
 
             for key, value in prepared_data.items():
-                set_clauses.append(f'"{key}" = %s')
+                set_clauses.append(SQL("{} = %s").format(Identifier(key)))
                 values.append(value)
 
             # Add updated_at with clock_timestamp() for precise timing
-            set_clauses.append('"updated_at" = clock_timestamp()')
+            set_clauses.append(SQL("{} = clock_timestamp()").format(Identifier("updated_at")))
 
             # Add client_id for WHERE clause
             values.append(client_id)
 
-            update_query = SQL("UPDATE oauth_clients SET {} WHERE id = %s").format(
-                SQL(", ").join(SQL(clause) for clause in set_clauses)
-            )
+            update_query = SQL("UPDATE oauth_clients SET {} WHERE id = %s").format(SQL(", ").join(set_clauses))
 
             async with self.db_connection.cursor(row_factory=dict_row) as cur:
                 await cur.execute(update_query + SQL(" RETURNING *"), values)
@@ -250,12 +256,14 @@ class ClientRepository(BaseRepository[OAuthClientModel, UUID]):
     async def get_active_clients(self, limit: int = 100, offset: int = 0) -> list[OAuthClientModel]:
         """Get all active OAuth clients with pagination"""
         try:
-            query = """
-                SELECT * FROM oauth_clients
-                WHERE is_active = true
-                ORDER BY created_at DESC
-                LIMIT %s OFFSET %s
-            """
+            query = SQL("""
+                        SELECT *
+                        FROM oauth_clients
+                        WHERE is_active = true
+                        ORDER BY created_at DESC
+                            LIMIT %s
+                        OFFSET %s
+                        """)
 
             async with self.db_connection.cursor(row_factory=dict_row) as cur:
                 await cur.execute(query, [limit, offset])
@@ -276,7 +284,7 @@ class ClientRepository(BaseRepository[OAuthClientModel, UUID]):
     async def count_active_clients(self) -> int:
         """Count the total number of active OAuth clients"""
         try:
-            query = "SELECT COUNT(*) FROM oauth_clients WHERE is_active = true"
+            query = SQL("SELECT COUNT(*) FROM oauth_clients WHERE is_active = true")
 
             async with self.db_connection.cursor() as cur:
                 await cur.execute(query)
@@ -290,7 +298,7 @@ class ClientRepository(BaseRepository[OAuthClientModel, UUID]):
     async def client_exists(self, client_id: str) -> bool:
         """Check if a client exists by client_id"""
         try:
-            query = "SELECT 1 FROM oauth_clients WHERE client_id = %s AND is_active = true"
+            query = SQL("SELECT 1 FROM oauth_clients WHERE client_id = %s AND is_active = true")
 
             async with self.db_connection.cursor() as cur:
                 await cur.execute(query, [client_id])
@@ -304,13 +312,14 @@ class ClientRepository(BaseRepository[OAuthClientModel, UUID]):
     async def get_client_scopes(self, client_id: UUID) -> list[str]:
         """Get all scope names associated with a client"""
         try:
-            query = """
-                SELECT s.scope_name
-                FROM oauth_scopes s
-                JOIN oauth_client_scopes cs ON s.id = cs.scope_id
-                WHERE cs.client_id = %s AND s.is_active = true
-                ORDER BY s.scope_name
-            """
+            query = SQL("""
+                        SELECT s.scope_name
+                        FROM oauth_scopes s
+                                 JOIN oauth_client_scopes cs ON s.id = cs.scope_id
+                        WHERE cs.client_id = %s
+                          AND s.is_active = true
+                        ORDER BY s.scope_name
+                        """)
 
             async with self.db_connection.cursor() as cur:
                 await cur.execute(query, [client_id])
@@ -324,12 +333,11 @@ class ClientRepository(BaseRepository[OAuthClientModel, UUID]):
     async def add_client_scope(self, client_id: UUID, scope_id: UUID) -> bool:
         """Associate a scope with a client"""
         try:
-            query = """
-                INSERT INTO oauth_client_scopes (client_id, scope_id, created_at)
-                VALUES (%s, %s, %s)
-                ON CONFLICT (client_id, scope_id) DO NOTHING
+            query = SQL("""
+                        INSERT INTO oauth_client_scopes (client_id, scope_id, created_at)
+                        VALUES (%s, %s, %s) ON CONFLICT (client_id, scope_id) DO NOTHING
                 RETURNING id
-            """
+                        """)
 
             async with self.db_connection.cursor() as cur:
                 await cur.execute(query, [client_id, scope_id, datetime.now(UTC)])
@@ -343,7 +351,7 @@ class ClientRepository(BaseRepository[OAuthClientModel, UUID]):
     async def remove_client_scope(self, client_id: UUID, scope_id: UUID) -> bool:
         """Remove a scope association from a client"""
         try:
-            query = "DELETE FROM oauth_client_scopes WHERE client_id = %s AND scope_id = %s"
+            query = SQL("DELETE FROM oauth_client_scopes WHERE client_id = %s AND scope_id = %s")
 
             async with self.db_connection.cursor() as cur:
                 await cur.execute(query, [client_id, scope_id])

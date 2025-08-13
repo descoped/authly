@@ -248,7 +248,7 @@ class AuthlyResourceManager:
 
             logger.info(f"Shutting down managed Database for {self.mode.value} mode")
             try:
-                await database.close()
+                await database.cleanup()
                 logger.info(f"Database cleanup completed for {self.mode.value} mode")
             except Exception as e:
                 logger.error(f"Error during Database cleanup for {self.mode.value} mode: {e}")

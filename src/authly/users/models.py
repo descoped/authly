@@ -2,7 +2,7 @@ from datetime import date, datetime
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class UserModel(BaseModel):
@@ -40,8 +40,8 @@ class UserModel(BaseModel):
     # OIDC Standard Claims - Address scope (structured claim)
     address: dict[str, Any] | None = Field(None, description="OIDC: Structured address claim")
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "id": "123e4567-e89b-12d3-a456-426614174000",
                 "username": "john.doe",
@@ -78,9 +78,10 @@ class UserModel(BaseModel):
                 },
             }
         }
+    )
 
-    @field_validator("birthdate", mode="before")
     @classmethod
+    @field_validator("birthdate", mode="before")
     def validate_birthdate(cls, v: str | date | None) -> str | None:
         """
         Convert birthdate to OIDC-compliant string format.

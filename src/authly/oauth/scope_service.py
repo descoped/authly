@@ -279,7 +279,8 @@ class ScopeService:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to validate scopes"
             ) from None
 
-    async def reduce_scopes_to_granted(self, requested_scopes: list[str], granted_scopes: list[str]) -> list[str]:
+    @staticmethod
+    async def reduce_scopes_to_granted(requested_scopes: list[str], granted_scopes: list[str]) -> list[str]:
         """
         Reduce requested scopes to those actually granted.
 
@@ -432,7 +433,8 @@ class ScopeService:
             # Default to False for security
             return False
 
-    def _validate_scope_name_format(self, scope_name: str) -> None:
+    @staticmethod
+    def _validate_scope_name_format(scope_name: str) -> None:
         """
         Validate scope name format according to OAuth 2.1 specs.
 
@@ -461,7 +463,8 @@ class ScopeService:
         if any(pattern in scope_name.lower() for pattern in reserved_patterns):
             logger.warning(f"Scope name uses reserved pattern: {scope_name}")
 
-    async def _check_scope_usage(self, scope_id: UUID) -> int:
+    @staticmethod
+    async def _check_scope_usage(scope_id: UUID) -> int:
         """
         Check how many active tokens/clients are using a scope.
 
@@ -474,3 +477,20 @@ class ScopeService:
         except Exception as e:
             logger.error(f"Error checking scope usage for {scope_id}: {e}")
             return 0
+
+    async def get_active_scopes(self) -> list[OAuthScopeModel]:
+        """
+        Get all active scopes.
+
+        This is a public wrapper for repository access needed by admin endpoints.
+
+        Returns:
+            List of active OAuthScopeModel instances
+        """
+        try:
+            return await self._scope_repo.get_active_scopes()
+        except Exception as e:
+            logger.error(f"Error getting active scopes: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get active scopes"
+            ) from None

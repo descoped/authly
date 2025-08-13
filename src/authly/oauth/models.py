@@ -90,7 +90,7 @@ class OAuthClientModel(BaseModel):
     client_secret_hash: str | None = Field(None, max_length=255)  # NULL for public clients
     client_name: str = Field(..., min_length=1, max_length=255)
     client_type: ClientType
-    redirect_uris: list[str] = Field(..., min_items=1)  # At least one redirect URI required
+    redirect_uris: list[str] = Field(..., min_length=1)  # At least one redirect URI required
     grant_types: list[GrantType] = Field(default=[GrantType.AUTHORIZATION_CODE, GrantType.REFRESH_TOKEN])
     response_types: list[ResponseType] = Field(default=[ResponseType.CODE])
     scope: str | None = None  # Default scopes (space-separated)
@@ -248,7 +248,7 @@ class OAuthClientCreateRequest(BaseModel):
 
     client_name: str = Field(..., min_length=1, max_length=255)
     client_type: ClientType
-    redirect_uris: list[str] = Field(..., min_items=1)
+    redirect_uris: list[str] = Field(..., min_length=1)
     scope: str | None = None
     grant_types: list[GrantType] | None = None
     response_types: list[ResponseType] | None = None

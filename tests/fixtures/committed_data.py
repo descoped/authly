@@ -9,8 +9,10 @@ created within test transactions.
 """
 
 import secrets
+from collections.abc import AsyncIterator
 from contextlib import suppress
 from datetime import UTC, datetime, timedelta
+from typing import Any
 from uuid import uuid4
 
 import pytest
@@ -33,7 +35,7 @@ from authly.users.models import UserModel
 
 
 @pytest.fixture
-async def committed_user(db_pool: AsyncConnectionPool) -> UserModel:
+async def committed_user(db_pool: AsyncConnectionPool) -> AsyncIterator[UserModel]:
     """
     Create a user that is committed to the database and visible to HTTP endpoints.
 
@@ -82,7 +84,7 @@ async def committed_user(db_pool: AsyncConnectionPool) -> UserModel:
 
 
 @pytest.fixture
-async def committed_admin_user(db_pool: AsyncConnectionPool) -> UserModel:
+async def committed_admin_user(db_pool: AsyncConnectionPool) -> AsyncIterator[UserModel]:
     """
     Create an admin user that is committed to the database and visible to HTTP endpoints.
 
@@ -131,7 +133,7 @@ async def committed_admin_user(db_pool: AsyncConnectionPool) -> UserModel:
 
 
 @pytest.fixture
-async def committed_oauth_client(db_pool: AsyncConnectionPool) -> dict:
+async def committed_oauth_client(db_pool: AsyncConnectionPool) -> AsyncIterator[dict[str, Any]]:
     """
     Create an OAuth client that is committed to the database and visible to HTTP endpoints.
 
@@ -175,7 +177,7 @@ async def committed_oauth_client(db_pool: AsyncConnectionPool) -> dict:
 
 
 @pytest.fixture
-async def committed_public_client(db_pool: AsyncConnectionPool) -> dict:
+async def committed_public_client(db_pool: AsyncConnectionPool) -> AsyncIterator[dict[str, Any]]:
     """
     Create a public OAuth client (no secret) that is committed to the database.
 
@@ -213,7 +215,7 @@ async def committed_public_client(db_pool: AsyncConnectionPool) -> dict:
 
 
 @pytest.fixture
-async def committed_cli_oauth_client(db_pool: AsyncConnectionPool) -> dict:
+async def committed_cli_oauth_client(db_pool: AsyncConnectionPool) -> AsyncIterator[dict[str, Any]]:
     """
     Create a CLI OAuth client (public client with PKCE) that is committed to the database.
 
@@ -253,7 +255,7 @@ async def committed_cli_oauth_client(db_pool: AsyncConnectionPool) -> dict:
 
 
 @pytest.fixture
-async def committed_admin_user_dict(db_pool: AsyncConnectionPool) -> dict:
+async def committed_admin_user_dict(db_pool: AsyncConnectionPool) -> AsyncIterator[dict[str, Any]]:
     """
     Create an admin user that is committed to the database and visible to HTTP endpoints.
 
@@ -308,7 +310,7 @@ async def committed_admin_user_dict(db_pool: AsyncConnectionPool) -> dict:
 
 
 @pytest.fixture
-async def committed_scope(db_pool: AsyncConnectionPool) -> dict:
+async def committed_scope(db_pool: AsyncConnectionPool) -> AsyncIterator[dict[str, Any]]:
     """
     Create a scope that is committed to the database and visible to HTTP endpoints.
 
@@ -341,7 +343,7 @@ async def committed_scope(db_pool: AsyncConnectionPool) -> dict:
             return
 
         # If creation failed, try to get existing scope
-        existing_scope = await scope_repo.get_scope_by_name(scope_name)
+        existing_scope = await scope_repo.get_by_scope_name(scope_name)
         if existing_scope:
             yield existing_scope.model_dump()
         else:
@@ -357,7 +359,7 @@ async def committed_scope(db_pool: AsyncConnectionPool) -> dict:
                     )
 
             # Return a standard scope
-            read_scope = await scope_repo.get_scope_by_name("read")
+            read_scope = await scope_repo.get_by_scope_name("read")
             yield read_scope.model_dump() if read_scope else {"scope_name": "read", "description": "Read access"}
 
 
@@ -365,8 +367,8 @@ async def committed_scope(db_pool: AsyncConnectionPool) -> dict:
 async def committed_authorization_code(
     db_pool: AsyncConnectionPool,
     committed_user: UserModel,
-    committed_oauth_client: dict,
-) -> dict:
+    committed_oauth_client: dict[str, Any],
+) -> AsyncIterator[dict[str, Any]]:
     """
     Create an authorization code that is committed to the database.
 
@@ -404,15 +406,15 @@ async def committed_authorization_code(
 
         # Cleanup: Mark as used or delete
         with suppress(Exception):
-            await auth_code_repo.mark_code_as_used(code)
+            await auth_code_repo.use_authorization_code(code)
 
 
 @pytest.fixture
 async def committed_token(
     db_pool: AsyncConnectionPool,
     committed_user: UserModel,
-    committed_oauth_client: dict,
-) -> dict:
+    committed_oauth_client: dict[str, Any],
+) -> AsyncIterator[dict[str, Any]]:
     """
     Create a token that is committed to the database.
 
@@ -422,17 +424,20 @@ async def committed_token(
         token_repo = TokenRepository(conn)
 
         # Generate token data
-        jti = str(uuid4())
+        token_id = uuid4()
+        jti = f"test_token_{uuid4().hex}"
+        token_value = f"dummy_jwt_token_{secrets.token_urlsafe(32)}"
 
         token_data = TokenModel(
-            jti=jti,
+            id=token_id,
+            token_jti=jti,
+            token_value=token_value,
             user_id=committed_user.id,
-            client_id=committed_oauth_client["client_id"],
+            client_id=None,  # client_id is UUID in model, but we have string
             token_type=TokenType.ACCESS,
             scope="read write",
-            issued_at=datetime.now(UTC),
             expires_at=datetime.now(UTC) + timedelta(hours=1),
-            is_revoked=False,
+            invalidated=False,
         )
 
         # Store token with autocommit
@@ -441,9 +446,9 @@ async def committed_token(
 
         yield {"jti": jti, "token_data": token_data}
 
-        # Cleanup: Revoke the token
+        # Cleanup: Invalidate the token
         with suppress(Exception):
-            await token_repo.revoke_token(jti)
+            await token_repo.invalidate_token(jti)
 
 
 # Fixture combinations for common test scenarios
@@ -453,9 +458,9 @@ async def committed_token(
 async def committed_auth_setup(
     db_pool: AsyncConnectionPool,
     committed_user: UserModel,
-    committed_oauth_client: dict,
-    committed_scope: dict,
-) -> dict:
+    committed_oauth_client: dict[str, Any],
+    committed_scope: dict[str, Any],
+) -> dict[str, Any]:
     """
     Complete setup for authorization testing with committed data.
 
@@ -472,9 +477,9 @@ async def committed_auth_setup(
 @pytest.fixture
 async def committed_client_credentials_setup(
     db_pool: AsyncConnectionPool,
-    committed_oauth_client: dict,
-    committed_scope: dict,
-) -> dict:
+    committed_oauth_client: dict[str, Any],
+    committed_scope: dict[str, Any],
+) -> dict[str, Any]:
     """
     Setup for client credentials grant testing with committed data.
 

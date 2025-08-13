@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+async def lifespan(fastapi_app: FastAPI) -> AsyncGenerator[None, None]:
     """
     FastAPI lifespan context manager with psycopg-toolkit Database integration.
 
@@ -36,6 +36,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """
     logger.info("Starting Authly application with psycopg-toolkit Database integration...")
 
+    resource_manager = None  # Initialize to None for finally block
     try:
         # Create resource manager with mode auto-detection
         # Force production mode for main.py entry point
@@ -72,7 +73,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
             # Create the provider and override the default dependency
             provider = create_resource_manager_provider(resource_manager)
-            app.dependency_overrides[get_resource_manager] = provider
+            fastapi_app.dependency_overrides[get_resource_manager] = provider
             logger.info("Resource manager dependency injection configured")
 
             # Bootstrap admin system if enabled by mode configuration
@@ -98,7 +99,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     finally:
         logger.info("Shutting down Authly application...")
         # Cleanup Redis connections if initialized
-        if "resource_manager" in locals():
+        if resource_manager is not None:
             await resource_manager.cleanup_redis()
         # Cleanup handled by context managers and resource manager
         logger.info("Application shutdown completed")
@@ -138,7 +139,7 @@ async def main():
     """
     setup_logging()
 
-    app = create_app()
+    main_app = create_app()
 
     # Load configuration to get defaults
 
@@ -151,7 +152,7 @@ async def main():
 
     # Create uvicorn configuration
     config = uvicorn.Config(
-        app,
+        main_app,
         host=host,
         port=port,
         workers=workers if workers > 1 else None,

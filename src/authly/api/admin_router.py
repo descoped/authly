@@ -120,8 +120,8 @@ async def get_system_status(
 
     # Get service statistics
     try:
-        clients = await client_service._client_repo.get_active_clients()
-        scopes = await scope_service._scope_repo.get_active_scopes()
+        clients = await client_service.get_active_clients_models()
+        scopes = await scope_service.get_active_scopes()
 
         stats = {
             "oauth_clients": len(clients),
@@ -153,7 +153,6 @@ async def get_system_status(
 
 @admin_router.get("/dashboard/stats")
 async def get_admin_dashboard_stats(
-    conn: AsyncConnection = Depends(get_database_connection),
     _admin: UserModel = Depends(require_admin_system_read),
     cache_service: AdminCacheService = Depends(get_admin_cache),
     user_service: UserService = Depends(get_user_service),
@@ -179,11 +178,11 @@ async def get_admin_dashboard_stats(
     # If not cached, compute stats
     try:
         # Get various counts (these could be optimized with a single query)
-        total_users = await user_service._repo.count_filtered({})
-        active_users = await user_service._repo.count_filtered({"is_active": True})
-        admin_users = await user_service._repo.count_filtered({"is_admin": True})
-        unverified_users = await user_service._repo.count_filtered({"is_verified": False})
-        password_change_required = await user_service._repo.count_filtered({"requires_password_change": True})
+        total_users = await user_service.count_filtered({})
+        active_users = await user_service.count_filtered({"is_active": True})
+        admin_users = await user_service.count_filtered({"is_admin": True})
+        unverified_users = await user_service.count_filtered({"is_verified": False})
+        password_change_required = await user_service.count_filtered({"requires_password_change": True})
 
         # Get recent activity stats
         from datetime import datetime, timedelta
@@ -192,8 +191,8 @@ async def get_admin_dashboard_stats(
         last_24h = now - timedelta(days=1)
         last_7d = now - timedelta(days=7)
 
-        recent_signups_24h = await user_service._repo.count_filtered({"created_after": last_24h})
-        recent_signups_7d = await user_service._repo.count_filtered({"created_after": last_7d})
+        recent_signups_24h = await user_service.count_filtered({"created_after": last_24h})
+        recent_signups_7d = await user_service.count_filtered({"created_after": last_7d})
 
         stats = {
             "users": {
@@ -242,7 +241,7 @@ async def list_clients(
     Mirrors the CLI 'client list' command functionality.
     """
     try:
-        clients = await client_service._client_repo.get_active_clients(limit=limit, offset=offset)
+        clients = await client_service.get_active_clients_models(limit=limit, offset=offset)
 
         if not include_inactive:
             clients = [client for client in clients if client.is_active]
@@ -325,7 +324,12 @@ async def update_client(
     Mirrors the CLI 'client update' command functionality.
     """
     try:
-        updated_client = await client_service.update_client(client_id, update_data)
+        # Update the client and get the updated model
+        await client_service.update_client(client_id, update_data)
+        updated_client = await client_service.get_client_model_by_id(client_id)
+
+        if not updated_client:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found after update")
 
         logger.info(f"Updated OAuth client: {client_id}")
         return updated_client
@@ -417,7 +421,7 @@ async def get_client_oidc_settings(
     Get OpenID Connect specific settings for a client.
     """
     try:
-        client = await client_service._client_repo.get_by_client_id(client_id)
+        client = await client_service.get_client_model_by_id(client_id)
 
         if not client:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found")
@@ -461,7 +465,7 @@ async def update_client_oidc_settings(
     Update OpenID Connect specific settings for a client.
     """
     try:
-        client = await client_service._client_repo.get_by_client_id(client_id)
+        client = await client_service.get_client_model_by_id(client_id)
 
         if not client:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found")
@@ -490,7 +494,7 @@ async def update_client_oidc_settings(
             )
 
         # Update client with OIDC settings
-        await client_service._client_repo.update_client(client.id, update_data)
+        await client_service.update_client_by_id(client_id, update_data)
 
         logger.info(f"Updated OIDC settings for client: {client_id}")
 
@@ -830,7 +834,8 @@ async def get_admin_users(
             )
 
         # Users already include active_sessions from optimized query
-        admin_users = users
+        # Convert dictionary responses to AdminUserResponse objects
+        admin_users = [AdminUserResponse(**user) for user in users]
 
         # Calculate pagination info
         total_pages = math.ceil(total_count / limit) if total_count > 0 else 0
@@ -857,7 +862,6 @@ async def get_admin_users(
             total_count=total_count,
             page_info=page_info,
             filters_applied=filters if filters else None,
-            active_count=active_count,
         )
 
     except HTTPException:
@@ -874,7 +878,6 @@ async def get_admin_user_details(
     user_id: UUID,
     admin_user: UserModel = Depends(require_admin_user_read),
     user_service: UserService = Depends(get_user_service),
-    conn: AsyncConnection = Depends(get_database_connection),
     cache_service: AdminCacheService = Depends(get_admin_cache),
 ):
     """
@@ -982,7 +985,7 @@ async def create_admin_user(
         )
 
         # Get active session count (should be 0 for new user)
-        active_sessions = await token_service._repo.count_active_sessions(created_user.id)
+        active_sessions = await token_service.count_active_sessions(created_user.id)
 
         # Convert to AdminUserCreateResponse with session count and temporary password
         user_response_data = created_user.model_dump()
@@ -1066,7 +1069,7 @@ async def update_admin_user(
         )
 
         # Get active session count for the response
-        active_sessions = await token_service._repo.count_active_sessions(user_id)
+        active_sessions = await token_service.count_active_sessions(user_id)
 
         # Convert to AdminUserResponse with session count
         user_data = updated_user.model_dump()
@@ -1213,7 +1216,7 @@ async def reset_user_password(
         )
 
         # Invalidate all existing sessions for security
-        invalidated_count = await token_service._repo.invalidate_user_sessions(user_id)
+        invalidated_count = await token_service.invalidate_user_sessions(user_id)
 
         logger.info(
             f"Admin user {admin_user.username} reset password for user {updated_user.username} "
@@ -1253,7 +1256,6 @@ async def get_user_sessions(
     limit: int = Query(25, ge=1, le=100, description="Number of sessions to return (max 100)"),
     include_inactive: bool = Query(True, description="Include inactive/expired sessions"),
     admin_user: UserModel = Depends(require_admin_user_read),
-    user_service: UserService = Depends(get_user_service),
     token_service: TokenService = Depends(get_admin_token_service),
     conn: AsyncConnection = Depends(get_database_connection),
 ):
@@ -1277,11 +1279,11 @@ async def get_user_sessions(
         user = await validation.validate_session_access(user_id, admin_user)
 
         # Get user sessions from token repository
-        sessions = await token_service._repo.get_user_sessions(
+        sessions = await token_service.get_user_sessions(
             user_id, skip=skip, limit=limit, include_inactive=include_inactive
         )
-        total_count = await token_service._repo.count_user_sessions(user_id, include_inactive=include_inactive)
-        active_count = await token_service._repo.count_active_sessions(user_id)
+        total_count = await token_service.count_user_sessions(user_id, include_inactive=include_inactive)
+        active_count = await token_service.count_active_sessions(user_id)
 
         # Convert TokenModel instances to AdminSessionResponse
         from datetime import datetime
@@ -1359,7 +1361,6 @@ async def get_user_sessions(
 async def revoke_all_user_sessions(
     user_id: UUID,
     admin_user: UserModel = Depends(require_admin_user_write),
-    user_service: UserService = Depends(get_user_service),
     token_service: TokenService = Depends(get_admin_token_service),
     conn: AsyncConnection = Depends(get_database_connection),
 ):
@@ -1388,13 +1389,13 @@ async def revoke_all_user_sessions(
 
         # Revoke all user sessions
         # Count active sessions before revocation
-        active_sessions_before = await token_service._repo.count_active_sessions(user_id)
+        active_sessions_before = await token_service.count_active_sessions(user_id)
 
         # Invalidate all user tokens (both access and refresh)
-        await token_service._repo.invalidate_user_tokens(user_id)
+        await token_service.invalidate_user_tokens(user_id)
 
         # Count active sessions after revocation (should be 0)
-        active_sessions_after = await token_service._repo.count_active_sessions(user_id)
+        active_sessions_after = await token_service.count_active_sessions(user_id)
         revoked_count = active_sessions_before - active_sessions_after
 
         logger.warning(
@@ -1432,7 +1433,6 @@ async def revoke_specific_user_session(
     user_id: UUID,
     session_id: UUID,
     admin_user: UserModel = Depends(require_admin_user_write),
-    user_service: UserService = Depends(get_user_service),
     token_service: TokenService = Depends(get_admin_token_service),
     conn: AsyncConnection = Depends(get_database_connection),
 ):
@@ -1461,7 +1461,7 @@ async def revoke_specific_user_session(
         user = await validation.validate_session_revocation(user_id, admin_user, session_id)
 
         # Get the specific session and validate ownership
-        session = await token_service._repo.get_by_id(session_id)
+        session = await token_service.get_token_by_id(session_id)
 
         if not session:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
@@ -1475,7 +1475,7 @@ async def revoke_specific_user_session(
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Session is already invalidated")
 
         # Invalidate the specific session
-        await token_service._repo.invalidate_token(session.token_jti)
+        await token_service.invalidate_token(session.token_jti)
 
         logger.info(
             f"Admin user {admin_user.username} revoked session {session_id} for user {user.username} "

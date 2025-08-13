@@ -190,7 +190,8 @@ class OIDCDiscoveryService:
         logger.info(f"Generated OIDC discovery metadata for issuer: {issuer_url}")
         return oidc_metadata
 
-    def get_static_oidc_metadata(self, issuer_url: str = "https://localhost:8000") -> OIDCServerMetadata:
+    @staticmethod
+    def get_static_oidc_metadata(issuer_url: str = "https://localhost:8000") -> OIDCServerMetadata:
         """
         Get static OIDC metadata for fallback scenarios.
 

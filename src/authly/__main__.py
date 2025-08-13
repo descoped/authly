@@ -19,6 +19,7 @@ import asyncio
 import logging
 import os
 import sys
+from typing import cast
 
 import click
 import uvicorn
@@ -58,7 +59,7 @@ def cli(ctx: click.Context, version: bool, commands: bool, install_completion: b
             from importlib.metadata import version as get_version
 
             authly_version = get_version("authly")
-        except Exception:
+        except (ImportError, ModuleNotFoundError, AttributeError):
             authly_version = "unknown"
         click.echo(f"Authly Authentication Service v{authly_version}")
         return
@@ -68,7 +69,11 @@ def cli(ctx: click.Context, version: bool, commands: bool, install_completion: b
 
         click.echo("Authly CLI Commands Reference")
         click.echo("=" * 40)
-        print_command_tree(ctx.command)
+        # ctx.command is a Group since cli is decorated with @click.group
+        if isinstance(ctx.command, click.Group):
+            print_command_tree(ctx.command)
+        else:
+            click.echo("Error: Expected a command group")
         return
 
     if install_completion:
@@ -143,6 +148,7 @@ def admin(ctx: click.Context) -> None:
 
     Manage OAuth clients, scopes, users, and system configuration.
     """
+    pass  # Commands are added dynamically in _setup_admin_commands()
     # Initialize context object if not exists (for proper delegation)
     if ctx.obj is None:
         ctx.obj = {}
@@ -162,10 +168,13 @@ def _setup_admin_commands():
     from authly.admin import cli as admin_cli
 
     # Add all commands from the admin CLI main group
-    for name, cmd in admin_cli.main.commands.items():
-        # Skip if already exists (shouldn't happen but be safe)
-        if name not in admin.commands:
-            admin.add_command(cmd, name=name)
+    # Cast admin to click.Group to access commands and add_command
+    admin_group = cast(click.Group, admin)
+    if hasattr(admin_cli.main, "commands"):
+        for name, cmd in admin_cli.main.commands.items():
+            # Skip if already exists (shouldn't happen but be safe)
+            if name not in admin_group.commands:
+                admin_group.add_command(cmd, name=name)
 
 
 def _run_production_mode(host: str, port: int, workers: int, log_level: str, access_log: bool) -> None:

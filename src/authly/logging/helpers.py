@@ -32,7 +32,7 @@ def log_oauth_event(
         grant_type: OAuth grant type
         **extra: Additional context fields
     """
-    context = {
+    context: dict[str, Any] = {
         "event_type": "oauth",
         "oauth_event": event,
     }
@@ -70,7 +70,7 @@ def log_authentication_event(
         failure_reason: Reason for authentication failure
         **extra: Additional context fields
     """
-    context = {
+    context: dict[str, Any] = {
         "event_type": "authentication",
         "auth_event": event,
     }
@@ -113,7 +113,7 @@ def log_admin_action(
         changes: Dictionary of changes made
         **extra: Additional context fields
     """
-    context = {
+    context: dict[str, Any] = {
         "event_type": "admin",
         "admin_action": action,
     }
@@ -155,7 +155,7 @@ def log_security_event(
         details: Additional security details
         **extra: Additional context fields
     """
-    context = {
+    context: dict[str, Any] = {
         "event_type": "security",
         "security_event": event,
         "severity": severity,
@@ -202,7 +202,7 @@ def log_database_event(
         error: Error message (if applicable)
         **extra: Additional context fields
     """
-    context = {
+    context: dict[str, Any] = {
         "event_type": "database",
         "db_event": event,
     }
@@ -235,7 +235,7 @@ def set_user_context(user_id: str, username: str | None = None, roles: list | No
         username: Username (optional)
         roles: User roles (optional)
     """
-    context = {"user_id": user_id}
+    context: dict[str, Any] = {"user_id": user_id}
 
     if username:
         context["username"] = username
@@ -254,7 +254,7 @@ def set_client_context(client_id: str, client_name: str | None = None, client_ty
         client_name: Client name (optional)
         client_type: Client type (optional)
     """
-    context = {"client_id": client_id}
+    context: dict[str, Any] = {"client_id": client_id}
 
     if client_name:
         context["client_name"] = client_name

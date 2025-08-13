@@ -109,6 +109,7 @@ def require_admin_scope(required_scope: str):
         Args:
             admin_user: Verified admin user from require_admin_user
             credentials: HTTP Bearer token credentials
+            config: Inject authly config
 
         Returns:
             UserModel with verified admin authority and scope permissions

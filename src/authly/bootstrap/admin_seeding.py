@@ -11,6 +11,7 @@ import os
 import secrets
 import string
 from datetime import UTC, datetime
+from typing import Any
 from uuid import uuid4
 
 from psycopg import AsyncConnection
@@ -303,7 +304,7 @@ async def bootstrap_admin_system(
     admin_username: str | None = None,
     admin_email: str | None = None,
     admin_password: str | None = None,
-) -> dict:
+) -> dict[str, Any]:
     """
     Complete admin system bootstrap process.
 
@@ -325,7 +326,7 @@ async def bootstrap_admin_system(
     try:
         logger.info("Starting admin system bootstrap")
 
-        results = {
+        results: dict[str, Any] = {
             "admin_user_created": False,
             "admin_user_id": None,
             "admin_scopes_registered": 0,

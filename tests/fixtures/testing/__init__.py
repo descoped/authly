@@ -1,11 +1,11 @@
-from fixtures.testing.lifespan import (
+from .lifespan import (
     custom_test_server,
     hybrid_test_server,
     resource_manager_server,
     resource_manager_test_server,
     test_server,
 )
-from fixtures.testing.postgres import (
+from .postgres import (
     _database_instance,
     _db_callbacks,
     _db_settings,

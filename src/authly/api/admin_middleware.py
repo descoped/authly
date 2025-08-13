@@ -32,6 +32,41 @@ def _is_admin_api_localhost_only() -> bool:
 LOCALHOST_IPS = {"127.0.0.1", "::1", "localhost"}
 
 
+def is_localhost(ip: str) -> bool:
+    """
+    Check if the given IP address is considered localhost.
+
+    Args:
+        ip: IP address to check
+
+    Returns:
+        True if IP is localhost, False otherwise
+    """
+    if not ip:
+        return False
+
+    # Direct localhost check
+    if ip in LOCALHOST_IPS:
+        return True
+
+    # IPv4 localhost range (127.0.0.0/8)
+    if ip.startswith("127."):
+        return True
+
+    # IPv6 localhost
+    if ip == "::1" or ip.lower() == "localhost":
+        return True
+
+    # Docker internal IPs (when running in containers)
+    docker_internal_ips = {
+        "172.17.0.1",  # Default Docker bridge
+        "172.18.0.1",  # Common Docker bridge
+        "host.docker.internal",  # Docker Desktop
+    }
+
+    return ip in docker_internal_ips
+
+
 class AdminSecurityMiddleware:
     """
     Middleware to enforce security controls for admin API endpoints.
@@ -76,7 +111,7 @@ class AdminSecurityMiddleware:
                 # Determine actual client IP
                 actual_ip = forwarded_for.split(",")[0].strip() if forwarded_for else real_ip or client_host
 
-                if not self._is_localhost(actual_ip):
+                if not is_localhost(actual_ip):
                     logger.warning(
                         f"Admin API access denied - non-localhost access: {actual_ip} "
                         f"requesting {request.method} {request.url.path}"
@@ -97,40 +132,6 @@ class AdminSecurityMiddleware:
 
         # Continue to application
         await self.app(scope, receive, send)
-
-    def _is_localhost(self, ip: str) -> bool:
-        """
-        Check if the given IP address is considered localhost.
-
-        Args:
-            ip: IP address to check
-
-        Returns:
-            True if IP is localhost, False otherwise
-        """
-        if not ip:
-            return False
-
-        # Direct localhost check
-        if ip in LOCALHOST_IPS:
-            return True
-
-        # IPv4 localhost range (127.0.0.0/8)
-        if ip.startswith("127."):
-            return True
-
-        # IPv6 localhost
-        if ip == "::1" or ip.lower() == "localhost":
-            return True
-
-        # Docker internal IPs (when running in containers)
-        docker_internal_ips = {
-            "172.17.0.1",  # Default Docker bridge
-            "172.18.0.1",  # Common Docker bridge
-            "host.docker.internal",  # Docker Desktop
-        }
-
-        return ip in docker_internal_ips
 
 
 def setup_admin_middleware(app):
@@ -170,8 +171,7 @@ async def check_admin_access(request: Request):
         actual_ip = forwarded_for.split(",")[0].strip() if forwarded_for else real_ip or client_host
 
         # Check if localhost
-        middleware = AdminSecurityMiddleware(None)
-        if not middleware._is_localhost(actual_ip):
+        if not is_localhost(actual_ip):
             logger.warning(f"Admin API access denied - non-localhost: {actual_ip}")
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN, detail="Admin API access restricted to localhost only"

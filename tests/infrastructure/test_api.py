@@ -4,7 +4,6 @@ import logging
 import pytest
 from fastapi import APIRouter
 from fastapi_testing import AsyncTestServer
-from psycopg import AsyncTransaction
 
 from authly.api import health_router
 from authly.config.config import AuthlyConfig
@@ -28,7 +27,7 @@ async def test_authly_initialization(initialize_authly):
 
 
 @pytest.mark.asyncio
-async def test_ping(test_server: AsyncTestServer, transaction: AsyncTransaction):
+async def test_ping(test_server: AsyncTestServer):
     # Register routes
     test_server.app.include_router(PingRouter().router)
 

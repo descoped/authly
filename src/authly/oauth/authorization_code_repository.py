@@ -155,12 +155,12 @@ class AuthorizationCodeRepository(BaseRepository[OAuthAuthorizationCodeModel, UU
                 now = datetime.now(UTC)
 
                 # Update code as used and return the record
-                query = """
+                query = SQL("""
                     UPDATE oauth_authorization_codes
                     SET is_used = true, used_at = %s
                     WHERE code = %s AND is_used = false
                     RETURNING *
-                """
+                """)
 
                 async with self.db_connection.cursor(row_factory=dict_row) as cur:
                     await cur.execute(query, [now, code])
@@ -245,7 +245,8 @@ class AuthorizationCodeRepository(BaseRepository[OAuthAuthorizationCodeModel, UU
             logger.error(f"Error in verify_pkce_challenge: {e}")
             return False
 
-    def _verify_pkce(self, code_verifier: str, code_challenge: str, method: str) -> bool:
+    @staticmethod
+    def _verify_pkce(code_verifier: str, code_challenge: str, method: str) -> bool:
         """
         Verify PKCE code verifier against code challenge.
         OAuth 2.1 only supports S256 method.
@@ -277,7 +278,7 @@ class AuthorizationCodeRepository(BaseRepository[OAuthAuthorizationCodeModel, UU
 
         with DatabaseTimer("authorization_code_cleanup"):
             try:
-                query = "DELETE FROM oauth_authorization_codes WHERE expires_at < %s"
+                query = SQL("DELETE FROM oauth_authorization_codes WHERE expires_at < %s")
 
                 async with self.db_connection.cursor() as cur:
                     await cur.execute(query, [before_datetime])
@@ -296,12 +297,12 @@ class AuthorizationCodeRepository(BaseRepository[OAuthAuthorizationCodeModel, UU
         """Get recent authorization codes for a user (for debugging/auditing)"""
         with DatabaseTimer("authorization_code_list_user"):
             try:
-                query = """
+                query = SQL("""
                     SELECT * FROM oauth_authorization_codes
                     WHERE user_id = %s
                     ORDER BY created_at DESC
                     LIMIT %s
-                """
+                """)
 
                 async with self.db_connection.cursor(row_factory=dict_row) as cur:
                     await cur.execute(query, [user_id, limit])
@@ -316,12 +317,12 @@ class AuthorizationCodeRepository(BaseRepository[OAuthAuthorizationCodeModel, UU
         """Get recent authorization codes for a client (for debugging/auditing)"""
         with DatabaseTimer("authorization_code_list_client"):
             try:
-                query = """
+                query = SQL("""
                     SELECT * FROM oauth_authorization_codes
                     WHERE client_id = %s
                     ORDER BY created_at DESC
                     LIMIT %s
-                """
+                """)
 
                 async with self.db_connection.cursor(row_factory=dict_row) as cur:
                     await cur.execute(query, [client_id, limit])
@@ -337,11 +338,11 @@ class AuthorizationCodeRepository(BaseRepository[OAuthAuthorizationCodeModel, UU
         with DatabaseTimer("authorization_code_revoke_user"):
             try:
                 now = datetime.now(UTC)
-                query = """
+                query = SQL("""
                     UPDATE oauth_authorization_codes
                     SET is_used = true, used_at = %s
                     WHERE user_id = %s AND is_used = false
-                """
+                """)
 
                 async with self.db_connection.cursor() as cur:
                     await cur.execute(query, [now, user_id])
@@ -356,11 +357,11 @@ class AuthorizationCodeRepository(BaseRepository[OAuthAuthorizationCodeModel, UU
         with DatabaseTimer("authorization_code_revoke_client"):
             try:
                 now = datetime.now(UTC)
-                query = """
+                query = SQL("""
                     UPDATE oauth_authorization_codes
                     SET is_used = true, used_at = %s
                     WHERE client_id = %s AND is_used = false
-                """
+                """)
 
                 async with self.db_connection.cursor() as cur:
                     await cur.execute(query, [now, client_id])
@@ -375,10 +376,10 @@ class AuthorizationCodeRepository(BaseRepository[OAuthAuthorizationCodeModel, UU
         with DatabaseTimer("authorization_code_count"):
             try:
                 now = datetime.now(UTC)
-                query = """
+                query = SQL("""
                     SELECT COUNT(*) FROM oauth_authorization_codes
                     WHERE is_used = false AND expires_at > %s
-                """
+                """)
 
                 async with self.db_connection.cursor() as cur:
                     await cur.execute(query, [now])

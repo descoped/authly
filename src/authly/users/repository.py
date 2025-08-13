@@ -140,19 +140,21 @@ class UserRepository(BaseRepository[UserModel, UUID]):
         """
         where_conditions, params = self._build_filter_conditions(filters or {})
 
-        query_parts = ["SELECT * FROM users"]
-
+        # Build query - use string for dynamic SQL since where_conditions are built at runtime
         if where_conditions:
-            query_parts.append("WHERE " + " AND ".join(where_conditions))
-
-        query_parts.extend(["ORDER BY created_at DESC", f"LIMIT {limit} OFFSET {skip}"])
-
-        query = SQL(" ".join(query_parts))
+            # Join conditions with AND
+            where_clause = " WHERE " + " AND ".join(where_conditions)
+            query_str = f"SELECT * FROM users{where_clause} ORDER BY created_at DESC LIMIT %s OFFSET %s"
+            params.extend([limit, skip])
+        else:
+            query_str = "SELECT * FROM users ORDER BY created_at DESC LIMIT %s OFFSET %s"
+            params = [limit, skip]
 
         with DatabaseTimer("user_list_filtered_paginated"):
             try:
                 async with self.db_connection.cursor(row_factory=dict_row) as cur:
-                    await cur.execute(query, params)
+                    # Execute dynamic query - type: ignore needed for dynamic SQL
+                    await cur.execute(query_str, params)  # type: ignore[arg-type]
                     results = await cur.fetchall()
                     return [UserModel(**row) for row in results]
             except Exception as e:
@@ -171,24 +173,27 @@ class UserRepository(BaseRepository[UserModel, UUID]):
         """
         where_conditions, params = self._build_filter_conditions(filters or {})
 
-        query_parts = ["SELECT COUNT(*) FROM users"]
-
+        # Build query - use string for dynamic SQL since where_conditions are built at runtime
         if where_conditions:
-            query_parts.append("WHERE " + " AND ".join(where_conditions))
-
-        query = SQL(" ".join(query_parts))
+            # Join conditions with AND
+            where_clause = " WHERE " + " AND ".join(where_conditions)
+            query_str = f"SELECT COUNT(*) FROM users{where_clause}"
+        else:
+            query_str = "SELECT COUNT(*) FROM users"
 
         with DatabaseTimer("user_count_filtered"):
             try:
                 async with self.db_connection.cursor() as cur:
-                    await cur.execute(query, params)
+                    # Execute dynamic query - type: ignore needed for dynamic SQL
+                    await cur.execute(query_str, params)  # type: ignore[arg-type]
                     result = await cur.fetchone()
                     return result[0] if result else 0
             except Exception as e:
                 logger.error(f"Error in count_filtered: {e}")
                 raise OperationError(f"Failed to count filtered users: {e!s}") from e
 
-    def _build_filter_conditions(self, filters: dict) -> tuple[list[str], list]:
+    @staticmethod
+    def _build_filter_conditions(filters: dict) -> tuple[list[str], list]:
         """
         Build WHERE conditions and parameters from filter dictionary.
 
@@ -293,10 +298,11 @@ class UserRepository(BaseRepository[UserModel, UUID]):
         """
         where_conditions, params = self._build_filter_conditions(filters or {})
 
-        # Build the optimized CTE query
-        base_where = "WHERE " + " AND ".join(where_conditions) if where_conditions else ""
+        # Build WHERE clause
+        where_clause = " WHERE " + " AND ".join(where_conditions) if where_conditions else ""
 
-        query = SQL(f"""
+        # Build the optimized CTE query
+        query_str = f"""
             WITH filtered_users AS (
                 -- Filter users based on criteria
                 SELECT
@@ -312,7 +318,7 @@ class UserRepository(BaseRepository[UserModel, UUID]):
                         0
                     ) as active_sessions
                 FROM users u
-                {base_where}
+                {where_clause}
             ),
             counts AS (
                 -- Get various counts in parallel
@@ -330,7 +336,7 @@ class UserRepository(BaseRepository[UserModel, UUID]):
             CROSS JOIN counts c
             ORDER BY fu.created_at DESC
             LIMIT %s OFFSET %s
-        """)
+        """
 
         # Add pagination parameters
         query_params = [*params, limit, skip]
@@ -338,7 +344,8 @@ class UserRepository(BaseRepository[UserModel, UUID]):
         with DatabaseTimer("user_optimized_admin_listing"):
             try:
                 async with self.db_connection.cursor(row_factory=dict_row) as cur:
-                    await cur.execute(query, query_params)
+                    # Execute dynamic query - type: ignore needed for dynamic SQL
+                    await cur.execute(query_str, query_params)  # type: ignore[arg-type]
                     results = await cur.fetchall()
 
                     if not results:

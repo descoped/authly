@@ -8,7 +8,7 @@ enabling the Authorization Code flow to work with a login UI.
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_serializer
 
 
 class SessionModel(BaseModel):
@@ -31,10 +31,17 @@ class SessionModel(BaseModel):
     csrf_token: str = Field(..., description="CSRF protection token")
     is_active: bool = Field(default=True, description="Session active status")
 
-    class Config:
-        """Pydantic configuration."""
+    model_config = ConfigDict()
 
-        json_encoders = {datetime: lambda v: v.isoformat(), UUID: lambda v: str(v)}
+    @field_serializer("created_at", "expires_at")
+    def serialize_datetime(self, dt: datetime) -> str:
+        """Serialize datetime to ISO format string."""
+        return dt.isoformat()
+
+    @field_serializer("user_id")
+    def serialize_uuid(self, uuid: UUID) -> str:
+        """Serialize UUID to string."""
+        return str(uuid)
 
 
 class LoginRequest(BaseModel):

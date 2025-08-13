@@ -96,9 +96,9 @@ async def show_login_page(
             }
 
     return templates.TemplateResponse(
+        request,
         "login.html",
         {
-            "request": request,
             "redirect_to": redirect_to,
             "error": error,
             "message": message,

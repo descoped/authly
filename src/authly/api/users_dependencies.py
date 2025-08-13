@@ -88,7 +88,7 @@ async def _validate_token_and_get_user_id(token: str, token_service: TokenServic
 
     except JWTError:
         raise credentials_exception from None
-    except Exception as e:
+    except (ValueError, KeyError, AttributeError, TypeError, RecordNotFoundError, OperationError) as e:
         logger.error(f"Error validating token: {e}")
         raise credentials_exception from e
 
@@ -161,7 +161,7 @@ async def get_current_user_optional(
     try:
         user_id = await _validate_token_and_get_user_id(token, token_service, config)
         return await _get_user_by_id(user_repo, user_id)
-    except Exception:
+    except (HTTPException, ValueError, KeyError, AttributeError, TypeError, RecordNotFoundError, OperationError):
         return None
 
 
@@ -245,6 +245,7 @@ async def get_token_scopes(
     Args:
         token: JWT access token
         token_service: Token service for validation
+        config: Authly config
 
     Returns:
         List of scopes granted to the token
@@ -273,7 +274,7 @@ async def get_token_scopes(
 
     except JWTError:
         raise credentials_exception from None
-    except Exception as e:
+    except (ValueError, KeyError, AttributeError, TypeError) as e:
         logger.error(f"Error extracting scopes from token: {e}")
         raise credentials_exception from e
 

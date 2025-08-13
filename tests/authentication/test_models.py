@@ -2,7 +2,7 @@
 Tests for authentication models.
 """
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
@@ -20,7 +20,7 @@ class TestSessionModel:
             session_id="test_session_123",
             user_id=user_id,
             username="testuser",
-            expires_at=datetime.utcnow() + timedelta(minutes=30),
+            expires_at=datetime.now(UTC) + timedelta(minutes=30),
             csrf_token="csrf_token_123",
             ip_address="127.0.0.1",
             user_agent="Mozilla/5.0",
@@ -37,7 +37,7 @@ class TestSessionModel:
     def test_session_model_defaults(self):
         """Test session model with default values."""
         user_id = uuid4()
-        expires_at = datetime.utcnow() + timedelta(minutes=30)
+        expires_at = datetime.now(UTC) + timedelta(minutes=30)
 
         session = SessionModel(
             session_id="test_session",
@@ -54,8 +54,8 @@ class TestSessionModel:
 
     def test_session_model_json_serialization(self):
         """Test session model JSON serialization."""
-        user_id = uuid4()
-        expires_at = datetime.utcnow() + timedelta(minutes=30)
+        user_id = str(uuid4())
+        expires_at = datetime.now(UTC) + timedelta(minutes=30)
 
         session = SessionModel(
             session_id="test_session",
@@ -73,8 +73,8 @@ class TestSessionModel:
 
     def test_session_model_dict_conversion(self):
         """Test session model to dict conversion."""
-        user_id = uuid4()
-        expires_at = datetime.utcnow() + timedelta(minutes=30)
+        user_id = str(uuid4())
+        expires_at = datetime.now(UTC) + timedelta(minutes=30)
 
         session = SessionModel(
             session_id="test_session",

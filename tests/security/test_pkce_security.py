@@ -10,7 +10,6 @@ import secrets
 
 import pytest
 from fastapi_testing import AsyncTestServer
-from psycopg_toolkit import TransactionManager
 
 from authly.core.resource_manager import AuthlyResourceManager
 
@@ -224,9 +223,7 @@ class TestPKCESecurity:
             print("✓ PKCE successfully prevents code interception attack")
 
     @pytest.mark.asyncio
-    async def test_pkce_verifier_bounds(
-        self, test_server, initialize_authly: AuthlyResourceManager, transaction_manager: TransactionManager
-    ):
+    async def test_pkce_verifier_bounds(self, test_server, initialize_authly: AuthlyResourceManager):
         """Test PKCE verifier length boundaries."""
         async with test_server.client as client:
             # Test verifier too short (< 43 characters)
@@ -265,7 +262,7 @@ class TestPKCESecurity:
 
             # Test verifier at boundaries (43 and 128 characters)
             valid_43_verifier = "a" * 43
-            response = await client.post(
+            _ = await client.post(
                 "/api/v1/oauth/token",
                 data={
                     "grant_type": "authorization_code",
@@ -281,7 +278,7 @@ class TestPKCESecurity:
             print("✓ 43-character verifier accepted")
 
             valid_128_verifier = "a" * 128
-            response = await client.post(
+            _ = await client.post(
                 "/api/v1/oauth/token",
                 data={
                     "grant_type": "authorization_code",

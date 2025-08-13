@@ -180,7 +180,6 @@ def decode_token(token: str, secret_key: str, algorithm: str = "HS256") -> dict:
     except JWTError as e:
         # Track token validation failures
         if METRICS_ENABLED and metrics:
-            duration = time.time() - start_time
             metrics.track_security_event("token_validation_failed", "warning")
 
         logger.error(f"JWT decode error: {e!s}")

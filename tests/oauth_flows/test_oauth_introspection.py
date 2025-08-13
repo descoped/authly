@@ -1,104 +1,114 @@
 """Tests for OAuth 2.0 Token Introspection endpoint (RFC 7662).
 
 Tests that validate token introspection functionality for both
-access tokens and refresh tokens.
+access tokens and refresh tokens using real integration testing.
 """
 
+import base64
 from datetime import UTC, datetime, timedelta
-from unittest.mock import Mock
+from typing import Any
 from uuid import uuid4
 
 import pytest
+from fastapi import status
 from fastapi_testing import AsyncTestServer
-from psycopg_toolkit import TransactionManager
+from psycopg_pool import AsyncConnectionPool
 
-from authly.api import auth_router, oauth_router, users_router
-from authly.auth.core import create_access_token, get_password_hash
+from authly.auth.core import create_access_token
 from authly.config import AuthlyConfig
-from authly.tokens.service import TokenService
-from authly.users import UserModel, UserRepository
+from authly.tokens.models import TokenModel, TokenType
+from authly.users.models import UserModel
 
 
-@pytest.mark.skip(reason="Auth tokens fixture uses password grant - needs conversion to auth code flow")
+def generate_test_token_with_jti(
+    config: AuthlyConfig, user_id: str, client_id: str | None = None, scope: str = "openid profile"
+) -> tuple[str, str]:
+    """Generate a test access token with JTI for introspection testing.
+
+    Returns:
+        Tuple of (token, jti)
+    """
+    jti = f"test_jti_{uuid4().hex}"  # Full UUID hex is 32 chars
+    token_data = {
+        "sub": str(user_id),
+        "jti": jti,
+        "scope": scope,
+    }
+    if client_id:
+        token_data["client_id"] = client_id
+
+    token = create_access_token(
+        data=token_data,
+        secret_key=config.secret_key,
+        config=config,
+        expires_delta=3600,  # 1 hour
+    )
+    return token, jti
+
+
 class TestTokenIntrospectionEndpoint:
-    """Test OAuth 2.0 Token Introspection endpoint functionality."""
-
-    @pytest.fixture
-    async def oauth_server(self, test_server) -> AsyncTestServer:
-        """Configure test server with OAuth routers."""
-        test_server.app.include_router(auth_router, prefix="/api/v1")
-        test_server.app.include_router(users_router, prefix="/api/v1")
-        test_server.app.include_router(oauth_router, prefix="/api/v1")
-        return test_server
-
-    @pytest.fixture
-    async def test_user(self, transaction_manager: TransactionManager) -> UserModel:
-        """Create a test user with proper password hash."""
-        user_data = UserModel(
-            id=uuid4(),
-            username=f"testuser_{uuid4().hex[:8]}",
-            email=f"test_{uuid4().hex[:8]}@example.com",
-            password_hash=get_password_hash("Test123!"),
-            is_verified=True,
-            is_admin=False,
-            created_at=datetime.now(UTC),
-            updated_at=datetime.now(UTC),
-        )
-
-        async with transaction_manager.transaction() as conn:
-            user_repo = UserRepository(conn)
-            return await user_repo.create(user_data)
-
-    @pytest.fixture
-    async def auth_tokens(self, oauth_server: AsyncTestServer, test_user: UserModel):
-        """Get valid access and refresh tokens for test user."""
-        # Login to get tokens
-        token_response = await oauth_server.client.post(
-            "/api/v1/oauth/token",
-            data={
-                "grant_type": "password",
-                "username": test_user.username,
-                "password": "Test123!",
-                "scope": "openid profile email database:read cache:read",
-            },
-        )
-
-        await token_response.expect_status(200)
-        token_data = await token_response.json()
-
-        return {
-            "access_token": token_data["access_token"],
-            "refresh_token": token_data.get("refresh_token"),
-            "token_type": token_data["token_type"],
-            "expires_in": token_data.get("expires_in"),
-            "scope": token_data.get("scope"),
-        }
+    """Test OAuth 2.0 Token Introspection endpoint functionality using real integration testing."""
 
     @pytest.mark.asyncio
     async def test_introspect_valid_access_token(
-        self, oauth_server: AsyncTestServer, test_user: UserModel, auth_tokens: dict
-    ):
+        self,
+        test_server: AsyncTestServer,
+        committed_user: UserModel,
+        committed_oauth_client: dict[str, Any],
+        db_pool: AsyncConnectionPool,
+        test_config: AuthlyConfig,
+    ) -> None:
         """Test introspection of a valid access token."""
-        # Introspect the access token
-        introspect_response = await oauth_server.client.post(
+        # Create a test token with known JTI
+        token, jti = generate_test_token_with_jti(
+            test_config, str(committed_user.id), committed_oauth_client["client_id"], "openid profile email"
+        )
+
+        # Store the token in the database
+        async with db_pool.connection() as conn:
+            await conn.set_autocommit(True)
+            from authly.tokens.repository import TokenRepository
+
+            token_repo = TokenRepository(conn)
+
+            token_model = TokenModel(
+                id=uuid4(),
+                token_jti=jti,
+                token_value=token,
+                user_id=committed_user.id,
+                client_id=None,  # We store client_id as string in token claims
+                token_type=TokenType.ACCESS,
+                scope="openid profile email",
+                expires_at=datetime.now(UTC) + timedelta(hours=1),
+                invalidated=False,
+            )
+            await token_repo.create(token_model)
+
+        # Create Basic Auth header for client authentication
+        credentials = f"{committed_oauth_client['client_id']}:{committed_oauth_client['client_secret']}"
+        encoded = base64.b64encode(credentials.encode()).decode()
+
+        # Introspect the token
+        response = await test_server.client.post(
             "/api/v1/oauth/introspect",
+            headers={"Authorization": f"Basic {encoded}"},
             data={
-                "token": auth_tokens["access_token"],
+                "token": token,
                 "token_type_hint": "access_token",
             },
         )
 
-        await introspect_response.expect_status(200)
-        introspect_data = await introspect_response.json()
+        assert response.status_code == status.HTTP_200_OK
+        introspect_data = await response.json()
 
         # Verify introspection response
         assert introspect_data["active"] is True
         assert introspect_data.get("token_type") == "Bearer"
-        assert introspect_data["sub"] == str(test_user.id)
-        assert introspect_data["username"] == test_user.username
+        assert introspect_data["sub"] == str(committed_user.id)
+        assert introspect_data["username"] == committed_user.username
         assert "exp" in introspect_data  # Expiration timestamp
         assert "scope" in introspect_data
-        assert "jti" in introspect_data  # JWT ID should be present
+        assert introspect_data["jti"] == jti
 
         # Check scopes are included
         scopes = introspect_data["scope"].split()
@@ -107,190 +117,308 @@ class TestTokenIntrospectionEndpoint:
         assert "email" in scopes
 
     @pytest.mark.asyncio
-    async def test_introspect_invalid_token(self, oauth_server: AsyncTestServer):
+    async def test_introspect_invalid_token(
+        self,
+        test_server: AsyncTestServer,
+        committed_oauth_client: dict[str, Any],
+    ) -> None:
         """Test introspection of an invalid/malformed token."""
+        # Create Basic Auth header for client authentication
+        credentials = f"{committed_oauth_client['client_id']}:{committed_oauth_client['client_secret']}"
+        encoded = base64.b64encode(credentials.encode()).decode()
+
         # Introspect an invalid token
-        introspect_response = await oauth_server.client.post(
+        response = await test_server.client.post(
             "/api/v1/oauth/introspect",
+            headers={"Authorization": f"Basic {encoded}"},
             data={
                 "token": "invalid.token.here",
             },
         )
 
-        await introspect_response.expect_status(200)
-        introspect_data = await introspect_response.json()
+        assert response.status_code == status.HTTP_200_OK
+        introspect_data = await response.json()
 
         # Invalid token should return active=false
         assert introspect_data["active"] is False
-        # The endpoint may return additional fields with null values, which is acceptable
 
     @pytest.mark.asyncio
-    async def test_introspect_expired_token(self, oauth_server: AsyncTestServer, test_user: UserModel, monkeypatch):
+    async def test_introspect_expired_token(
+        self,
+        test_server: AsyncTestServer,
+        committed_user: UserModel,
+        committed_oauth_client: dict[str, Any],
+        db_pool: AsyncConnectionPool,
+        test_config: AuthlyConfig,
+    ) -> None:
         """Test introspection of an expired token."""
-        # Set required JWT environment variables for testing
-        monkeypatch.setenv("JWT_SECRET_KEY", "test-secret-key-for-introspection-tests")
-        monkeypatch.setenv("JWT_REFRESH_SECRET_KEY", "test-refresh-key-for-introspection-tests")
-
-        # Create an expired token manually using the auth core function
-        from authly.config import EnvDatabaseProvider, EnvSecretProvider
-
-        config = AuthlyConfig.load(EnvSecretProvider(), EnvDatabaseProvider())
-
-        # Create the expired token (using negative expires_delta)
+        # Create an expired token
+        jti = f"expired_jti_{uuid4().hex}"  # Full UUID hex for 32+ chars
         expired_token = create_access_token(
             data={
-                "sub": str(test_user.id),
-                "jti": "test_expired_jti",
+                "sub": str(committed_user.id),
+                "jti": jti,
                 "scope": "openid profile",
+                "client_id": committed_oauth_client["client_id"],
             },
-            secret_key=config.secret_key,
-            config=config,
-            expires_delta=-60,  # Already expired by 60 minutes
+            secret_key=test_config.secret_key,
+            config=test_config,
+            expires_delta=-3600,  # Already expired by 1 hour
         )
 
+        # Store the expired token in the database
+        async with db_pool.connection() as conn:
+            await conn.set_autocommit(True)
+            from authly.tokens.repository import TokenRepository
+
+            token_repo = TokenRepository(conn)
+
+            token_model = TokenModel(
+                id=uuid4(),
+                token_jti=jti,
+                token_value=expired_token,
+                user_id=committed_user.id,
+                client_id=None,
+                token_type=TokenType.ACCESS,
+                scope="openid profile",
+                expires_at=datetime.now(UTC) - timedelta(hours=1),  # Expired
+                invalidated=False,
+            )
+            await token_repo.create(token_model)
+
+        # Create Basic Auth header
+        credentials = f"{committed_oauth_client['client_id']}:{committed_oauth_client['client_secret']}"
+        encoded = base64.b64encode(credentials.encode()).decode()
+
         # Introspect the expired token
-        introspect_response = await oauth_server.client.post(
+        response = await test_server.client.post(
             "/api/v1/oauth/introspect",
+            headers={"Authorization": f"Basic {encoded}"},
             data={
                 "token": expired_token,
             },
         )
 
-        await introspect_response.expect_status(200)
-        introspect_data = await introspect_response.json()
+        assert response.status_code == status.HTTP_200_OK
+        introspect_data = await response.json()
 
         # Expired token should return active=false
         assert introspect_data["active"] is False
 
     @pytest.mark.asyncio
-    @pytest.mark.skip(reason="Password grant removed for OAuth 2.1 compliance")
-    async def test_introspect_with_database_scopes(self, oauth_server: AsyncTestServer, test_user: UserModel):
-        """Test introspection includes custom database scopes."""
-        # Login with database scopes
-        token_response = await oauth_server.client.post(
-            "/api/v1/oauth/token",
-            data={
-                "grant_type": "password",
-                "username": test_user.username,
-                "password": "Test123!",
-                "scope": "openid database:read database:write cache:read cache:write",
-            },
+    async def test_introspect_revoked_token(
+        self,
+        test_server: AsyncTestServer,
+        committed_user: UserModel,
+        committed_oauth_client: dict[str, Any],
+        db_pool: AsyncConnectionPool,
+        test_config: AuthlyConfig,
+    ) -> None:
+        """Test introspection of a revoked token."""
+        # Create a valid token
+        token, jti = generate_test_token_with_jti(
+            test_config, str(committed_user.id), committed_oauth_client["client_id"], "openid"
         )
 
-        # Check if scopes are supported (may fail if not yet added)
-        if token_response.status_code == 200:
-            token_data = await token_response.json()
+        # Store the token as revoked
+        async with db_pool.connection() as conn:
+            await conn.set_autocommit(True)
+            from authly.tokens.repository import TokenRepository
 
-            # Introspect the token
-            introspect_response = await oauth_server.client.post(
-                "/api/v1/oauth/introspect",
-                data={
-                    "token": token_data["access_token"],
-                },
+            token_repo = TokenRepository(conn)
+
+            token_model = TokenModel(
+                id=uuid4(),
+                token_jti=jti,
+                token_value=token,
+                user_id=committed_user.id,
+                client_id=None,
+                token_type=TokenType.ACCESS,
+                scope="openid",
+                expires_at=datetime.now(UTC) + timedelta(hours=1),
+                invalidated=True,  # Marked as revoked
             )
+            await token_repo.create(token_model)
 
-            await introspect_response.expect_status(200)
-            introspect_data = await introspect_response.json()
+        # Create Basic Auth header
+        credentials = f"{committed_oauth_client['client_id']}:{committed_oauth_client['client_secret']}"
+        encoded = base64.b64encode(credentials.encode()).decode()
 
-            if introspect_data["active"]:
-                # Check database scopes are included
-                scopes = introspect_data.get("scope", "").split()
-                # These may not be present until we add them properly
-                if "database:read" in scopes:
-                    assert "database:read" in scopes
-                    assert "database:write" in scopes
-                    assert "cache:read" in scopes
-                    assert "cache:write" in scopes
-
-    @pytest.mark.asyncio
-    async def test_introspect_refresh_token(
-        self, oauth_server: AsyncTestServer, test_user: UserModel, auth_tokens: dict
-    ):
-        """Test introspection of a refresh token."""
-        if not auth_tokens.get("refresh_token"):
-            pytest.skip("No refresh token available")
-
-        # Introspect the refresh token
-        introspect_response = await oauth_server.client.post(
+        # Introspect the revoked token
+        response = await test_server.client.post(
             "/api/v1/oauth/introspect",
+            headers={"Authorization": f"Basic {encoded}"},
             data={
-                "token": auth_tokens["refresh_token"],
-                "token_type_hint": "refresh_token",
+                "token": token,
             },
         )
 
-        await introspect_response.expect_status(200)
-        introspect_data = await introspect_response.json()
+        assert response.status_code == status.HTTP_200_OK
+        introspect_data = await response.json()
 
-        # Refresh token introspection behavior depends on implementation
-        # It should either be active with appropriate metadata or inactive
-        assert "active" in introspect_data
-
-        if introspect_data["active"]:
-            # Token type may be "Bearer" or "refresh_token" depending on implementation
-            assert introspect_data.get("token_type") in ["Bearer", "refresh_token"]
-            assert introspect_data.get("sub") == str(test_user.id)
+        # Revoked token should return active=false
+        assert introspect_data["active"] is False
 
     @pytest.mark.asyncio
-    async def test_introspect_missing_token(self, oauth_server: AsyncTestServer):
+    async def test_introspect_missing_token(
+        self,
+        test_server: AsyncTestServer,
+        committed_oauth_client: dict[str, Any],
+    ) -> None:
         """Test introspection with missing token parameter."""
+        # Create Basic Auth header
+        credentials = f"{committed_oauth_client['client_id']}:{committed_oauth_client['client_secret']}"
+        encoded = base64.b64encode(credentials.encode()).decode()
+
         # Try to introspect without providing token
-        introspect_response = await oauth_server.client.post(
+        response = await test_server.client.post(
             "/api/v1/oauth/introspect",
+            headers={"Authorization": f"Basic {encoded}"},
             data={
                 "token_type_hint": "access_token",
             },
         )
 
-        # Should fail with 422 (validation error) or 400
-        assert introspect_response.status_code in [400, 422]
+        # Should fail with 422 (validation error)
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
     @pytest.mark.asyncio
-    async def test_introspect_token_type_hints(self, oauth_server: AsyncTestServer, auth_tokens: dict):
-        """Test token_type_hint parameter is properly handled."""
-        # Test with explicit access_token hint
-        introspect_response = await oauth_server.client.post(
+    async def test_introspect_without_authentication(
+        self,
+        test_server: AsyncTestServer,
+    ) -> None:
+        """Test that introspection requires client authentication."""
+        # Try to introspect without authentication
+        response = await test_server.client.post(
             "/api/v1/oauth/introspect",
             data={
-                "token": auth_tokens["access_token"],
+                "token": "some_token",
+            },
+        )
+
+        # Should return 200 with active=false (per RFC 7662 - no error for security)
+        assert response.status_code == status.HTTP_200_OK
+        introspect_data = await response.json()
+        assert introspect_data["active"] is False
+
+    @pytest.mark.asyncio
+    async def test_introspect_token_type_hints(
+        self,
+        test_server: AsyncTestServer,
+        committed_user: UserModel,
+        committed_oauth_client: dict[str, Any],
+        db_pool: AsyncConnectionPool,
+        test_config: AuthlyConfig,
+    ) -> None:
+        """Test token_type_hint parameter is properly handled."""
+        # Create a test token
+        token, jti = generate_test_token_with_jti(
+            test_config, str(committed_user.id), committed_oauth_client["client_id"], "openid"
+        )
+
+        # Store the token
+        async with db_pool.connection() as conn:
+            await conn.set_autocommit(True)
+            from authly.tokens.repository import TokenRepository
+
+            token_repo = TokenRepository(conn)
+
+            token_model = TokenModel(
+                id=uuid4(),
+                token_jti=jti,
+                token_value=token,
+                user_id=committed_user.id,
+                client_id=None,
+                token_type=TokenType.ACCESS,
+                scope="openid",
+                expires_at=datetime.now(UTC) + timedelta(hours=1),
+                invalidated=False,
+            )
+            await token_repo.create(token_model)
+
+        # Create Basic Auth header
+        credentials = f"{committed_oauth_client['client_id']}:{committed_oauth_client['client_secret']}"
+        encoded = base64.b64encode(credentials.encode()).decode()
+
+        # Test with explicit access_token hint
+        response = await test_server.client.post(
+            "/api/v1/oauth/introspect",
+            headers={"Authorization": f"Basic {encoded}"},
+            data={
+                "token": token,
                 "token_type_hint": "access_token",
             },
         )
 
-        await introspect_response.expect_status(200)
-        introspect_data = await introspect_response.json()
+        assert response.status_code == status.HTTP_200_OK
+        introspect_data = await response.json()
         assert introspect_data["active"] is True
 
         # Test with wrong hint (should still work but might be slower)
-        introspect_response = await oauth_server.client.post(
+        response = await test_server.client.post(
             "/api/v1/oauth/introspect",
+            headers={"Authorization": f"Basic {encoded}"},
             data={
-                "token": auth_tokens["access_token"],
+                "token": token,
                 "token_type_hint": "refresh_token",  # Wrong hint
             },
         )
 
-        await introspect_response.expect_status(200)
-        introspect_data = await introspect_response.json()
+        assert response.status_code == status.HTTP_200_OK
+        introspect_data = await response.json()
         # The endpoint should handle wrong hints gracefully
-        # It may return active=false or still validate correctly
         assert "active" in introspect_data
 
     @pytest.mark.asyncio
     async def test_introspect_response_claims(
-        self, oauth_server: AsyncTestServer, test_user: UserModel, auth_tokens: dict
-    ):
+        self,
+        test_server: AsyncTestServer,
+        committed_user: UserModel,
+        committed_oauth_client: dict[str, Any],
+        db_pool: AsyncConnectionPool,
+        test_config: AuthlyConfig,
+    ) -> None:
         """Test all required and optional claims in introspection response."""
-        # Introspect the access token
-        introspect_response = await oauth_server.client.post(
+        # Create a test token
+        token, jti = generate_test_token_with_jti(
+            test_config, str(committed_user.id), committed_oauth_client["client_id"], "openid profile email"
+        )
+
+        # Store the token
+        async with db_pool.connection() as conn:
+            await conn.set_autocommit(True)
+            from authly.tokens.repository import TokenRepository
+
+            token_repo = TokenRepository(conn)
+
+            token_model = TokenModel(
+                id=uuid4(),
+                token_jti=jti,
+                token_value=token,
+                user_id=committed_user.id,
+                client_id=None,
+                token_type=TokenType.ACCESS,
+                scope="openid profile email",
+                expires_at=datetime.now(UTC) + timedelta(hours=1),
+                invalidated=False,
+            )
+            await token_repo.create(token_model)
+
+        # Create Basic Auth header
+        credentials = f"{committed_oauth_client['client_id']}:{committed_oauth_client['client_secret']}"
+        encoded = base64.b64encode(credentials.encode()).decode()
+
+        # Introspect the token
+        response = await test_server.client.post(
             "/api/v1/oauth/introspect",
+            headers={"Authorization": f"Basic {encoded}"},
             data={
-                "token": auth_tokens["access_token"],
+                "token": token,
             },
         )
 
-        await introspect_response.expect_status(200)
-        introspect_data = await introspect_response.json()
+        assert response.status_code == status.HTTP_200_OK
+        introspect_data = await response.json()
 
         if introspect_data["active"]:
             # Required claims for active tokens
@@ -306,6 +434,7 @@ class TestTokenIntrospectionEndpoint:
             # Optional but useful claims
             assert "username" in introspect_data
             assert "token_type" in introspect_data
+            assert "jti" in introspect_data
 
             # Validate claim types
             assert isinstance(introspect_data["exp"], int)
@@ -318,48 +447,28 @@ class TestTokenIntrospectionEndpoint:
             assert introspect_data["iat"] <= now
             assert introspect_data["exp"] > now  # Token should not be expired
 
-
-class TestIntrospectionService:
-    """Test introspection service logic directly."""
-
-    @pytest.fixture
-    def mock_token_service(self):
-        """Create mock token service."""
-        service = Mock(spec=TokenService)
-        return service
-
-    @pytest.fixture
-    def mock_user_repo(self):
-        """Create mock user repository."""
-        repo = Mock(spec=UserRepository)
-        return repo
-
-    @pytest.fixture
-    def sample_token_data(self):
-        """Create sample token data."""
-        return {
-            "sub": str(uuid4()),
-            "jti": "test_jti",
-            "scope": "openid profile email database:read",
-            "exp": int((datetime.now(UTC) + timedelta(hours=1)).timestamp()),
-            "iat": int(datetime.now(UTC).timestamp()),
-        }
-
     @pytest.mark.asyncio
-    async def test_introspect_service_valid_token(self, mock_token_service, mock_user_repo, sample_token_data):
-        """Test introspection service with valid token."""
-        # This is a simplified test of the introspection response structure
-        response_data = {
-            "active": True,
-            "scope": sample_token_data["scope"],
-            "sub": sample_token_data["sub"],
-            "exp": sample_token_data["exp"],
-            "iat": sample_token_data["iat"],
-            "token_type": "Bearer",
-        }
+    async def test_introspect_public_client_authentication(
+        self,
+        test_server: AsyncTestServer,
+        committed_public_client: dict[str, Any],
+    ) -> None:
+        """Test that public clients can introspect tokens (with limitations)."""
+        # Public clients should be able to introspect but may have restrictions
+        # Create Basic Auth header with empty password
+        credentials = f"{committed_public_client['client_id']}:"
+        encoded = base64.b64encode(credentials.encode()).decode()
 
-        # Verify the response structure
-        assert response_data["active"] is True
-        assert response_data["sub"] == sample_token_data["sub"]
-        assert "database:read" in response_data["scope"]
-        assert response_data["exp"] > sample_token_data["iat"]
+        # Try to introspect with public client
+        response = await test_server.client.post(
+            "/api/v1/oauth/introspect",
+            headers={"Authorization": f"Basic {encoded}"},
+            data={
+                "token": "dummy_token",
+            },
+        )
+
+        # Should return 200 with active=false (token doesn't exist)
+        assert response.status_code == status.HTTP_200_OK
+        introspect_data = await response.json()
+        assert introspect_data["active"] is False

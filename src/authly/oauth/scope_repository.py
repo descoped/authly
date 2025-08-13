@@ -67,12 +67,13 @@ class ScopeRepository(BaseRepository[OAuthScopeModel, UUID]):
 
         with DatabaseTimer("scope_read_by_names"):
             try:
-                placeholders = ", ".join(["%s"] * len(scope_names))
-                query = f"""
+                # Build query with proper SQL composition
+                placeholders = SQL(", ").join([SQL("%s")] * len(scope_names))
+                query = SQL("""
                     SELECT * FROM oauth_scopes
-                    WHERE scope_name IN ({placeholders}) AND is_active = true
+                    WHERE scope_name IN ({}) AND is_active = true
                     ORDER BY scope_name
-                """
+                """).format(placeholders)
 
                 async with self.db_connection.cursor(row_factory=dict_row) as cur:
                     await cur.execute(query, scope_names)
@@ -162,12 +163,12 @@ class ScopeRepository(BaseRepository[OAuthScopeModel, UUID]):
         """Get all active OAuth scopes with pagination"""
         with DatabaseTimer("scope_list_active"):
             try:
-                query = """
+                query = SQL("""
                     SELECT * FROM oauth_scopes
                     WHERE is_active = true
                     ORDER BY scope_name
                     LIMIT %s OFFSET %s
-                """
+                """)
 
                 async with self.db_connection.cursor(row_factory=dict_row) as cur:
                     await cur.execute(query, [limit, offset])
@@ -185,11 +186,11 @@ class ScopeRepository(BaseRepository[OAuthScopeModel, UUID]):
     async def get_default_scopes(self) -> list[OAuthScopeModel]:
         """Get all default scopes (granted automatically)"""
         try:
-            query = """
+            query = SQL("""
                 SELECT * FROM oauth_scopes
                 WHERE is_default = true AND is_active = true
                 ORDER BY scope_name
-            """
+            """)
 
             async with self.db_connection.cursor(row_factory=dict_row) as cur:
                 await cur.execute(query)
@@ -203,7 +204,7 @@ class ScopeRepository(BaseRepository[OAuthScopeModel, UUID]):
     async def scope_exists(self, scope_name: str) -> bool:
         """Check if a scope exists by name"""
         try:
-            query = "SELECT 1 FROM oauth_scopes WHERE scope_name = %s AND is_active = true"
+            query = SQL("SELECT 1 FROM oauth_scopes WHERE scope_name = %s AND is_active = true")
 
             async with self.db_connection.cursor() as cur:
                 await cur.execute(query, [scope_name])
@@ -221,11 +222,12 @@ class ScopeRepository(BaseRepository[OAuthScopeModel, UUID]):
 
         with DatabaseTimer("scope_validate_names"):
             try:
-                placeholders = ", ".join(["%s"] * len(scope_names))
-                query = f"""
+                # Build query with proper SQL composition
+                placeholders = SQL(", ").join([SQL("%s")] * len(scope_names))
+                query = SQL("""
                     SELECT scope_name FROM oauth_scopes
-                    WHERE scope_name IN ({placeholders}) AND is_active = true
-                """
+                    WHERE scope_name IN ({}) AND is_active = true
+                """).format(placeholders)
 
                 async with self.db_connection.cursor() as cur:
                     await cur.execute(query, scope_names)
@@ -239,12 +241,12 @@ class ScopeRepository(BaseRepository[OAuthScopeModel, UUID]):
     async def get_scopes_for_client(self, client_id: UUID) -> list[OAuthScopeModel]:
         """Get all scopes associated with a specific client"""
         try:
-            query = """
+            query = SQL("""
                 SELECT s.* FROM oauth_scopes s
                 JOIN oauth_client_scopes cs ON s.id = cs.scope_id
                 WHERE cs.client_id = %s AND s.is_active = true
                 ORDER BY s.scope_name
-            """
+            """)
 
             async with self.db_connection.cursor(row_factory=dict_row) as cur:
                 await cur.execute(query, [client_id])
@@ -258,12 +260,12 @@ class ScopeRepository(BaseRepository[OAuthScopeModel, UUID]):
     async def get_scopes_for_token(self, token_id: UUID) -> list[OAuthScopeModel]:
         """Get all scopes associated with a specific token"""
         try:
-            query = """
+            query = SQL("""
                 SELECT s.* FROM oauth_scopes s
                 JOIN oauth_token_scopes ts ON s.id = ts.scope_id
                 WHERE ts.token_id = %s AND s.is_active = true
                 ORDER BY s.scope_name
-            """
+            """)
 
             async with self.db_connection.cursor(row_factory=dict_row) as cur:
                 await cur.execute(query, [token_id])
@@ -286,13 +288,13 @@ class ScopeRepository(BaseRepository[OAuthScopeModel, UUID]):
 
             for scope_id in scope_ids:
                 values.extend([token_id, scope_id, now])
-                placeholders.append("(%s, %s, %s)")
+                placeholders.append(SQL("(%s, %s, %s)"))
 
-            query = f"""
+            query = SQL("""
                 INSERT INTO oauth_token_scopes (token_id, scope_id, created_at)
-                VALUES {", ".join(placeholders)}
+                VALUES {}
                 ON CONFLICT (token_id, scope_id) DO NOTHING
-            """
+            """).format(SQL(", ").join(placeholders))
 
             async with self.db_connection.cursor() as cur:
                 await cur.execute(query, values)
@@ -305,7 +307,7 @@ class ScopeRepository(BaseRepository[OAuthScopeModel, UUID]):
     async def remove_token_scopes(self, token_id: UUID) -> int:
         """Remove all scope associations for a token"""
         try:
-            query = "DELETE FROM oauth_token_scopes WHERE token_id = %s"
+            query = SQL("DELETE FROM oauth_token_scopes WHERE token_id = %s")
 
             async with self.db_connection.cursor() as cur:
                 await cur.execute(query, [token_id])
@@ -318,7 +320,7 @@ class ScopeRepository(BaseRepository[OAuthScopeModel, UUID]):
     async def count_active_scopes(self) -> int:
         """Count the total number of active OAuth scopes"""
         try:
-            query = "SELECT COUNT(*) FROM oauth_scopes WHERE is_active = true"
+            query = SQL("SELECT COUNT(*) FROM oauth_scopes WHERE is_active = true")
 
             async with self.db_connection.cursor() as cur:
                 await cur.execute(query)

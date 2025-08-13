@@ -110,9 +110,8 @@ def get_command_tree(cli: click.Group, aligned: bool = True) -> str:
         return "\n".join(lines)
     else:
         # Non-aligned version (original)
-        tree = ["authly"]
-        tree.append(generate_tree(cli))
-        return "\n".join(tree)
+        tree_lines = ["authly", generate_tree(cli)]
+        return "\n".join(tree_lines)
 
 
 def print_command_tree(cli: click.Group, aligned: bool = True) -> None:

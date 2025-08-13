@@ -4,6 +4,10 @@ Tests required for OpenID Connect 1.0 compliance.
 Covers the mandatory features without redundancy.
 """
 
+import base64
+import hashlib
+import secrets
+
 import pytest
 from fastapi import status
 from fastapi_testing import AsyncTestServer
@@ -11,6 +15,14 @@ from fastapi_testing import AsyncTestServer
 # NOTE: Using committed fixtures from tests/fixtures/committed_data.py
 # These fixtures properly commit data before returning, following test isolation rules
 # No custom fixtures needed here - we'll use the shared committed_user and committed_oauth_client
+
+
+def generate_pkce_pair():
+    """Generate PKCE code verifier and challenge pair."""
+    verifier = base64.urlsafe_b64encode(secrets.token_bytes(32)).decode("utf-8").rstrip("=")
+    digest = hashlib.sha256(verifier.encode("utf-8")).digest()
+    challenge = base64.urlsafe_b64encode(digest).decode("utf-8").rstrip("=")
+    return verifier, challenge
 
 
 class TestOIDCCoreCompliance:
@@ -243,16 +255,7 @@ class TestOIDCCoreCompliance:
         committed_oauth_client,  # Use committed fixture
     ):
         """Test that UserInfo claims depend on granted scopes."""
-        import base64
-        import hashlib
-        import secrets
         from urllib.parse import parse_qs, urlparse
-
-        def generate_pkce_pair():
-            code_verifier = base64.urlsafe_b64encode(secrets.token_bytes(32)).decode("utf-8").rstrip("=")
-            digest = hashlib.sha256(code_verifier.encode("utf-8")).digest()
-            code_challenge = base64.urlsafe_b64encode(digest).decode("utf-8").rstrip("=")
-            return code_verifier, code_challenge
 
         async with test_server.client as client:
             # Test 1: Limited scope (openid only) - should get minimal claims

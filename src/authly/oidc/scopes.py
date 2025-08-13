@@ -18,6 +18,7 @@ and available via the UserInfo endpoint.
 
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any
 
 
 class OIDCScope(Enum):
@@ -170,56 +171,56 @@ class OIDCClaimsMapping:
     """
 
     @staticmethod
-    def get_claims_for_scopes(scopes: list[str]) -> set[str]:
+    def get_claims_for_scopes(scope_list: list[str]) -> set[str]:
         """
         Get all claims that should be included for the given scopes.
 
         Args:
-            scopes: List of requested scope names
+            scope_list: List of requested scope names
 
         Returns:
             Set of claim names that should be included
         """
-        claims = set()
+        claim_set = set()
 
-        for scope in scopes:
+        for scope in scope_list:
             if scope in OIDC_SCOPES:
-                claims.update(OIDC_SCOPES[scope].claims)
+                claim_set.update(OIDC_SCOPES[scope].claims)
 
-        return claims
+        return claim_set
 
     @staticmethod
-    def validate_oidc_scopes(scopes: list[str]) -> dict[str, bool]:
+    def validate_oidc_scopes(scope_list: list[str]) -> dict[str, bool]:
         """
         Validate OIDC scopes and return validation results.
 
         Args:
-            scopes: List of scope names to validate
+            scope_list: List of scope names to validate
 
         Returns:
             Dictionary mapping scope names to validation results
         """
         validation_results = {}
 
-        for scope in scopes:
+        for scope in scope_list:
             validation_results[scope] = scope in OIDC_SCOPES
 
         return validation_results
 
     @staticmethod
-    def is_oidc_request(scopes: list[str]) -> bool:
+    def is_oidc_request(scope_list: list[str]) -> bool:
         """
         Check if a scope request is an OpenID Connect request.
 
         An OIDC request must include the 'openid' scope.
 
         Args:
-            scopes: List of requested scope names
+            scope_list: List of requested scope names
 
         Returns:
             True if this is an OIDC request (contains 'openid' scope)
         """
-        return OIDCScope.OPENID.value in scopes
+        return OIDCScope.OPENID.value in scope_list
 
     @staticmethod
     def get_required_scopes() -> list[str]:
@@ -270,20 +271,22 @@ class OIDCClaimsMapping:
         return scope_def.claims if scope_def else set()
 
     @staticmethod
-    def filter_claims_by_scopes(claims: dict[str, any], scopes: list[str]) -> dict[str, any]:
+    def filter_claims_by_scopes(claim_dict: dict[str, Any], scope_list: list[str]) -> dict[str, Any]:
         """
         Filter claims based on granted scopes.
 
         Args:
-            claims: Dictionary of all available claims
-            scopes: List of granted scope names
+            claim_dict: Dictionary of all available claims
+            scope_list: List of granted scope names
 
         Returns:
             Dictionary of claims filtered by scopes
         """
-        allowed_claims = OIDCClaimsMapping.get_claims_for_scopes(scopes)
+        allowed_claims = OIDCClaimsMapping.get_claims_for_scopes(scope_list)
 
-        return {claim_name: claim_value for claim_name, claim_value in claims.items() if claim_name in allowed_claims}
+        return {
+            claim_name: claim_value for claim_name, claim_value in claim_dict.items() if claim_name in allowed_claims
+        }
 
 
 def get_oidc_scopes_with_descriptions() -> dict[str, str]:
@@ -306,7 +309,7 @@ def get_all_oidc_scope_names() -> list[str]:
     return list(OIDC_SCOPES.keys())
 
 
-def get_oidc_claims_reference() -> dict[str, dict[str, any]]:
+def get_oidc_claims_reference() -> dict[str, dict[str, Any]]:
     """
     Get comprehensive OIDC claims reference.
 
@@ -329,12 +332,12 @@ def get_oidc_claims_reference() -> dict[str, dict[str, any]]:
 # Example usage and validation
 if __name__ == "__main__":
     # Example: Get claims for profile and email scopes
-    scopes = ["openid", "profile", "email"]
-    claims = OIDCClaimsMapping.get_claims_for_scopes(scopes)
-    print(f"Claims for scopes {scopes}: {claims}")
+    example_scopes = ["openid", "profile", "email"]
+    example_claims = OIDCClaimsMapping.get_claims_for_scopes(example_scopes)
+    print(f"Claims for scopes {example_scopes}: {example_claims}")
 
     # Example: Check if request is OIDC
-    is_oidc = OIDCClaimsMapping.is_oidc_request(scopes)
+    is_oidc = OIDCClaimsMapping.is_oidc_request(example_scopes)
     print(f"Is OIDC request: {is_oidc}")
 
     # Example: Get scope descriptions

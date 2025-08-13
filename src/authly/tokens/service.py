@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 from fastapi import HTTPException
 from jose import jwt
 from jose.exceptions import JWTError
-from psycopg_toolkit import RecordNotFoundError
+from psycopg_toolkit import OperationError, RecordNotFoundError
 from starlette import status
 
 from authly.auth import create_access_token, create_refresh_token, decode_token
@@ -66,7 +66,7 @@ class TokenService:
         try:
             await self._repo.invalidate_token(token_jti)
             return True
-        except Exception:
+        except OperationError:
             return False
 
     async def invalidate_user_tokens(self, user_id: UUID, token_type: TokenType | None = None) -> int:
@@ -110,6 +110,7 @@ class TokenService:
         Args:
             user: The user to create tokens for
             scope: Optional OAuth scopes (space-separated string)
+            client_id: Optional client ID (space-separated string)
             oidc_params: Optional OIDC parameters for ID token generation
 
         Returns:
@@ -235,6 +236,7 @@ class TokenService:
         Args:
             refresh_token: The refresh token to use for creating new tokens
             user_repo: UserRepository instance for user lookups
+            client_id: Client ID for token generation
 
         Returns:
             TokenPairResponse containing the new token pair
@@ -448,6 +450,115 @@ class TokenService:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not refresh tokens"
             ) from None
 
+    async def count_active_sessions(self, user_id: UUID) -> int:
+        """
+        Count active sessions for a user.
+
+        This is a public wrapper for repository access needed by admin endpoints.
+
+        Args:
+            user_id: The user ID
+
+        Returns:
+            Number of active sessions
+        """
+        try:
+            return await self._repo.count_active_sessions(user_id)
+        except Exception as e:
+            logger.error(f"Error counting active sessions for user {user_id}: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to count sessions"
+            ) from None
+
+    async def invalidate_user_sessions(self, user_id: UUID) -> int:
+        """
+        Invalidate all sessions for a user.
+
+        This is a public wrapper for repository access needed by admin endpoints.
+
+        Args:
+            user_id: The user ID
+
+        Returns:
+            Number of sessions invalidated
+        """
+        try:
+            return await self._repo.invalidate_user_sessions(user_id)
+        except Exception as e:
+            logger.error(f"Error invalidating sessions for user {user_id}: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to invalidate sessions"
+            ) from None
+
+    async def get_user_sessions(self, user_id: UUID, skip: int = 0, limit: int = 100, include_inactive: bool = False):
+        """
+        Get user sessions with pagination.
+
+        This is a public wrapper for repository access needed by admin endpoints.
+
+        Args:
+            user_id: The user ID
+            skip: Number of sessions to skip
+            limit: Maximum number of sessions to return
+            include_inactive: Whether to include inactive sessions
+
+        Returns:
+            List of user sessions
+        """
+        try:
+            return await self._repo.get_user_sessions(
+                user_id, skip=skip, limit=limit, include_inactive=include_inactive
+            )
+        except Exception as e:
+            logger.error(f"Error getting sessions for user {user_id}: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get sessions"
+            ) from None
+
+    async def count_user_sessions(self, user_id: UUID, include_inactive: bool = False) -> int:
+        """
+        Count total sessions for a user.
+
+        This is a public wrapper for repository access needed by admin endpoints.
+
+        Args:
+            user_id: The user ID
+            include_inactive: Whether to include inactive sessions in count
+
+        Returns:
+            Total number of sessions
+        """
+        try:
+            return await self._repo.count_user_sessions(user_id, include_inactive=include_inactive)
+        except Exception as e:
+            logger.error(f"Error counting sessions for user {user_id}: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to count sessions"
+            ) from None
+
+    async def get_token_by_id(self, token_id: UUID):
+        """
+        Get a token by its ID.
+
+        This is a public wrapper for repository access needed by admin endpoints.
+
+        Args:
+            token_id: The token ID
+
+        Returns:
+            Token model or None if not found
+        """
+        try:
+            return await self._repo.get_by_id(token_id)
+        except Exception as e:
+            # If it's a not found error, return None instead of raising
+            if "not found" in str(e).lower():
+                return None
+            logger.error(f"Error getting token {token_id}: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get token"
+            ) from None
+
     async def logout_user_session(self, access_token: str, user_id: UUID) -> int:
         """
         Logout a user session by invalidating all their tokens.
@@ -655,7 +766,8 @@ class TokenService:
             logger.error(f"Error during token revocation: {e!s}")
             return False
 
-    def _is_oidc_request(self, scope: str | None) -> bool:
+    @staticmethod
+    def _is_oidc_request(scope: str | None) -> bool:
         """
         Check if this is an OpenID Connect request (contains 'openid' scope).
 

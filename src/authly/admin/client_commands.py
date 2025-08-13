@@ -29,10 +29,10 @@ def validate_client_type(ctx, param, value):
 
     try:
         return ClientType(value)
-    except ValueError as e:
+    except ValueError as ve:
         raise click.BadParameter(
             f"Invalid client type. Must be one of: {', '.join([ct.value for ct in ClientType])}"
-        ) from e
+        ) from ve
 
 
 def validate_auth_method(ctx, param, value):
@@ -228,9 +228,9 @@ def create_client(
         return
 
     async def run_create():
-        async with get_api_client() as client:
+        async with get_api_client() as api_client:
             try:
-                result, secret = await client.create_client(create_request)
+                result, secret = await api_client.create_client(create_request)
 
                 if output == "json":
                     result_data = result.model_dump()
@@ -248,17 +248,17 @@ def create_client(
                     else:
                         click.echo("  Client Secret: None (public client)")
 
-            except AdminAPIError as e:
-                click.echo(f"❌ {e.message}", err=True)
+            except AdminAPIError as api_err:
+                click.echo(f"❌ {api_err.message}", err=True)
                 sys.exit(1)
-            except Exception as e:
-                click.echo(f"❌ Error creating client: {e}", err=True)
+            except Exception as create_err:
+                click.echo(f"❌ Error creating client: {create_err}", err=True)
                 sys.exit(1)
 
     try:
         asyncio.run(run_create())
-    except Exception as e:
-        click.echo(f"❌ Unexpected error: {e}", err=True)
+    except Exception as unexpected_err:
+        click.echo(f"❌ Unexpected error: {unexpected_err}", err=True)
         sys.exit(1)
 
 
@@ -315,12 +315,14 @@ def list_clients(ctx: click.Context, limit: int, offset: int, output: str, show_
         click.echo(f"Listing OAuth clients (limit: {limit}, offset: {offset})")
 
     async def run_list():
-        async with get_api_client() as client:
+        async with get_api_client() as api_client:
             try:
-                clients = await client.list_clients(active_only=not show_inactive, limit=limit, offset=offset)
+                clients = await api_client.list_clients(active_only=not show_inactive, limit=limit, offset=offset)
 
                 if output == "json":
-                    click.echo(json.dumps([client.model_dump() for client in clients], indent=2, default=str))
+                    click.echo(
+                        json.dumps([oauth_client.model_dump() for oauth_client in clients], indent=2, default=str)
+                    )
                 else:
                     if not clients:
                         click.echo("No clients found.")
@@ -333,31 +335,31 @@ def list_clients(ctx: click.Context, limit: int, offset: int, output: str, show_
                     click.echo("-" * 120)
 
                     # Table rows
-                    for client in clients:
-                        status = "✅" if client.is_active else "❌"
-                        pkce = "✅" if client.require_pkce else "❌"
-                        redirect_uris = ", ".join(client.redirect_uris)
+                    for oauth_client in clients:
+                        status = "✅" if oauth_client.is_active else "❌"
+                        pkce = "✅" if oauth_client.require_pkce else "❌"
+                        redirect_uris = ", ".join(oauth_client.redirect_uris)
                         if len(redirect_uris) > 40:
                             redirect_uris = redirect_uris[:37] + "..."
 
                         click.echo(
-                            f"{client.client_id:<36} {client.client_name:<20} "
-                            f"{client.client_type.value:<12} {status:<6} {pkce:<4} {redirect_uris}"
+                            f"{oauth_client.client_id:<36} {oauth_client.client_name:<20} "
+                            f"{oauth_client.client_type.value:<12} {status:<6} {pkce:<4} {redirect_uris}"
                         )
 
                     click.echo(f"\nTotal: {len(clients)} client(s)")
 
-            except AdminAPIError as e:
-                click.echo(f"❌ {e.message}", err=True)
+            except AdminAPIError as api_err:
+                click.echo(f"❌ {api_err.message}", err=True)
                 sys.exit(1)
-            except Exception as e:
-                click.echo(f"❌ Error listing clients: {e}", err=True)
+            except Exception as list_err:
+                click.echo(f"❌ Error listing clients: {list_err}", err=True)
                 sys.exit(1)
 
     try:
         asyncio.run(run_list())
-    except Exception as e:
-        click.echo(f"❌ Unexpected error: {e}", err=True)
+    except Exception as unexpected_err:
+        click.echo(f"❌ Unexpected error: {unexpected_err}", err=True)
         sys.exit(1)
 
 
@@ -425,9 +427,9 @@ def show_client(ctx: click.Context, client_id: str, output: str):
         click.echo(f"Getting client details: {client_id}")
 
     async def run_show():
-        async with get_api_client() as client:
+        async with get_api_client() as api_client:
             try:
-                client_details = await client.get_client(client_id)
+                client_details = await api_client.get_client(client_id)
 
                 if output == "json":
                     click.echo(json.dumps(client_details.model_dump(), indent=2, default=str))
@@ -468,20 +470,20 @@ def show_client(ctx: click.Context, client_id: str, output: str):
                     if client_details.policy_uri:
                         click.echo(f"Privacy Policy: {client_details.policy_uri}")
 
-            except AdminAPIError as e:
-                click.echo(f"❌ {e.message}", err=True)
+            except AdminAPIError as api_err:
+                click.echo(f"❌ {api_err.message}", err=True)
                 sys.exit(1)
-            except Exception as e:
-                if "404" in str(e):
+            except Exception as show_err:
+                if "404" in str(show_err):
                     click.echo(f"❌ Client not found: {client_id}", err=True)
                 else:
-                    click.echo(f"❌ Error getting client details: {e}", err=True)
+                    click.echo(f"❌ Error getting client details: {show_err}", err=True)
                 sys.exit(1)
 
     try:
         asyncio.run(run_show())
-    except Exception as e:
-        click.echo(f"❌ Unexpected error: {e}", err=True)
+    except Exception as unexpected_err:
+        click.echo(f"❌ Unexpected error: {unexpected_err}", err=True)
         sys.exit(1)
 
 
@@ -597,26 +599,26 @@ def update_client(
         return
 
     async def run_update():
-        async with get_api_client() as client:
+        async with get_api_client() as api_client:
             try:
-                updated_client = await client.update_client(client_id, update_data)
+                updated_client = await api_client.update_client(client_id, update_data)
 
                 click.echo("✅ Client updated successfully!")
                 click.echo(f"  Client ID: {updated_client.client_id}")
                 click.echo(f"  Name: {updated_client.client_name}")
                 click.echo(f"  Active: {'✅ Yes' if updated_client.is_active else '❌ No'}")
 
-            except AdminAPIError as e:
-                click.echo(f"❌ {e.message}", err=True)
+            except AdminAPIError as api_err:
+                click.echo(f"❌ {api_err.message}", err=True)
                 sys.exit(1)
-            except Exception as e:
-                click.echo(f"❌ Error updating client: {e}", err=True)
+            except Exception as update_err:
+                click.echo(f"❌ Error updating client: {update_err}", err=True)
                 sys.exit(1)
 
     try:
         asyncio.run(run_update())
-    except Exception as e:
-        click.echo(f"❌ Unexpected error: {e}", err=True)
+    except Exception as unexpected_err:
+        click.echo(f"❌ Unexpected error: {unexpected_err}", err=True)
         sys.exit(1)
 
 
@@ -684,30 +686,30 @@ def regenerate_secret(ctx: click.Context, client_id: str, confirm: bool):
         return
 
     async def run_regenerate():
-        async with get_api_client() as client:
+        async with get_api_client() as api_client:
             try:
-                credentials = await client.regenerate_client_secret(client_id)
+                credentials = await api_client.regenerate_client_secret(client_id)
 
                 click.echo("✅ Client secret regenerated successfully!")
                 click.echo(f"  New Secret: {credentials.client_secret}")
                 click.echo("  ⚠️  Store the new secret securely - it won't be shown again!")
 
-            except AdminAPIError as e:
-                click.echo(f"❌ {e.message}", err=True)
+            except AdminAPIError as api_err:
+                click.echo(f"❌ {api_err.message}", err=True)
                 sys.exit(1)
-            except Exception as e:
-                if "404" in str(e):
+            except Exception as regen_err:
+                if "404" in str(regen_err):
                     click.echo("❌ Client not found", err=True)
-                elif "public client" in str(e).lower():
+                elif "public client" in str(regen_err).lower():
                     click.echo("❌ Cannot regenerate secret for public client", err=True)
                 else:
-                    click.echo(f"❌ Error regenerating secret: {e}", err=True)
+                    click.echo(f"❌ Error regenerating secret: {regen_err}", err=True)
                 sys.exit(1)
 
     try:
         asyncio.run(run_regenerate())
-    except Exception as e:
-        click.echo(f"❌ Unexpected error: {e}", err=True)
+    except Exception as unexpected_err:
+        click.echo(f"❌ Unexpected error: {unexpected_err}", err=True)
         sys.exit(1)
 
 
@@ -773,25 +775,25 @@ def delete_client(ctx: click.Context, client_id: str, confirm: bool):
         return
 
     async def run_delete():
-        async with get_api_client() as client:
+        async with get_api_client() as api_client:
             try:
-                result = await client.delete_client(client_id)
+                result = await api_client.delete_client(client_id)
 
                 click.echo("✅ Client deactivated successfully!")
                 click.echo(f"  Message: {result.get('message', 'Client deleted')}")
 
-            except AdminAPIError as e:
-                click.echo(f"❌ {e.message}", err=True)
+            except AdminAPIError as api_err:
+                click.echo(f"❌ {api_err.message}", err=True)
                 sys.exit(1)
-            except Exception as e:
-                if "404" in str(e):
+            except Exception as delete_err:
+                if "404" in str(delete_err):
                     click.echo("❌ Client not found", err=True)
                 else:
-                    click.echo(f"❌ Error deleting client: {e}", err=True)
+                    click.echo(f"❌ Error deleting client: {delete_err}", err=True)
                 sys.exit(1)
 
     try:
         asyncio.run(run_delete())
-    except Exception as e:
-        click.echo(f"❌ Unexpected error: {e}", err=True)
+    except Exception as unexpected_err:
+        click.echo(f"❌ Unexpected error: {unexpected_err}", err=True)
         sys.exit(1)

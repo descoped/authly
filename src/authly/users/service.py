@@ -39,7 +39,8 @@ class UserService:
     def __init__(self, user_repo: UserRepository):
         self._repo = user_repo
 
-    def generate_temporary_password(self, length: int = 12) -> str:
+    @staticmethod
+    def generate_temporary_password(length: int = 12) -> str:
         """
         Generate a secure temporary password.
 
@@ -83,8 +84,9 @@ class UserService:
 
         return "".join(password_chars)
 
+    @staticmethod
     def _filter_user_fields(
-        self, user: UserModel, is_admin_context: bool = False, include_admin_fields: bool = False
+        user: UserModel, is_admin_context: bool = False, include_admin_fields: bool = False
     ) -> dict:
         """
         Filter user fields based on admin context and permissions.
@@ -208,6 +210,7 @@ class UserService:
         Raises:
             HTTPException: If validation fails or user already exists
         """
+        username = user_data.get("username", "unknown")  # Default for error messages
         try:
             # Extract required fields
             username = user_data["username"]
@@ -654,3 +657,23 @@ class UserService:
         existing_user = await self._repo.get_by_email(email)
         if existing_user and existing_user.id != exclude_user_id:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
+
+    async def count_filtered(self, filters: dict) -> int:
+        """
+        Count users matching the given filters.
+
+        This is a public wrapper for repository access needed by admin endpoints.
+
+        Args:
+            filters: Dictionary of filter criteria
+
+        Returns:
+            Count of matching users
+        """
+        try:
+            return await self._repo.count_filtered(filters)
+        except Exception as e:
+            logger.error(f"Error counting users with filters {filters}: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to count users"
+            ) from None

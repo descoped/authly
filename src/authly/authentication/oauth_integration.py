@@ -118,6 +118,7 @@ def patch_oauth_authorization_endpoints():
         OAuth 2.1 Authorization endpoint with support for both session-based
         (browser) and token-based (API) authentication.
         """,
+        operation_id="oauth_authorize_get_with_session",
         responses={
             200: {"description": "Authorization form displayed"},
             302: {"description": "Redirect to client or login"},
@@ -277,9 +278,9 @@ def patch_oauth_authorization_endpoints():
 
             # Render the authorization consent template
             return templates.TemplateResponse(
-                request=request,
-                name="oauth/authorize.html",
-                context={
+                request,
+                "oauth/authorize.html",
+                {
                     "client": client,
                     "client_id": client_id,
                     "redirect_uri": redirect_uri,
@@ -337,6 +338,7 @@ def patch_oauth_authorization_endpoints():
         OAuth 2.1 Authorization processing endpoint with support for both
         session-based (browser) and token-based (API) authentication.
         """,
+        operation_id="oauth_authorize_post_with_session",
         responses={
             302: {"description": "Redirect to client with code or error"},
             400: {"description": "Invalid request"},

@@ -17,7 +17,7 @@ from enum import Enum
 from typing import Any
 from uuid import uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 logger = logging.getLogger(__name__)
 
@@ -87,9 +87,10 @@ class ErrorDetail(BaseModel):
     message: str = Field(..., description="Human-readable error message")
     value: Any | None = Field(None, description="Invalid value that caused the error")
 
-    class Config:
+    model_config = ConfigDict(
         # Allow arbitrary types for the value field
-        arbitrary_types_allowed = True
+        arbitrary_types_allowed=True
+    )
 
 
 class AdminErrorResponse(BaseModel):

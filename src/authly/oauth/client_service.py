@@ -617,6 +617,75 @@ class ClientService:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get client scopes"
             ) from None
 
+    async def get_active_clients_models(self, limit: int = 100, offset: int = 0) -> list[OAuthClientModel]:
+        """
+        Get active OAuth client models (raw models, not responses).
+
+        This is a public wrapper for repository access needed by admin endpoints.
+
+        Args:
+            limit: Maximum number of clients to return
+            offset: Number of clients to skip
+
+        Returns:
+            List of OAuthClientModel instances
+        """
+        try:
+            return await self._client_repo.get_active_clients(limit=limit, offset=offset)
+        except Exception as e:
+            logger.error(f"Error getting active client models: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get clients"
+            ) from None
+
+    async def get_client_model_by_id(self, client_id: str) -> OAuthClientModel | None:
+        """
+        Get the raw client model by client_id.
+
+        This is a public wrapper for repository access needed by admin endpoints.
+
+        Args:
+            client_id: The OAuth client identifier
+
+        Returns:
+            OAuthClientModel or None if not found
+        """
+        try:
+            return await self._client_repo.get_by_client_id(client_id)
+        except Exception as e:
+            logger.error(f"Error getting client model for {client_id}: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get client"
+            ) from None
+
+    async def update_client_by_id(self, client_id: str, update_data: dict) -> bool:
+        """
+        Update client by retrieving it first and then updating.
+
+        This is a public wrapper for repository access needed by admin endpoints.
+
+        Args:
+            client_id: The OAuth client identifier
+            update_data: Dictionary of fields to update
+
+        Returns:
+            True if update was successful
+        """
+        try:
+            client = await self._client_repo.get_by_client_id(client_id)
+            if not client:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found")
+
+            await self._client_repo.update_client(client.id, update_data)
+            return True
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error updating client {client_id}: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update client"
+            ) from None
+
     def _validate_redirect_uris(self, redirect_uris: list[str], client_type: ClientType) -> None:
         """Validate redirect URIs according to OAuth 2.1 security requirements"""
         if not redirect_uris:
@@ -674,7 +743,8 @@ class ClientService:
                 status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid scopes: {', '.join(invalid_scopes)}"
             )
 
-    def _validate_oidc_fields(self, request: OAuthClientCreateRequest) -> None:
+    @staticmethod
+    def _validate_oidc_fields(request: OAuthClientCreateRequest) -> None:
         """Validate OpenID Connect specific client fields"""
 
         # Check if this is an OIDC client (has openid scope)

@@ -43,16 +43,17 @@ class DeferredOAuth2PasswordBearer:
         self._lock = Lock()
         self._init_error: Exception | None = None
 
-    def get_token_url(self, request: Request = None) -> str:
+    def get_token_url(self, request: Request = None) -> str:  # pylint: disable=unused-argument
         """Get the token URL."""
         try:
             # Try to get from the global resource manager instance
-            from authly.core.dependencies import _resource_manager_instance
+            from authly.core.dependencies import get_resource_manager
 
-            if _resource_manager_instance is not None:
-                config = _resource_manager_instance.get_config()
+            try:
+                resource_manager = get_resource_manager()
+                config = resource_manager.get_config()
                 return f"{config.fastapi_api_version_prefix}/oauth/token"
-            else:
+            except RuntimeError:
                 # Fallback to direct environment variable reading
                 import os
 
@@ -95,7 +96,7 @@ oauth2_scheme = DeferredOAuth2PasswordBearer()
 class DeferredOAuth2PasswordBearerOptional(DeferredOAuth2PasswordBearer):
     """OAuth2 scheme that returns None instead of raising exception when no token present."""
 
-    async def initialize(self, request: Request = None) -> OAuth2State:
+    async def initialize(self, request: Request = None) -> OAuth2State | None:
         """Thread-safe, retry-safe initialization with auto_error=False"""
         if self._init_error:
             self._init_error = None
@@ -111,6 +112,16 @@ class DeferredOAuth2PasswordBearerOptional(DeferredOAuth2PasswordBearer):
                     return None
 
         return self._state
+
+    async def __call__(self, request: Request) -> str | None:
+        """
+        Override to handle the case where initialize returns None.
+        This is the method that FastAPI will call as a dependency.
+        """
+        state = await self.initialize(request)
+        if state is None:
+            return None
+        return await state.oauth(request)
 
 
 # Optional OAuth2 scheme (returns None if no token)

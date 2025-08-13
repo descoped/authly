@@ -3,6 +3,7 @@
 import os
 import sys
 from pathlib import Path
+from typing import cast
 
 import click
 from click.shell_completion import get_completion_class
@@ -73,7 +74,8 @@ def generate_completion_script(shell: str) -> str:
 
     # Create completion instance
     complete_var = "_AUTHLY_COMPLETE"
-    completion = completion_cls(cli, {}, "authly", complete_var)
+    # Cast cli to Command since it's decorated with @click.group
+    completion = completion_cls(cast(click.Command, cli), {}, "authly", complete_var)
 
     # Add wrapper for python -m authly
     script = completion.source()
