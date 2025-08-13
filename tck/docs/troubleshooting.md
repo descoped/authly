@@ -1,73 +1,91 @@
-# OIDC Conformance Testing Troubleshooting Guide
-
-This guide helps resolve common issues when running OIDC conformance tests against Authly.
+# Troubleshooting Guide
 
 ## Common Issues and Solutions
 
-### 1. Conformance Suite Won't Start
+### 1. TCK Container Build Issues
 
-**Problem**: Docker containers fail to start or immediately exit.
-
-**Solutions**:
-- Check Docker is running: `docker ps`
-- Check ports are available: `lsof -i :8443` and `lsof -i :8000`
-- Review Docker logs: `docker-compose -f docker/docker-compose.yml logs`
-- Ensure sufficient memory: Docker needs at least 4GB RAM
-
-### 2. CORS Errors
-
-**Problem**: Browser console shows CORS policy errors.
+**Problem**: TCK container fails to build or run.
 
 **Solutions**:
-1. Update Authly's CORS configuration:
-```python
-CORS_ORIGINS = [
-    "https://localhost:8443",
-    "http://localhost:8443",
-    "https://localhost:443"
-]
+```bash
+# Clean rebuild
+make clean
+make build-tck
+
+# Check Docker daemon
+docker ps
+
+# Verify Dockerfile
+cat Dockerfile.tck
 ```
 
-2. Restart Authly server after configuration changes
+### 2. Authly Connection Issues
 
-3. If using Docker, ensure the networks are configured correctly
-
-### 3. SSL Certificate Issues
-
-**Problem**: Browser shows SSL certificate warnings.
+**Problem**: TCK can't connect to Authly.
 
 **Solutions**:
-1. Accept the self-signed certificate in your browser
-2. Navigate to https://localhost:8443 and click "Advanced" → "Proceed"
-3. For automation, use: `curl -k` or `verify=False` in Python requests
-
-### 4. Discovery Endpoint Not Found
-
-**Problem**: Conformance suite can't find `/.well-known/openid_configuration`
-
-**Solutions**:
-1. Verify Authly is running: `curl http://localhost:8000/health`
-2. Check discovery endpoint: `curl http://localhost:8000/.well-known/openid_configuration | jq .`
-3. Ensure OIDC is enabled in Authly configuration
-4. If using Docker, check network connectivity between containers
-5. Note: Endpoints are under `/api/v1/` prefix:
-   - Authorization: `http://localhost:8000/api/v1/oauth/authorize`
-   - Token: `http://localhost:8000/api/v1/auth/token`
-
-### 5. Client Authentication Failures
-
-**Problem**: Tests fail with "invalid_client" errors.
-
-**Solutions**:
-1. Verify client credentials match between Authly and test configuration
-2. Check client_type is "confidential" for secret-based authentication
-3. Ensure client_secret is properly encoded (base64 for Basic auth)
-4. Create client using Authly admin CLI:
 ```bash
-python -m authly.admin.cli client create \
-    --client-id oidc-conformance-test \
-    --client-secret conformance-test-secret-change-in-production \
-    --client-type confidential
+# For local Authly
+export AUTHLY_BASE_URL=http://localhost:8000
+
+# For Docker Authly
+export AUTHLY_BASE_URL=http://host.docker.internal:8000
+
+# Test connection
+curl $AUTHLY_BASE_URL/health
+```
+
+### 3. Discovery Endpoint Not Found
+
+**Problem**: TCK can't find `/.well-known/openid-configuration`
+
+**Solutions**:
+```bash
+# Verify Authly is running
+curl http://localhost:8000/health
+
+# Check discovery endpoint (note: openid-configuration, not openid_configuration)
+curl http://localhost:8000/.well-known/openid-configuration | jq .
+
+# Verify JWKS endpoint
+curl http://localhost:8000/.well-known/jwks.json | jq .
+```
+
+### 4. Report Generation Failures
+
+**Problem**: Reports not being generated or saved.
+
+**Solutions**:
+```bash
+# Create reports directory
+mkdir -p reports/latest
+
+# Check permissions
+ls -la reports/
+
+# Run with verbose output
+make validate
+
+# Check generated reports
+ls -la reports/latest/
+```
+
+### 5. Test Failures
+
+**Problem**: Specific conformance tests are failing.
+
+**Solutions**:
+```bash
+# View detailed failure reasons
+cat reports/latest/SPECIFICATION_CONFORMANCE.md
+
+# Check actionable items for fixes
+cat reports/latest/ACTIONABLE_ITEMS.md
+
+# Common fixes:
+# - HTTPS issuer: Deploy with HTTPS for production
+# - UserInfo POST: Expected to fail (not implemented)
+# - Discovery issuer: Check issuer configuration matches
 ```
 
 ### 6. PKCE Validation Errors
@@ -120,96 +138,38 @@ python -m authly.admin.cli client create \
 3. Ensure database is initialized with schema
 4. Check firewall/network settings
 
-### 11. Authly Startup Issues
+### 8. Environment Issues
 
-**Problem**: Authly fails to start with various errors.
+**Problem**: Environment variables not being recognized.
 
 **Solutions**:
-
-**Missing JWT secrets**:
 ```bash
+# Set required variables
+export AUTHLY_BASE_URL=http://localhost:8000
 export JWT_SECRET_KEY='test-secret-key'
 export JWT_REFRESH_SECRET_KEY='test-refresh-key'
+
+# Verify in container
+docker compose --profile validator run --rm validator env | grep AUTHLY
 ```
 
-**Missing database tables**:
-```bash
-# Initialize schema using init script
-docker compose exec -T postgres psql -U authly -d authly < docker-postgres/init-db-and-user.sql
-```
+### 9. CI/CD Issues
 
-**Using embedded mode with testcontainers**:
-```bash
-# Starts with embedded PostgreSQL (new container each time)
-uv run python -m authly serve --embedded --host 0.0.0.0 --port 8000
-```
-
-**Using Docker Compose (recommended)**:
-```bash
-# Starts all services with persistent data
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
-```
-
-### 12. Test Client Creation
-
-**Problem**: Can't create test client through admin CLI.
+**Problem**: Tests fail in CI but pass locally.
 
 **Solutions**:
-
-**Direct SQL approach (recommended)**:
 ```bash
-# Create SQL file with test client
-cat > /tmp/create_test_client.sql << 'EOF'
-INSERT INTO oauth_clients (
-    client_id, client_name, client_type, client_secret_hash,
-    redirect_uris, grant_types, response_types, scope,
-    require_pkce, is_active
-) VALUES (
-    'oidc-conformance-test',
-    'OIDC Conformance Test Client',
-    'confidential',
-    '$2b$12$K4Y4RR5YlF5uBN2H7fP3YuHj6FKThQBqQqZeD/YMBZZIxZLH2Ejha',
-    ARRAY['https://localhost:8443/test/a/authly/callback']::text[],
-    ARRAY['authorization_code', 'refresh_token']::text[],
-    ARRAY['code']::text[],
-    'openid profile email',
-    true, true
-) ON CONFLICT (client_id) DO NOTHING;
-EOF
+# Use CI profile
+docker compose --profile github-ci up -d
 
-# Execute in database
-docker compose exec -T postgres psql -U authly -d authly < /tmp/create_test_client.sql
+# Wait longer for services
+sleep 30  # Instead of 10
+
+# Use service names instead of localhost
+export AUTHLY_BASE_URL=http://authly:8000
 ```
 
-### 13. Authorization Endpoint Returns 401
-
-**Problem**: Authorization endpoint returns 401 instead of redirecting to login.
-
-**Solution**: This is expected behavior for API-first authorization servers. The 401 indicates authentication is required. In a real flow:
-1. Client redirects user to authorization endpoint
-2. Authorization server returns 401 with login requirements
-3. Client handles authentication flow
-4. After authentication, authorization proceeds
-
-For testing, you may need to:
-- Create a test user first
-- Use session cookies or bearer tokens
-- Implement the full OAuth flow with authentication
-
-## Debugging Tips
-
-### Enable Debug Logging
-
-In Authly:
-```python
-import logging
-logging.basicConfig(level=logging.DEBUG)
-```
-
-In conformance suite:
-```bash
-docker-compose -f docker/docker-compose.yml logs -f conformance-suite
-```
+## Quick Debugging Commands
 
 ### Test Individual Endpoints
 
@@ -227,37 +187,32 @@ curl -v "http://localhost:8000/oauth/authorize?response_type=code&client_id=test
 curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/oidc/userinfo
 ```
 
-### Check Conformance Suite API
+### Check TCK Status
 
 ```bash
-# Check if suite is running
-curl -k https://localhost:8443/api/runner/available
+# View running containers
+docker ps | grep tck
 
-# List test modules
-curl -k https://localhost:8443/api/testmodules
+# Check TCK logs
+docker compose logs validator
 
-# Get test plan status
-curl -k https://localhost:8443/api/plan/{plan-id}/status
+# Test specific endpoint
+docker compose --profile validator run --rm validator python -c "
+import requests
+resp = requests.get('http://host.docker.internal:8000/.well-known/openid-configuration')
+print(f'Status: {resp.status_code}')
+print(f'Issuer: {resp.json().get("issuer")}')
+"
 ```
-
-### Common Log Locations
-
-- Authly logs: Check console output or configured log file
-- Conformance suite: `docker-compose logs conformance-suite`
-- PostgreSQL: `docker-compose logs authly-db`
-- MongoDB: `docker-compose logs conformance-mongo`
-- Test results: `tck/results/*/test-logs.txt`
 
 ## Getting Help
 
-If you encounter issues not covered here:
+If issues persist:
 
-1. Check Authly's OIDC documentation: `docs/oidc-implementation.md`
-2. Review conformance suite documentation: https://gitlab.com/openid/conformance-suite
-3. Check test logs in `tck/results/` directory
-4. Open an issue with:
-   - Error messages
-   - Test configuration
-   - Authly version
-   - Conformance suite version
-   - Steps to reproduce
+1. **Check reports**: `cat reports/latest/ACTIONABLE_ITEMS.md`
+2. **Review logs**: `docker compose logs`
+3. **Clean restart**: `make clean && make validate`
+4. **Open issue with**:
+   - Error messages from reports
+   - Output of `make validate`
+   - Environment details (`docker version`, `python --version`)

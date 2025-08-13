@@ -1,0 +1,13 @@
+# TCK Dependencies - Minimal and focused
+# Python 3.13+ compatible
+
+# Core dependencies for OIDC/OAuth validation
+pyjwt>=2.10.1        # JWT token parsing and validation
+requests>=2.32.4      # HTTP client for endpoint testing  
+urllib3>=2.5.0        # HTTP utilities and connection pooling
+
+# Optional dependencies for extended functionality
+# Uncomment as needed:
+# cryptography>=43.0.0  # Advanced cryptographic operations
+# jsonschema>=4.23.0    # JSON schema validation
+# click>=8.1.7          # CLI interface (if needed)

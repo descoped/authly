@@ -13,43 +13,43 @@ Full analysis of all API endpoints against OIDC Core, OAuth 2.0, and OAuth 2.1 s
 #### Required OIDC Endpoints:
 | Endpoint | Method | Status | Notes |
 |----------|--------|--------|-------|
-| `/api/v1/oauth/authorize` | GET | PARTIAL | OAuth 2.1 Authorization Endpoint with OpenID Connect Support |
-| `/api/v1/oauth/authorize` | POST | PARTIAL | OAuth 2.1 Authorization Processing with OpenID Connect Support |
-| `/api/v1/oauth/token` | POST | PARTIAL | Get Access Token |
-| `/.well-known/openid-configuration` | GET | PASS | OpenID Connect Discovery |
-| `/oidc/userinfo` | GET | PARTIAL | OpenID Connect UserInfo Endpoint |
+| `/api/v1/oauth/authorize` | GET | FAIL | OAuth 2.1 Authorization with Session Support |
+| `/api/v1/oauth/authorize` | POST | FAIL | OAuth 2.1 Authorization Processing with Session Support |
+| `/api/v1/oauth/token` | POST | FAIL | Get Access Token |
+| `/.well-known/openid-configuration` | GET | FAIL | OpenID Connect Discovery |
+| `/oidc/userinfo` | GET | FAIL | OpenID Connect UserInfo Endpoint |
 | `/oidc/userinfo` | PUT | UNTESTED | Update OpenID Connect UserInfo |
-| `/.well-known/jwks.json` | GET | PASS | JSON Web Key Set (JWKS) |
+| `/.well-known/jwks.json` | GET | FAIL | JSON Web Key Set (JWKS) |
 
 #### Optional OIDC Endpoints:
 | Endpoint | Method | Status | Notes |
 |----------|--------|--------|-------|
-| `/api/v1/oauth/revoke` | POST | PARTIAL | Revoke Token |
+| `/api/v1/oauth/revoke` | POST | FAIL | Revoke Token |
 
 ### OAuth 2.0 Endpoints
 - **Total OAuth endpoints**: 1
 
 | Endpoint | Method | Requirement | Status |
 |----------|--------|-------------|--------|
-| `/api/v1/oauth/introspect` | POST | Optional | PARTIAL |
+| `/api/v1/oauth/introspect` | POST | Optional | FAIL |
 
 ### Admin/Custom Endpoints
-- **Total custom endpoints**: 45
+- **Total custom endpoints**: 50
 
 | Endpoint | Method | Tags | Purpose |
 |----------|--------|------|---------|
+| `/auth/login` | GET | authentication | Show Login Page |
+| `/auth/login` | POST | authentication | Login |
+| `/auth/logout` | POST | authentication | Logout |
+| `/auth/logout` | GET | authentication | Logout |
+| `/auth/session` | GET | authentication | Get Session Info |
+| `/auth/session/validate` | POST | authentication | Validate Session |
 | `/health` | GET | health | Health Check |
 | `/metrics` | GET | metrics | Get Metrics |
 | `/api/v1/auth/logout` | POST | auth | Logout |
 | `/api/v1/auth/change-password` | POST | auth | Change Password |
-| `/api/v1/auth/password-status` | GET | auth | Get Password Status |
-| `/api/v1/users/` | POST | users | Create a new user account |
-| `/api/v1/users/` | GET | users | Get Users |
-| `/api/v1/users/me` | GET | users | Get Current User Info |
-| `/api/v1/users/{user_id}` | GET | users | Get User |
-| `/api/v1/users/{user_id}` | PUT | users | Update User |
 
-*... and 35 more custom endpoints*
+*... and 40 more custom endpoints*
 
 ## 2. Cryptographic Requirements (JWKS)
 
@@ -60,18 +60,18 @@ Full analysis of all API endpoints against OIDC Core, OAuth 2.0, and OAuth 2.1 s
 ### Key Details:
 | Key ID | Type | Algorithm | Use | Valid | Issues |
 |--------|------|-----------|-----|-------|--------|
-| `key_2025081117293392...` | RSA | RS256 | sig | ✅ | None |
+| `key_2025081315072911...` | RSA | RS256 | sig | ✅ | None |
 
 ## 3. Discovery Document Validation
 
 ### Required Fields (OIDC Core):
 | Field | Present | Value |
 |-------|---------|-------|
-| `issuer` | ✅ | http://localhost:8000 |
-| `authorization_endpoint` | ✅ | http://localhost:8000/api/v1/oauth/authorize |
-| `token_endpoint` | ✅ | http://localhost:8000/api/v1/oauth/token |
-| `userinfo_endpoint` | ✅ | http://localhost:8000/oidc/userinfo |
-| `jwks_uri` | ✅ | http://localhost:8000/.well-known/jwks.json |
+| `issuer` | ✅ | http://host.docker.internal:8000 |
+| `authorization_endpoint` | ✅ | http://host.docker.internal:8000/api/v1/oauth/auth... |
+| `token_endpoint` | ✅ | http://host.docker.internal:8000/api/v1/oauth/toke... |
+| `userinfo_endpoint` | ✅ | http://host.docker.internal:8000/oidc/userinfo |
+| `jwks_uri` | ✅ | http://host.docker.internal:8000/.well-known/jwks.... |
 | `response_types_supported` | ✅ | ['code'] |
 | `subject_types_supported` | ✅ | ['public'] |
 | `id_token_signing_alg_values_supported` | ✅ | ['RS256', 'HS256'] |
@@ -89,13 +89,13 @@ Full analysis of all API endpoints against OIDC Core, OAuth 2.0, and OAuth 2.1 s
 
 ## 5. Complete Endpoint Inventory
 
-Total endpoints in OpenAPI: 54
+Total endpoints in OpenAPI: 59
 
 ### By Category:
 - OIDC Core: 8
 - OAuth 2.0: 1
 - Admin: 27
-- Custom: 18
+- Custom: 23
 
 ## 6. Conformance Test Scope Analysis
 

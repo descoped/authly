@@ -1,8 +1,8 @@
 # Test Plan Execution Report
 
 ## OIDC Basic Certification
-**Executed**: 2025-08-06T21:12:57.842838
-**Server**: http://localhost:8000
+**Executed**: 2025-08-13T16:23:33.460729
+**Server**: http://host.docker.internal:8000
 
 ## Summary
 - **Total Tests**: 17
@@ -16,9 +16,9 @@
 | Test Module | Status | Required | Description |
 |-------------|--------|----------|-------------|
 | oidcc-server | ✅ PASS | Yes | Server configuration validation |
-| oidcc-discovery-issuer-not-matching-config | ✅ PASS | Yes | Discovery endpoint issuer validation |
+| oidcc-discovery-issuer-not-matching-config | ❌ FAIL | Yes | Discovery endpoint issuer validation |
 | oidcc-ensure-request-without-nonce-succeeds-for-code-flow | ⏭️ NOT_IMPLEMENTED | Yes |  |
-| oidcc-ensure-registered-redirect-uri | ❌ FAIL | Yes | Redirect URI exact match validation |
+| oidcc-ensure-registered-redirect-uri | ✅ PASS | Yes | Redirect URI exact match validation |
 | oidcc-userinfo-get | ✅ PASS | Yes | UserInfo endpoint GET method |
 | oidcc-userinfo-post-header | ❌ FAIL | Yes | UserInfo endpoint POST with Bearer token |
 | oidcc-userinfo-post-body | ⏭️ NOT_IMPLEMENTED | No |  |
@@ -34,8 +34,8 @@
 | oidcc-claims-essential | ⏭️ NOT_IMPLEMENTED | No |  |
 
 ## ⚠️ Required Tests Failed
+- oidcc-discovery-issuer-not-matching-config
 - oidcc-ensure-request-without-nonce-succeeds-for-code-flow
-- oidcc-ensure-registered-redirect-uri
 - oidcc-userinfo-post-header
 - oidcc-nonce-invalid
 

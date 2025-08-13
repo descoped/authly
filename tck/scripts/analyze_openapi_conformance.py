@@ -4,26 +4,30 @@ Analyze OpenAPI spec to create comprehensive OIDC/OAuth conformance matrix
 """
 
 import json
+import os
 import requests
 from typing import Dict, List, Set
 from pathlib import Path
 
+# Get base URL from environment or default
+BASE_URL = os.getenv("AUTHLY_BASE_URL", "http://localhost:8000")
+
 
 def fetch_openapi():
     """Fetch OpenAPI specification"""
-    resp = requests.get("http://localhost:8000/openapi.json")
+    resp = requests.get(f"{BASE_URL}/openapi.json")
     return resp.json()
 
 
 def fetch_discovery():
     """Fetch OIDC discovery document"""
-    resp = requests.get("http://localhost:8000/.well-known/openid-configuration")
+    resp = requests.get(f"{BASE_URL}/.well-known/openid-configuration")
     return resp.json()
 
 
 def fetch_jwks():
     """Fetch JWKS"""
-    resp = requests.get("http://localhost:8000/.well-known/jwks.json")
+    resp = requests.get(f"{BASE_URL}/.well-known/jwks.json")
     return resp.json()
 
 

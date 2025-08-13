@@ -1,8 +1,8 @@
 # Test Plan Execution Report
 
 ## OAuth 2.1 PKCE Certification
-**Executed**: 2025-08-06T21:12:58.076396
-**Server**: http://localhost:8000
+**Executed**: 2025-08-13T16:23:34.094747
+**Server**: http://host.docker.internal:8000
 
 ## Summary
 - **Total Tests**: 8

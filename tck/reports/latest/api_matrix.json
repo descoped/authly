@@ -1,5 +1,77 @@
 [
   {
+    "path": "/auth/login",
+    "method": "GET",
+    "operation_id": "show_login_page_auth_login_get",
+    "summary": "Show Login Page",
+    "tags": [
+      "authentication"
+    ],
+    "category": "Custom",
+    "spec_requirement": "N/A",
+    "compliance_status": null
+  },
+  {
+    "path": "/auth/login",
+    "method": "POST",
+    "operation_id": "login_auth_login_post",
+    "summary": "Login",
+    "tags": [
+      "authentication"
+    ],
+    "category": "Custom",
+    "spec_requirement": "N/A",
+    "compliance_status": null
+  },
+  {
+    "path": "/auth/logout",
+    "method": "POST",
+    "operation_id": "logout_auth_logout_post",
+    "summary": "Logout",
+    "tags": [
+      "authentication"
+    ],
+    "category": "Custom",
+    "spec_requirement": "N/A",
+    "compliance_status": null
+  },
+  {
+    "path": "/auth/logout",
+    "method": "GET",
+    "operation_id": "logout_auth_logout_get",
+    "summary": "Logout",
+    "tags": [
+      "authentication"
+    ],
+    "category": "Custom",
+    "spec_requirement": "N/A",
+    "compliance_status": null
+  },
+  {
+    "path": "/auth/session",
+    "method": "GET",
+    "operation_id": "get_session_info_auth_session_get",
+    "summary": "Get Session Info",
+    "tags": [
+      "authentication"
+    ],
+    "category": "Custom",
+    "spec_requirement": "N/A",
+    "compliance_status": null
+  },
+  {
+    "path": "/auth/session/validate",
+    "method": "POST",
+    "operation_id": "validate_session_auth_session_validate_post",
+    "summary": "Validate Session",
+    "tags": [
+      "authentication"
+    ],
+    "category": "Custom",
+    "spec_requirement": "N/A",
+    "compliance_status": null
+  },
+  {
     "path": "/health",
     "method": "GET",
     "operation_id": "health_check_health_get",
@@ -84,18 +156,6 @@
     "compliance_status": null
   },
   {
-    "path": "/api/v1/users/me",
-    "method": "GET",
-    "operation_id": "get_current_user_info_api_v1_users_me_get",
-    "summary": "Get Current User Info",
-    "tags": [
-      "users"
-    ],
-    "category": "Custom",
-    "spec_requirement": "N/A",
-    "compliance_status": null
-  },
-  {
     "path": "/api/v1/users/{user_id}",
     "method": "GET",
     "operation_id": "get_user_api_v1_users__user_id__get",
@@ -146,8 +206,8 @@
   {
     "path": "/api/v1/oauth/authorize",
     "method": "GET",
-    "operation_id": "authorize_get_api_v1_oauth_authorize_get",
-    "summary": "OAuth 2.1 Authorization Endpoint with OpenID Connect Support",
+    "operation_id": "oauth_authorize_get_with_session",
+    "summary": "OAuth 2.1 Authorization with Session Support",
     "tags": [
       "OAuth 2.1"
     ],
@@ -158,8 +218,8 @@
   {
     "path": "/api/v1/oauth/authorize",
     "method": "POST",
-    "operation_id": "authorize_post_api_v1_oauth_authorize_post",
-    "summary": "OAuth 2.1 Authorization Processing with OpenID Connect Support",
+    "operation_id": "oauth_authorize_post_with_session",
+    "summary": "OAuth 2.1 Authorization Processing with Session Support",
     "tags": [
       "OAuth 2.1"
     ],
@@ -177,6 +237,18 @@
     ],
     "category": "OIDC Core",
     "spec_requirement": "Required",
+    "compliance_status": null
+  },
+  {
+    "path": "/api/v1/oauth/introspect",
+    "method": "POST",
+    "operation_id": "introspect_token_endpoint_api_v1_oauth_introspect_post",
+    "summary": "Introspect Token Endpoint",
+    "tags": [
+      "OAuth 2.1"
+    ],
+    "category": "OAuth 2.0",
+    "spec_requirement": "Optional",
     "compliance_status": null
   },
   {
@@ -201,18 +273,6 @@
     ],
     "category": "Custom",
     "spec_requirement": "N/A",
-    "compliance_status": null
-  },
-  {
-    "path": "/api/v1/oauth/introspect",
-    "method": "POST",
-    "operation_id": "introspect_token_api_v1_oauth_introspect_post",
-    "summary": "Introspect Token",
-    "tags": [
-      "OAuth 2.1"
-    ],
-    "category": "OAuth 2.0",
-    "spec_requirement": "Optional",
     "compliance_status": null
   },
   {

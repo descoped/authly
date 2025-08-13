@@ -1,9 +1,12 @@
-# Conformance Suite - External dependency
-# Clone this from: https://gitlab.com/openid/conformance-suite.git
+# Conformance Suite - External dependency (CI only)
 conformance-suite/
 
-# Test results
-results/
+# Reports - Generated content (always fresh)
+reports/latest/*
+reports/test-plans/
+!reports/latest/.gitkeep
+
+# Logs
 *.log
 
 # Temporary files

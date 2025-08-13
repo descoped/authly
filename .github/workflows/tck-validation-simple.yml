@@ -1,0 +1,109 @@
+name: TCK Validation (Simplified)
+
+# Simplified OIDC/OAuth validation using only the refactored TCK
+# No complex conformance suite setup - just our lightweight validator
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'src/**'
+      - 'tck/**'
+      - '.github/workflows/tck-validation-simple.yml'
+  pull_request:
+    branches: [master]
+    paths:
+      - 'src/**'
+      - 'tck/**'
+  workflow_dispatch:
+
+jobs:
+  tck-validation:
+    name: TCK Compliance Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Build Authly from Sources
+        run: |
+          echo "🔨 Building Authly Docker image..."
+          docker compose build authly
+          
+      - name: Start Authly Service
+        run: |
+          echo "🚀 Starting Authly service..."
+          docker compose up -d authly
+          
+          # Wait for Authly to be healthy (max 60 seconds)
+          echo "⏳ Waiting for Authly to be healthy..."
+          timeout 60 bash -c 'until curl -sf http://localhost:8000/health > /dev/null 2>&1; do echo -n "."; sleep 2; done'
+          echo " ✅ Authly is ready"
+      
+      - name: Run TCK Validation
+        run: |
+          cd tck
+          echo "🔍 Running TCK validation using containerized approach..."
+          make validate
+      
+      - name: Check Compliance Results
+        run: |
+          cd tck
+          
+          if [ -f reports/latest/SPECIFICATION_CONFORMANCE.md ]; then
+            echo "✅ Conformance report generated"
+            
+            # Extract compliance percentage
+            COMPLIANCE=$(grep "checks passed" reports/latest/SPECIFICATION_CONFORMANCE.md | grep -oE "[0-9]+%" | head -1 | tr -d '%' || echo "0")
+            
+            echo "## 📊 TCK Validation Results" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Compliance Level: ${COMPLIANCE}%**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            if [ "$COMPLIANCE" -ge 90 ]; then
+              echo "✅ **PASSED**: TCK validation achieved ${COMPLIANCE}% compliance" >> $GITHUB_STEP_SUMMARY
+              echo "VALIDATION_PASSED=true" >> $GITHUB_ENV
+            else
+              echo "❌ **FAILED**: TCK validation only achieved ${COMPLIANCE}% compliance" >> $GITHUB_STEP_SUMMARY
+              echo "VALIDATION_PASSED=false" >> $GITHUB_ENV
+            fi
+            
+            # Add report preview
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "<details>" >> $GITHUB_STEP_SUMMARY
+            echo "<summary>📋 View Compliance Report</summary>" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            head -50 reports/latest/SPECIFICATION_CONFORMANCE.md >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            echo "</details>" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ No conformance report generated"
+            echo "VALIDATION_PASSED=false" >> $GITHUB_ENV
+          fi
+      
+      - name: Upload TCK Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tck-validation-report
+          path: |
+            tck/reports/latest/SPECIFICATION_CONFORMANCE.md
+            tck/reports/latest/conformance_results.json
+      
+      - name: Cleanup
+        if: always()
+        run: |
+          echo "🧹 Stopping services..."
+          docker compose down
+      
+      - name: Final Status
+        run: |
+          if [ "${{ env.VALIDATION_PASSED }}" != "true" ]; then
+            echo "❌ TCK validation failed"
+            exit 1
+          fi
+          echo "✅ TCK validation passed successfully"

@@ -1,7 +1,9 @@
 name: OIDC Spec Validation
 
 # This workflow validates OIDC/OAuth specification compliance
-# using a lightweight Python validator script
+# Uses the refactored TCK structure with simplified validation
+# - Primary: Lightweight Python validator (src/validator.py) 
+# - Fallback: Full conformance suite if needed for comprehensive testing
 
 on:
   push:
@@ -94,8 +96,8 @@ jobs:
         if: steps.check-image.outputs.exists == 'false'
         uses: docker/build-push-action@v5
         with:
-          context: ./tck
-          file: ./tck/conformance-suite-production/Dockerfile
+          context: ./tck/conformance-suite
+          file: ./tck/conformance-suite/Dockerfile
           push: true
           tags: |
             ghcr.io/${{ github.repository_owner }}/oidc-conformance-suite:${{ steps.conformance-tag.outputs.tag }}
@@ -131,9 +133,9 @@ jobs:
           # Set the conformance image to use
           export CONFORMANCE_IMAGE="ghcr.io/${{ github.repository_owner }}/oidc-conformance-suite:${{ steps.conformance-tag.outputs.tag }}"
           
-          # Start the TCK conformance suite stack using CI compose file
+          # Start the TCK conformance suite stack using CI profile
           cd tck
-          docker compose -f docker-compose-tck-ci.yml up -d
+          docker compose --profile github-ci up -d
           cd ..
           
           # Show what containers are starting
@@ -166,7 +168,7 @@ jobs:
       - name: Install Dependencies
         run: |
           # Install Python packages needed for the validator script
-          pip install -r tck/requirements-tck.txt
+          pip install -r tck/requirements.txt
       
       - name: Run Conformance Validator
         id: validate
@@ -174,7 +176,7 @@ jobs:
           cd tck
           # Run the OIDC spec compliance validator
           # This checks discovery, JWKS, token formats, and security requirements
-          python scripts/conformance-validator.py || true
+          python src/validator.py || true
           
           # Check if the report was created
           if [ -f reports/latest/SPECIFICATION_CONFORMANCE.md ]; then
@@ -252,7 +254,7 @@ jobs:
         run: |
           # Stop TCK conformance suite stack
           cd tck
-          docker compose -f docker-compose-tck-ci.yml down || true
+          docker compose down || true
           cd ..
           
           # Stop Authly stack

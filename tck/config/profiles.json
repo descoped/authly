@@ -1,0 +1,38 @@
+{
+  "profiles": {
+    "basic": {
+      "name": "Basic OIDC Compliance",
+      "description": "Core OIDC specifications validation",
+      "categories": [
+        "discovery",
+        "jwks",
+        "endpoints",
+        "security"
+      ],
+      "required_endpoints": [
+        "/.well-known/openid-configuration",
+        "/.well-known/jwks.json",
+        "/api/v1/oauth/authorize",
+        "/api/v1/oauth/token",
+        "/oidc/userinfo"
+      ]
+    },
+    "oauth21": {
+      "name": "OAuth 2.1 Compliance", 
+      "description": "OAuth 2.1 specifications with PKCE enforcement",
+      "categories": [
+        "discovery",
+        "jwks", 
+        "endpoints",
+        "security",
+        "pkce"
+      ],
+      "required_features": [
+        "pkce_required",
+        "s256_support",
+        "no_plain_pkce"
+      ]
+    }
+  },
+  "default_profile": "basic"
+}

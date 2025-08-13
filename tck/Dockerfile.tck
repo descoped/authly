@@ -16,15 +16,15 @@ RUN addgroup -g 1000 tck && \
 WORKDIR /tck
 
 # Copy TCK requirements (isolated dependencies)
-COPY requirements-tck.txt .
+COPY requirements.txt .
 
 # Install TCK-specific Python dependencies
-RUN pip install --no-cache-dir -r requirements-tck.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy TCK scripts and configuration
+# Copy TCK source code and configuration
+COPY src/ src/
 COPY scripts/ scripts/
 COPY config/ config/
-COPY reports/ reports/
 
 # Create reports directory with proper permissions
 RUN mkdir -p reports/latest && \
@@ -37,7 +37,7 @@ USER tck
 ENV AUTHLY_BASE_URL=http://host.docker.internal:8000
 
 # Default command runs conformance validation
-CMD ["python", "scripts/conformance-validator.py"]
+CMD ["python", "src/validator.py"]
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
