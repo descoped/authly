@@ -166,7 +166,7 @@ jobs:
       - name: Install Dependencies
         run: |
           # Install Python packages needed for the validator script
-          pip install requests urllib3 pyjwt
+          pip install -r tck/requirements-tck.txt
       
       - name: Run Conformance Validator
         id: validate

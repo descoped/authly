@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # =================================================================
   # CONFORMANCE SUITE SERVICES
@@ -22,39 +20,28 @@ services:
   # Conformance suite HTTPS server
   tck-httpd:
     build:
-      context: ./conformance-suite/httpd
+      context: ./httpd-ci
       dockerfile: Dockerfile
     container_name: tck-httpd
     ports:
       - "8443:8443"
-    volumes:
-      - ./conformance-suite/src/main/resources/:/usr/local/apache2/htdocs/:ro
     networks:
       - authly-network
     depends_on:
       - tck-server
 
-  # Conformance suite server 
-  # Dual mode support:
-  # - Local development: builds from ./conformance-suite/server-dev if CONFORMANCE_IMAGE is not set
-  # - CI/Production: uses pre-built image from CONFORMANCE_IMAGE environment variable
+  # Conformance suite server (using pre-built image from GitHub Packages)
   tck-server:
-    build:
-      context: ${BUILD_CONTEXT:-./conformance-suite/server-dev}
-      dockerfile: ${DOCKERFILE:-Dockerfile}
-    image: ${CONFORMANCE_IMAGE:-tck-server:local}
+    # Use image from GitHub Container Registry if available, otherwise build locally
+    image: ${CONFORMANCE_IMAGE:-ghcr.io/descoped/oidc-conformance-suite:latest}
     container_name: tck-server
-    volumes:
-      - ${JAR_VOLUME:-./conformance-suite/target/}:/server/:ro
+    ports:
+      - "9999:9999"  # Conformance suite API port
     environment:
       - JAVA_OPTS=-Xmx2g -XX:MaxMetaspaceSize=512m
-    command: >
-      java
-      -jar /server/fapi-test-suite.jar
-      -Djdk.tls.maxHandshakeMessageSize=65536
-      --fintechlabs.base_url=https://localhost.emobix.co.uk:8443
-      --fintechlabs.devmode=true
-      --fintechlabs.startredir=true
+      - BASE_URL=https://localhost.emobix.co.uk:8443
+      - DEVMODE=true
+      - STARTREDIR=true
     networks:
       - authly-network
     extra_hosts:
@@ -68,6 +55,25 @@ services:
         max-size: "500k"
         max-file: "5"
 
+  # TCK Conformance Validator (isolated Python environment)
+  tck-validator:
+    build:
+      context: .
+      dockerfile: Dockerfile.tck
+    image: authly-tck:latest
+    container_name: tck-validator
+    volumes:
+      - ./reports:/tck/reports
+    networks:
+      - authly-network
+    environment:
+      - AUTHLY_BASE_URL=http://host.docker.internal:8000
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    profiles:
+      - validator  # Only start when explicitly requested
+    restart: "no"  # Run once and exit
+
   # =================================================================
   # AUTHLY SERVICES (extends from main docker-compose)
   # =================================================================
@@ -78,7 +84,7 @@ services:
 networks:
   authly-network:
     external: true
-    name: authly_default
+    name: authly_authly-net
 
 volumes:
   tck_mongo_data:

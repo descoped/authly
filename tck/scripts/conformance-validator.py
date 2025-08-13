@@ -20,6 +20,7 @@ import base64
 import hashlib
 import requests
 import jwt
+import os
 from datetime import datetime, timedelta
 from typing import Dict, List, Tuple
 import sys
@@ -29,8 +30,8 @@ from pathlib import Path
 class OIDCConformanceValidator:
     """Validates OIDC Core 1.0 specification compliance"""
 
-    def __init__(self, base_url="http://localhost:8000"):
-        self.base_url = base_url
+    def __init__(self, base_url=None):
+        self.base_url = base_url or os.getenv("AUTHLY_BASE_URL", "http://localhost:8000")
         self.discovery = None
         self.jwks = None
         self.results = {"discovery": {}, "jwks": {}, "id_token": {}, "endpoints": {}, "security": {}}

@@ -1,0 +1,44 @@
+# TCK Conformance Testing Environment
+# Isolated from main Authly environment
+FROM python:3.13-alpine
+
+# Install system dependencies
+RUN apk add --no-cache \
+    curl \
+    jq \
+    bash
+
+# Create non-root user for security
+RUN addgroup -g 1000 tck && \
+    adduser -u 1000 -G tck -s /bin/bash -D tck
+
+# Set working directory
+WORKDIR /tck
+
+# Copy TCK requirements (isolated dependencies)
+COPY requirements-tck.txt .
+
+# Install TCK-specific Python dependencies
+RUN pip install --no-cache-dir -r requirements-tck.txt
+
+# Copy TCK scripts and configuration
+COPY scripts/ scripts/
+COPY config/ config/
+COPY reports/ reports/
+
+# Create reports directory with proper permissions
+RUN mkdir -p reports/latest && \
+    chown -R tck:tck /tck
+
+# Switch to non-root user
+USER tck
+
+# Set environment variable for Authly host (accessible from Docker network)
+ENV AUTHLY_BASE_URL=http://host.docker.internal:8000
+
+# Default command runs conformance validation
+CMD ["python", "scripts/conformance-validator.py"]
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import requests, jwt; print('TCK environment ready')"
