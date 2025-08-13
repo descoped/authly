@@ -91,7 +91,7 @@ def get_base_url(request: Request) -> str:
                         "subject_types_supported": ["public"],
                         "claims_supported": ["sub", "name", "email", "email_verified", "profile"],
                         "scopes_supported": ["openid", "profile", "email", "address", "phone"],
-                        "grant_types_supported": ["authorization_code", "refresh_token"],
+                        "grant_types_supported": ["authorization_code", "refresh_token", "client_credentials"],
                         "code_challenge_methods_supported": ["S256"],
                         "require_pkce": True,
                     }
@@ -601,8 +601,6 @@ async def oidc_end_session(
                 )
 
         # Perform session termination
-        invalidated_count = 0
-
         if user_id:
             try:
                 # Use token service to invalidate user sessions

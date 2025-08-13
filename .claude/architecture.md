@@ -2,7 +2,7 @@
 
 ## Overview
 
-Authly is a production-ready OAuth 2.1 + OpenID Connect Core 1.0 + Session Management 1.0 authorization server built with modern Python patterns and enterprise-grade security. This document provides comprehensive architectural guidance for understanding, maintaining, and extending the system.
+Authly is an OAuth 2.1 + OpenID Connect Core 1.0 + Session Management 1.0 authorization server in active development, built with modern Python patterns and enterprise-grade security principles. This document provides comprehensive architectural guidance for understanding, maintaining, and extending the system.
 
 ## Architectural Principles
 

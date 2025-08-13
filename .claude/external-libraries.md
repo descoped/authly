@@ -3,7 +3,7 @@
 This document contains learnings and usage patterns for external libraries developed by the Descoped team that are used in this project.
 
 **Local Repository References:**
-- **psycopg-toolkit**: `../psycopg-toolkit/` (local development repository) - **v0.2.1 with JSONB support**
+- **psycopg-toolkit**: `../psycopg-toolkit/` (local development repository) - **v0.2.0+ with JSONB support**
 - **fastapi-testing**: `../fastapi-testing/` (local development repository)
 
 ## psycopg-toolkit (v0.2.2)

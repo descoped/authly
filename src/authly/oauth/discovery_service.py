@@ -67,7 +67,7 @@ class DiscoveryService:
             revocation_endpoint=revocation_endpoint,
             # OAuth 2.1 specific settings
             response_types_supported=["code"],
-            grant_types_supported=["authorization_code", "refresh_token"],
+            grant_types_supported=["authorization_code", "refresh_token", "client_credentials"],
             code_challenge_methods_supported=["S256"],  # OAuth 2.1 requires PKCE with S256
             require_pkce=True,  # OAuth 2.1 requirement
             # Authentication methods supported
@@ -114,7 +114,7 @@ class DiscoveryService:
             revocation_endpoint=urljoin(f"{base_url}{api_prefix}/", "oauth/revoke"),
             # OAuth 2.1 defaults
             response_types_supported=["code"],
-            grant_types_supported=["authorization_code", "refresh_token"],
+            grant_types_supported=["authorization_code", "refresh_token", "client_credentials"],
             code_challenge_methods_supported=["S256"],
             require_pkce=True,
             token_endpoint_auth_methods_supported=["client_secret_basic", "client_secret_post", "none"],

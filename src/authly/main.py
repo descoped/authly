@@ -119,8 +119,8 @@ def setup_logging():
     """Configure logging for production deployment"""
     from authly.logging.setup import get_service_version, setup_structured_logging
 
-    # Determine if we should use JSON logging
-    json_logging = os.getenv("LOG_JSON", "true").lower() in ("true", "1", "yes")
+    # Determine if we should use JSON logging (default to plain text)
+    json_logging = os.getenv("LOG_JSON", "false").lower() in ("true", "1", "yes")
 
     # Setup structured logging
     setup_structured_logging(

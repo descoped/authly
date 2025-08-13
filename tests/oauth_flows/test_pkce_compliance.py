@@ -227,56 +227,6 @@ class TestPKCECompliance:
         # assert has_cors, "CORS headers missing in redirect response"
 
     @pytest.mark.asyncio
-    @pytest.mark.skip(reason="Password grant removed for OAuth 2.1 compliance")
-    async def test_pkce_plain_method_rejected(
-        self,
-        test_server: AsyncTestServer,
-        committed_oauth_client,
-        committed_user,
-    ):
-        """Test that plain PKCE method is rejected (OAuth 2.1 requirement)."""
-        # First, authenticate the user to get an access token
-        login_response = await test_server.client.post(
-            "/api/v1/oauth/token",
-            data={
-                "grant_type": "password",
-                "username": committed_user.username,
-                "password": "TestPassword123!",  # Default password from fixtures
-            },
-        )
-        assert login_response.status_code == 200
-        access_token = (await login_response.json())["access_token"]
-
-        # OAuth 2.1 requires S256 only, plain method must be rejected
-        code_verifier = base64.urlsafe_b64encode(secrets.token_bytes(32)).decode("utf-8").rstrip("=")
-
-        # For plain method, challenge equals verifier (not hashed)
-        code_challenge_plain = code_verifier
-
-        # Try to use plain method in authorization request
-        response = await test_server.client.get(
-            "/api/v1/oauth/authorize",
-            params={
-                "response_type": "code",
-                "client_id": committed_oauth_client["client_id"],
-                "redirect_uri": committed_oauth_client["redirect_uris"][0],
-                "scope": "openid",
-                "state": "test_state",
-                "code_challenge": code_challenge_plain,
-                "code_challenge_method": "plain",  # This should be rejected
-            },
-            headers={"Authorization": f"Bearer {access_token}"},
-            follow_redirects=False,
-        )
-
-        # Should reject the plain method with 400 Bad Request
-        # OAuth 2.1 requires rejecting plain method
-        assert response.status_code == status.HTTP_400_BAD_REQUEST, f"Expected 400, got {response.status_code}"
-        data = await response.json()
-        assert "error" in data
-        assert data["error"] == "invalid_request"  # This is what the current implementation returns
-
-    @pytest.mark.asyncio
     async def test_client_credentials_does_not_require_pkce(
         self,
         test_server: AsyncTestServer,

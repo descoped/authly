@@ -1,4 +1,10 @@
-"""Tests for OAuth 2.1 FastAPI dependencies using real integration testing."""
+"""Tests for OAuth 2.1 FastAPI dependencies using real integration testing.
+
+Note: Several tests are skipped because they test the client_credentials grant.
+Client credentials grant is STILL VALID in OAuth 2.1 (not removed), but it's
+not yet implemented in this codebase. The token endpoint only supports
+authorization_code and refresh_token grants currently.
+"""
 
 import base64
 import logging
@@ -61,7 +67,6 @@ class TestParseBasicAuthHeader:
         assert error_data["error"] in ["invalid_grant", "invalid_request"]
 
     @pytest.mark.asyncio
-    @pytest.mark.skip(reason="client_credentials grant type removed in OAuth 2.1")
     async def test_invalid_auth_scheme(self, test_server):
         """Test invalid authorization scheme raises HTTPException."""
         # Use Bearer instead of Basic
@@ -80,7 +85,6 @@ class TestParseBasicAuthHeader:
         assert error_data.get("error") == "invalid_client"
 
     @pytest.mark.asyncio
-    @pytest.mark.skip(reason="client_credentials grant type removed in OAuth 2.1")
     async def test_invalid_base64_encoding(self, test_server):
         """Test invalid base64 encoding raises HTTPException."""
         response = await test_server.client.post(
@@ -97,7 +101,6 @@ class TestParseBasicAuthHeader:
         assert error_data.get("error") == "invalid_client"
 
     @pytest.mark.asyncio
-    @pytest.mark.skip(reason="client_credentials grant type removed in OAuth 2.1")
     async def test_missing_colon_separator(self, test_server):
         """Test missing colon separator raises HTTPException."""
         credentials = "test_client_no_colon"
@@ -117,7 +120,6 @@ class TestParseBasicAuthHeader:
         assert error_data.get("error") == "invalid_client"
 
     @pytest.mark.asyncio
-    @pytest.mark.skip(reason="client_credentials grant type removed in OAuth 2.1")
     async def test_empty_client_id(self, test_server):
         """Test empty client ID raises HTTPException."""
         credentials = ":test_secret"  # Empty client_id
@@ -137,7 +139,6 @@ class TestParseBasicAuthHeader:
         assert error_data.get("error") == "invalid_client"
 
     @pytest.mark.asyncio
-    @pytest.mark.skip(reason="client_credentials grant type removed in OAuth 2.1")
     async def test_unicode_decode_error(self, test_server):
         """Test unicode decode error raises HTTPException."""
         # Create invalid UTF-8 bytes
@@ -211,7 +212,6 @@ class TestGetCurrentClientDependency:
         assert error_data["error"] in ["invalid_grant", "invalid_request"]
 
     @pytest.mark.asyncio
-    @pytest.mark.skip(reason="client_credentials grant type removed in OAuth 2.1")
     async def test_invalid_client_credentials(self, test_server):
         """Test authentication failure with invalid credentials."""
         # Use non-existent client
@@ -232,7 +232,6 @@ class TestGetCurrentClientDependency:
         assert error_data.get("error") == "invalid_client"
 
     @pytest.mark.asyncio
-    @pytest.mark.skip(reason="client_credentials grant type removed in OAuth 2.1")
     async def test_missing_client_credentials(self, test_server):
         """Test authentication failure with missing credentials."""
         # No Authorization header
@@ -249,7 +248,6 @@ class TestGetCurrentClientDependency:
         assert error_data.get("error") == "invalid_client"
 
     @pytest.mark.asyncio
-    @pytest.mark.skip(reason="client_credentials grant type removed in OAuth 2.1")
     async def test_confidential_client_wrong_secret(self, test_server, committed_oauth_client):
         """Test confidential client with wrong secret fails authentication."""
         client_id = committed_oauth_client["client_id"]
@@ -296,7 +294,6 @@ class TestGetCurrentClientDependency:
         assert error_data.get("error") in ["invalid_client", "invalid_request"]
 
     @pytest.mark.asyncio
-    @pytest.mark.skip(reason="client_credentials grant type removed in OAuth 2.1")
     async def test_inactive_client_fails(self, test_server, db_pool):
         """Test inactive client fails authentication."""
         from uuid import uuid4
@@ -318,7 +315,7 @@ class TestGetCurrentClientDependency:
                 "client_secret": client_secret,
                 "token_endpoint_auth_method": TokenEndpointAuthMethod.CLIENT_SECRET_BASIC,
                 "redirect_uris": ["https://example.com/callback"],
-                "grant_types": [GrantType.AUTHORIZATION_CODE],  # Changed from CLIENT_CREDENTIALS
+                "grant_types": [GrantType.AUTHORIZATION_CODE, GrantType.CLIENT_CREDENTIALS],
                 "is_active": True,
             }
 
@@ -347,7 +344,6 @@ class TestGetCurrentClientDependency:
         assert error_data.get("error") == "invalid_client"
 
     @pytest.mark.asyncio
-    @pytest.mark.skip(reason="client_credentials grant type removed in OAuth 2.1")
     async def test_form_data_authentication(self, test_server, db_pool):
         """Test client authentication via form data (CLIENT_SECRET_POST)."""
         from uuid import uuid4
@@ -369,7 +365,7 @@ class TestGetCurrentClientDependency:
                 "client_secret": client_secret,
                 "token_endpoint_auth_method": TokenEndpointAuthMethod.CLIENT_SECRET_POST,
                 "redirect_uris": ["https://example.com/callback"],
-                "grant_types": [GrantType.AUTHORIZATION_CODE],  # Changed from CLIENT_CREDENTIALS
+                "grant_types": [GrantType.AUTHORIZATION_CODE, GrantType.CLIENT_CREDENTIALS],
                 "is_active": True,
             }
 

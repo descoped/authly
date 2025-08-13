@@ -227,6 +227,124 @@ class TokenService:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not create authentication tokens"
             ) from None
 
+    async def create_client_token(
+        self,
+        client_id: str,
+        scope: str | None = None,
+    ) -> dict:
+        """
+        Create an access token for client credentials grant (machine-to-machine auth).
+
+        This is used for OAuth 2.1 client credentials flow where the client authenticates
+        directly without a user context.
+
+        Args:
+            client_id: The OAuth client ID requesting the token
+            scope: Optional OAuth scopes (space-separated string)
+
+        Returns:
+            Dict containing access_token, token_type, expires_in, and optional scope
+
+        Note:
+            - No refresh token is issued for client credentials grant (OAuth 2.1 requirement)
+            - No ID token is issued (client credentials is not an OIDC flow)
+            - Token subject is the client_id, not a user_id
+        """
+        import time
+
+        start_time = time.time()
+
+        try:
+            # Get the client to get its UUID ID if we have client_repo
+            client_uuid = None
+            if self._client_repo:
+                client = await self._client_repo.get_by_client_id(client_id)
+                if client:
+                    client_uuid = client.id
+
+            # Generate unique JTI for the token
+            access_jti = secrets.token_hex(self._config.token_hex_length)
+
+            # Prepare token data with client_id as subject
+            access_data = {
+                "sub": client_id,  # Subject is the client itself
+                "jti": access_jti,
+                "client_id": client_id,  # Include client_id claim
+                "token_use": "client_credentials",  # Mark this as a client credentials token
+            }
+
+            # Add scope if provided
+            if scope:
+                access_data["scope"] = scope
+
+            # Create JWT token
+            access_token = create_access_token(
+                data=access_data,
+                secret_key=self._config.secret_key,
+                algorithm=self._config.algorithm,
+                expires_delta=self._config.access_token_expire_minutes,
+                config=self._config,
+            )
+
+            # Decode token to get expiry time
+            access_payload = jwt.decode(access_token, self._config.secret_key, algorithms=[self._config.algorithm])
+
+            # Create token model (no user_id for client credentials)
+            access_token_model = TokenModel(
+                id=uuid4(),
+                user_id=None,  # No user context for client credentials
+                token_jti=access_jti,
+                token_type=TokenType.ACCESS,
+                token_value=access_token,
+                expires_at=datetime.fromtimestamp(access_payload["exp"], tz=UTC),
+                created_at=datetime.now(UTC),
+                scope=scope,
+                client_id=client_uuid,  # Store the client's UUID ID
+            )
+
+            # Store the token
+            await self.create_token(access_token_model)
+
+            # Track successful client token creation
+            if METRICS_ENABLED and metrics:
+                duration = time.time() - start_time
+                metrics.track_token_operation(
+                    operation="create_client_token",
+                    status="success",
+                    client_id=client_id,
+                    token_type="client_credentials",
+                    duration=duration,
+                    is_oidc=False,  # Client credentials is not OIDC
+                )
+
+            logger.info(f"Created client credentials token for client {client_id}")
+
+            # Return token response (no refresh_token for client credentials)
+            return {
+                "access_token": access_token,
+                "token_type": "Bearer",
+                "expires_in": self._config.access_token_expire_minutes * 60,
+                "scope": scope,  # Include scope if it was requested
+            }
+
+        except Exception as e:
+            # Track error
+            if METRICS_ENABLED and metrics:
+                duration = time.time() - start_time
+                metrics.track_token_operation(
+                    operation="create_client_token",
+                    status="error",
+                    client_id=client_id,
+                    token_type="client_credentials",
+                    duration=duration,
+                    is_oidc=False,
+                )
+
+            logger.error(f"Error creating client credentials token for client {client_id}: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not create client credentials token"
+            ) from None
+
     async def refresh_token_pair(
         self, refresh_token: str, user_repo: UserRepository, client_id: str | None = None
     ) -> TokenPairResponse:

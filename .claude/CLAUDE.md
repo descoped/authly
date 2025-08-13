@@ -2,13 +2,23 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## ⚠️ MANDATORY PREREQUISITE (PERMANENT RULE - NEVER REMOVE)
+Scan all memory files in "Memory System (.claude/)" before proceeding.
+
+Memory structure: CLAUDE.md (main) + referenced files (splits). Maintain separation without overlap.
+
+**EXCLUSION RULE**: Files under `.claude/evolution/` are NOT part of memory. NEVER consolidate files under this folder.
+
+When consolidating: UPDATE "Memory System (.claude/*.md)" - never remove.
+
+
 ## Project Overview
 
 **Authly** is an OAuth 2.1 and OpenID Connect authorization server in active development. It provides JWT-based authentication, admin API with two-layer security, user management, and PostgreSQL integration. The project aims for standards compliance but is currently a work in progress.
 
-**Version**: 1.0.0-dev  
+**Version**: 0.5.8  
 **Status**: Development/Testing - Not Production Certified  
-**Last Updated**: 2025-08-12
+**Last Updated**: 2025-08-13
 
 ### Current Implementation Status
 
@@ -31,7 +41,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - OIDC Debugger Integration
 
 **⚠️ KNOWN LIMITATIONS:**
-- OIDC conformance: 100% specification compliance achieved (not officially certified)
+- OIDC conformance: ~90% specification compliance (not officially certified)
 - UserInfo endpoint doesn't support POST method (GET only)
 - Not all OIDC test scenarios implemented
 - Performance optimization ongoing
@@ -84,7 +94,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
    - Never hide or obscure test failures
 
 4. **Compliance Honesty**: 
-   - Current OIDC compliance: 100% (all 40 conformance checks passing, not officially certified)
+   - Current OIDC compliance: ~90% (core functionality working, not officially certified)
    - OAuth 2.1: Implemented with full error compliance but not officially certified
    - Always clarify this is not officially certified when discussing compliance
 
@@ -181,10 +191,10 @@ Core tables: users, clients, scopes, authorization_codes, tokens, jwks_keys, use
 
 ## Current Limitations and Known Issues
 
-### OIDC Conformance (100% Compliant)
+### OIDC Conformance (~90% Compliant)
 **What Works:**
-- Discovery endpoints (100% compliant)
-- JWKS validation (100% compliant)
+- Discovery endpoints (compliant with main spec)
+- JWKS validation (compliant with main spec) 
 - PKCE enforcement with OAuth-compliant errors
 - Token endpoint with proper OAuth error format
 - Authorization endpoint with correct parameter validation
@@ -230,9 +240,15 @@ Core tables: users, clients, scopes, authorization_codes, tokens, jwks_keys, use
 **📁 `tests/`** - **Test Suite**
 - `oauth_flows/` - OAuth 2.1 test suite
 - `oidc_features/` - OIDC test suite
+- `oidc_scenarios/` - Additional OIDC test scenarios
 - `admin_portal/` - Admin interface tests
+- `admin_user_management/` - Admin user management tests
 - `auth_user_journey/` - User authentication tests
+- `authentication/` - Core authentication tests
 - `infrastructure/` - Core infrastructure tests
+- `security/` - Security-focused tests
+- `performance/` - Performance testing
+- `tck/` - Test Conformance Kit tests
 - Real database integration tests (no mocking)
 
 **📁 `docs/`** - **User Documentation**
@@ -247,8 +263,8 @@ Core tables: users, clients, scopes, authorization_codes, tokens, jwks_keys, use
 - Standalone deployment configurations
 
 **📁 `tck/`** - **Test Conformance Kit**
-- OIDC/OAuth conformance testing
-- Currently achieves 100% spec compliance (40/40 checks)
+- OIDC/OAuth conformance testing (also available in tests/tck/)
+- Currently achieves ~90% spec compliance
 
 **📁 `ai_docs/`** - **AI Development Documentation**
 - `TODO.md` - Current tasks and priorities
@@ -264,11 +280,11 @@ Core tables: users, clients, scopes, authorization_codes, tokens, jwks_keys, use
 
 **This is a work-in-progress authorization server:**
 - ✅ Core OAuth 2.1 features work with compliant error handling
-- ✅ OIDC implementation with 100% conformance (40/40 checks)
+- ✅ OIDC implementation with ~90% conformance
 - ✅ Browser-based compliance testing suite available
 - ✅ Docker standalone deployment with embedded dependencies
 - ⚠️ Not ready for production use without thorough testing
-- ⚠️ Not officially OIDC certified (but 100% compliant)
+- ⚠️ Not officially OIDC certified (~90% compliant)
 - 🚧 Active development ongoing on `feature/odic-debugger` branch
 
 **Recommended Use Cases:**
@@ -311,6 +327,7 @@ Remember: The source code is the truth. Make claims only about what is actually 
 - **Structure**: `.claude/codebase-structure.md` - Project layout
 - **Libraries**: `.claude/external-libraries.md` - psycopg-toolkit & fastapi-testing
 - **Practices**: `.claude/instructions/authly-development-practices.md` - Development rules
+- **Testing Guide**: `.claude/instructions/authly-testing-guide.md` - Testing procedures
 
 ### Current Work
 - **Tasks**: `ai_docs/TODO.md` - Current priorities
@@ -319,6 +336,8 @@ Remember: The source code is the truth. Make claims only about what is actually 
 ### Key Source Files
 - **App Entry**: `src/authly/__main__.py` - CLI entry point
 - **FastAPI App**: `src/authly/app.py` - Application factory
+- **Main Module**: `src/authly/main.py` - Main application entry
+- **Embedded Mode**: `src/authly/embedded.py` - Embedded deployment
 - **OAuth Router**: `src/authly/api/oauth_router.py` - OAuth endpoints
 - **OIDC Router**: `src/authly/api/oidc_router.py` - OIDC endpoints
 - **Admin CLI**: `src/authly/admin/cli.py` - Admin commands

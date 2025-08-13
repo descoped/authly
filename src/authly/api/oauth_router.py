@@ -36,12 +36,14 @@ from authly.oauth.models import (
     CodeChallengeMethod,
     Display,
     OAuthAuthorizationRequest,
+    OAuthClientModel,
     Prompt,
     ResponseMode,
     ResponseType,
     UserConsentRequest,
 )
 from authly.oauth.scope_repository import ScopeRepository
+from authly.oauth.scope_service import ScopeService
 from authly.tokens import TokenService, get_token_service
 from authly.tokens.repository import TokenRepository
 from authly.users import UserModel, UserRepository
@@ -648,6 +650,7 @@ async def authorize_post(
 
 @oauth_router.post("/token", response_model=None)
 async def get_access_token(
+    request: Request,
     grant_type: str = Form(..., description="The grant type"),
     username: str | None = Form(None, description="Username for password grant"),
     password: str | None = Form(None, description="Password for password grant"),
@@ -663,6 +666,7 @@ async def get_access_token(
     authorization_service: AuthorizationService = Depends(get_authorization_service),
     client_repo: ClientRepository = Depends(get_client_repository),
     scope_repo: ScopeRepository = Depends(get_scope_repository),
+    config: AuthlyConfig = Depends(get_config),
 ) -> TokenResponse | JSONResponse:
     """
     OAuth 2.1 Token Endpoint.
@@ -672,6 +676,7 @@ async def get_access_token(
     Supported grant types:
     - authorization_code: OAuth 2.1 authorization code flow with PKCE
     - refresh_token: Refresh an access token
+    - client_credentials: Machine-to-machine authentication (no user context)
     """
 
     # Create repositories from database connection
@@ -679,7 +684,7 @@ async def get_access_token(
     TokenRepository(db_connection)
 
     # Create a TokenRequest object from form data for backward compatibility
-    request = TokenRequest(
+    token_req = TokenRequest(
         grant_type=grant_type,
         username=username,
         password=password,
@@ -692,13 +697,77 @@ async def get_access_token(
         refresh_token=refresh_token,
     )
 
-    if request.grant_type == "authorization_code":
-        return await _handle_authorization_code_grant(request, user_repo, token_service, authorization_service)
-    elif request.grant_type == "refresh_token":
-        return await _handle_refresh_token_grant(request, user_repo, token_service)
+    if token_req.grant_type == "authorization_code":
+        return await _handle_authorization_code_grant(token_req, user_repo, token_service, authorization_service)
+    elif token_req.grant_type == "refresh_token":
+        return await _handle_refresh_token_grant(token_req, user_repo, token_service)
+    elif grant_type == "client_credentials":
+        # Client credentials grant requires authenticated client
+        from authly.oauth.models import TokenEndpointAuthMethod
+        from authly.oauth.scope_service import ScopeService
+
+        # Authenticate the client (using Basic Auth or client_secret_post)
+        try:
+            # Get authenticated client
+            import base64
+
+            from authly.oauth.client_service import ClientService
+
+            client_service = ClientService(client_repo, scope_repo, config)
+            authenticated_client = None
+
+            # Check for Basic Auth in headers first
+            auth_header = request.headers.get("Authorization", "")
+            if auth_header.startswith("Basic "):
+                try:
+                    # Decode Basic Auth
+                    encoded_credentials = auth_header[6:]  # Remove "Basic " prefix
+                    decoded = base64.b64decode(encoded_credentials).decode("utf-8")
+                    auth_client_id, auth_client_secret = decoded.split(":", 1)
+
+                    # Authenticate with Basic Auth credentials
+                    authenticated_client = await client_service.authenticate_client(
+                        client_id=auth_client_id,
+                        client_secret=auth_client_secret,
+                        auth_method=TokenEndpointAuthMethod.CLIENT_SECRET_BASIC,
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to parse Basic Auth header: {e}")
+
+            # If no Basic Auth, try form data
+            if not authenticated_client and client_id and client_secret:
+                # Credentials are in form data, use CLIENT_SECRET_POST
+                authenticated_client = await client_service.authenticate_client(
+                    client_id=client_id,
+                    client_secret=client_secret,
+                    auth_method=TokenEndpointAuthMethod.CLIENT_SECRET_POST,
+                )
+
+            if not authenticated_client:
+                return oauth_error_response("invalid_client", "Client authentication failed")
+
+            # Create scope service
+            scope_service = ScopeService(scope_repo)
+
+            # Create TokenRequest for consistency
+            token_request = TokenRequest(
+                grant_type=grant_type,
+                scope=scope,
+                client_id=client_id,
+                client_secret=client_secret,
+            )
+
+            # Handle client credentials grant
+            return await _handle_client_credentials_grant(
+                token_request, token_service, authenticated_client, scope_service
+            )
+
+        except Exception as e:
+            logger.error(f"Client authentication failed for client_credentials grant: {e}")
+            return oauth_error_response("invalid_client", "Client authentication failed")
     else:
         return oauth_error_response(
-            "unsupported_grant_type", f"The authorization grant type '{request.grant_type}' is not supported"
+            "unsupported_grant_type", f"The authorization grant type '{token_req.grant_type}' is not supported"
         )
 
 
@@ -924,6 +993,100 @@ async def introspect_token_endpoint(
         user_repo=user_repo,
         config=config,
     )
+
+
+async def _handle_client_credentials_grant(
+    request: TokenRequest,
+    token_service: TokenService,
+    client: OAuthClientModel,
+    scope_service: ScopeService,
+) -> TokenResponse | JSONResponse:
+    """
+    Handle client_credentials grant type for OAuth 2.1.
+
+    This grant type is used for machine-to-machine authentication where
+    the client authenticates directly without a user context.
+
+    OAuth 2.1 Requirements:
+    - Client MUST be authenticated
+    - No refresh token is issued
+    - Scopes must be validated against client's allowed scopes
+    - Response contains only access_token
+    """
+    import time
+
+    from authly.oauth.models import GrantType
+
+    start_time = time.time()
+
+    try:
+        # Client authentication is already done by the token endpoint
+        # The 'client' parameter contains the authenticated client
+
+        # Validate that client is allowed to use client_credentials grant
+        if GrantType.CLIENT_CREDENTIALS not in client.grant_types:
+            if METRICS_ENABLED and metrics:
+                metrics.track_oauth_token_request(
+                    "client_credentials", client.client_id, "unauthorized_grant_type", 0.0
+                )
+            return oauth_error_response(
+                "unauthorized_client", "Client is not authorized to use client_credentials grant type"
+            )
+
+        # Validate requested scopes against client's allowed scopes
+        requested_scope = request.scope
+        if requested_scope:
+            # Parse requested scopes
+            requested_scopes = set(requested_scope.split())
+
+            # Check if all requested scopes are allowed for this client
+            client_scopes = set(client.scope.split()) if client.scope else set()
+
+            # Validate scopes
+            if not requested_scopes.issubset(client_scopes):
+                invalid_scopes = requested_scopes - client_scopes
+                if METRICS_ENABLED and metrics:
+                    metrics.track_oauth_token_request("client_credentials", client.client_id, "invalid_scope", 0.0)
+                logger.warning(f"Client {client.client_id} requested invalid scopes: {invalid_scopes}")
+                return oauth_error_response("invalid_scope", "Requested scope exceeds client's allowed scopes")
+
+            # Use the validated requested scope
+            final_scope = requested_scope
+        else:
+            # No scope requested, use client's default scopes
+            final_scope = client.scope
+
+        # Create client credentials token (no user context)
+        token_data = await token_service.create_client_token(client_id=client.client_id, scope=final_scope)
+
+        # Track successful client credentials grant
+        if METRICS_ENABLED and metrics:
+            duration = time.time() - start_time
+            metrics.track_oauth_token_request("client_credentials", client.client_id, "success", duration)
+
+        logger.info(f"Client credentials token issued for client {client.client_id}")
+
+        # Return token response (no refresh_token for client credentials)
+        return TokenResponse(
+            access_token=token_data["access_token"],
+            token_type=token_data["token_type"],
+            expires_in=token_data["expires_in"],
+            scope=token_data.get("scope"),
+            # No refresh_token or id_token for client credentials
+            refresh_token=None,
+            id_token=None,
+        )
+
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        # Track general client credentials grant error
+        if METRICS_ENABLED and metrics:
+            duration = time.time() - start_time
+            metrics.track_oauth_token_request("client_credentials", client.client_id, "error", duration)
+        logger.error(f"Error handling client credentials grant: {e}")
+        return oauth_error_response("server_error", "Could not process client credentials grant")
 
 
 @oauth_router.post("/revoke", status_code=status.HTTP_200_OK)

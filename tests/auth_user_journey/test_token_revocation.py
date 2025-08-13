@@ -20,7 +20,6 @@ from authly.auth.core import get_password_hash
 from authly.users import UserModel, UserRepository
 
 
-@pytest.mark.skip(reason="valid_tokens fixture uses password grant - needs conversion to auth code flow")
 class TestTokenRevocation:
     """Test OAuth 2.0 Token Revocation endpoint."""
 
@@ -51,19 +50,37 @@ class TestTokenRevocation:
             return await user_repo.create(user_data)
 
     @pytest.fixture
-    async def valid_tokens(self, auth_server: AsyncTestServer, test_user: UserModel):
-        """Get valid access and refresh tokens for testing."""
-        response = await auth_server.client.post(
-            "/api/v1/oauth/token",
-            data={
-                "grant_type": "password",
-                "username": test_user.username,
-                "password": "Test123!",
-                "scope": "openid profile email",  # Add OIDC scopes
-            },
-        )
-        await response.expect_status(200)
-        return await response.json()
+    async def valid_tokens(
+        self, auth_server: AsyncTestServer, test_user: UserModel, transaction_manager: TransactionManager, test_config
+    ):
+        """Get valid access and refresh tokens for testing.
+
+        Since password grant is removed in OAuth 2.1, we create tokens directly
+        for testing token revocation functionality.
+        """
+        from authly.oauth.client_repository import ClientRepository
+        from authly.tokens.repository import TokenRepository
+        from authly.tokens.service import TokenService
+
+        async with transaction_manager.transaction() as conn:
+            token_repo = TokenRepository(conn)
+            client_repo = ClientRepository(conn)
+            token_service = TokenService(token_repo, test_config, client_repo)
+
+            # Create tokens directly for testing
+            token_pair = await token_service.create_token_pair(
+                user=test_user,
+                scope="openid profile email",
+                client_id=None,  # No client for testing
+            )
+
+            return {
+                "access_token": token_pair.access_token,
+                "refresh_token": token_pair.refresh_token,
+                "token_type": "Bearer",
+                "expires_in": token_pair.expires_in,
+                "scope": token_pair.scope,
+            }
 
     @pytest.mark.asyncio
     async def test_revoke_access_token_success(self, auth_server: AsyncTestServer, valid_tokens: dict):

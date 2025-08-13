@@ -24,11 +24,42 @@ def generate_pkce_pair():
     return code_verifier, code_challenge
 
 
+async def get_user_access_token(test_server, committed_user, scope="openid profile email"):
+    """Helper to get an access token for a user without using password grant.
+
+    Since password grant is removed in OAuth 2.1, we create a token directly
+    for testing purposes. This simulates what would happen after a user
+    authenticates through a proper login flow.
+    """
+    from authly.core.dependencies import get_resource_manager
+    from authly.oauth.client_repository import ClientRepository
+    from authly.tokens.repository import TokenRepository
+    from authly.tokens.service import TokenService
+
+    # Get dependencies
+    resource_manager = get_resource_manager()
+    transaction_manager = resource_manager.get_transaction_manager()
+    config = resource_manager.get_config()
+
+    async with transaction_manager.transaction() as conn:
+        token_repo = TokenRepository(conn)
+        client_repo = ClientRepository(conn)
+        token_service = TokenService(token_repo, config, client_repo)
+
+        # Create an access token for the user with OIDC scopes
+        token_pair = await token_service.create_token_pair(
+            user=committed_user,
+            scope=scope,  # Include OIDC scopes for userinfo endpoint
+            client_id=None,  # No client for initial user authentication
+        )
+
+        return token_pair.access_token
+
+
 class TestRedirectUriValidation:
     """Test OAuth 2.1 redirect URI exact matching requirements."""
 
     @pytest.mark.asyncio
-    @pytest.mark.skip(reason="Password grant removed for OAuth 2.1 compliance - needs conversion to auth code flow")
     async def test_invalid_redirect_uri_rejected_api_endpoint(
         self, test_server, committed_user, committed_oauth_client
     ):
@@ -36,14 +67,8 @@ class TestRedirectUriValidation:
         async with test_server.client as client:
             code_verifier, code_challenge = generate_pkce_pair()
 
-            # Login the user first
-            login_response = await client.post(
-                "/api/v1/oauth/token",
-                data={"grant_type": "password", "username": committed_user.username, "password": "TestPassword123!"},
-            )
-            assert login_response.status_code == status.HTTP_200_OK
-            login_data = await login_response.json()
-            access_token = login_data["access_token"]
+            # Get user access token for testing
+            access_token = await get_user_access_token(test_server, committed_user)
 
             # Try authorization with INVALID redirect URI (should be exact match)
             invalid_redirect_uri = committed_oauth_client["redirect_uris"][0] + "/invalid"
@@ -95,20 +120,13 @@ class TestRedirectUriValidation:
             assert "redirect_uri" in error_data["error_description"].lower()
 
     @pytest.mark.asyncio
-    @pytest.mark.skip(reason="Password grant removed for OAuth 2.1 compliance")
     async def test_valid_redirect_uri_accepted(self, test_server, committed_user, committed_oauth_client):
         """Test that exact matching redirect URI is accepted."""
         async with test_server.client as client:
             code_verifier, code_challenge = generate_pkce_pair()
 
-            # Login the user first
-            login_response = await client.post(
-                "/api/v1/oauth/token",
-                data={"grant_type": "password", "username": committed_user.username, "password": "TestPassword123!"},
-            )
-            assert login_response.status_code == status.HTTP_200_OK
-            login_data = await login_response.json()
-            access_token = login_data["access_token"]
+            # Get user access token for testing
+            access_token = await get_user_access_token(test_server, committed_user)
 
             # Try authorization with VALID redirect URI (exact match)
             auth_params = {
@@ -161,21 +179,14 @@ class TestCompleteAuthorizationCodeFlow:
     """Test complete OAuth 2.1 Authorization Code + PKCE flow using HTTP endpoints."""
 
     @pytest.mark.asyncio
-    @pytest.mark.skip(reason="Password grant removed for OAuth 2.1 compliance")
     async def test_full_authorization_code_flow(self, test_server, committed_user, committed_oauth_client):
         """Test complete flow: authorize -> consent -> token -> refresh -> revoke."""
         async with test_server.client as client:
             # Generate PKCE challenge
             code_verifier, code_challenge = generate_pkce_pair()
 
-            # Step 1: Login the user using password grant
-            login_response = await client.post(
-                "/api/v1/oauth/token",
-                data={"grant_type": "password", "username": committed_user.username, "password": "TestPassword123!"},
-            )
-            assert login_response.status_code == status.HTTP_200_OK
-            login_data = await login_response.json()
-            access_token = login_data["access_token"]
+            # Step 1: Get user access token for testing
+            access_token = await get_user_access_token(test_server, committed_user)
 
             # Step 2: Start authorization request (GET shows consent form)
             auth_params = {
@@ -316,7 +327,6 @@ class TestCompleteOIDCFlow:
     """Test complete OpenID Connect flow using HTTP endpoints."""
 
     @pytest.mark.asyncio
-    @pytest.mark.skip(reason="Password grant removed for OAuth 2.1 compliance")
     async def test_full_oidc_flow_with_id_token(self, test_server, committed_user, committed_oauth_client):
         """Test OIDC flow: authorize with openid scope -> get ID token -> validate -> userinfo."""
         async with test_server.client as client:
@@ -324,14 +334,8 @@ class TestCompleteOIDCFlow:
             code_verifier, code_challenge = generate_pkce_pair()
             nonce = f"nonce_{secrets.token_hex(16)}"
 
-            # Step 1: Login the user using password grant
-            login_response = await client.post(
-                "/api/v1/oauth/token",
-                data={"grant_type": "password", "username": committed_user.username, "password": "TestPassword123!"},
-            )
-            assert login_response.status_code == status.HTTP_200_OK
-            login_data = await login_response.json()
-            access_token = login_data["access_token"]
+            # Step 1: Get user access token for testing
+            access_token = await get_user_access_token(test_server, committed_user)
 
             # Step 2: Authorization request with OIDC scopes (GET shows consent form)
             auth_params = {
@@ -436,24 +440,12 @@ class TestLogoutFlow:
     """Test logout and session termination flows using HTTP endpoints."""
 
     @pytest.mark.asyncio
-    @pytest.mark.skip(reason="Password grant removed for OAuth 2.1 compliance")
     async def test_oidc_logout_flow(self, test_server, committed_user):
         """Test OIDC RP-initiated logout flow."""
         async with test_server.client as client:
-            # Step 1: Login to get tokens using password grant
-            login_response = await client.post(
-                "/api/v1/oauth/token",
-                data={
-                    "grant_type": "password",
-                    "username": committed_user.username,
-                    "password": "TestPassword123!",
-                    "scope": "openid profile email",  # Add OIDC scopes for userinfo endpoint
-                },
-            )
-            assert login_response.status_code == status.HTTP_200_OK
-            login_data = await login_response.json()
-            access_token = login_data["access_token"]
-            refresh_token = login_data["refresh_token"]
+            # Step 1: Get user access token for testing
+            access_token = await get_user_access_token(test_server, committed_user)
+            refresh_token = None  # Not needed for logout test
 
             # Step 2: Verify tokens work
             userinfo_response = await client.get("/oidc/userinfo", headers={"Authorization": f"Bearer {access_token}"})
@@ -526,17 +518,11 @@ class TestErrorHandling:
             assert error_data["error"] in ["invalid_client", "invalid_request"]
 
     @pytest.mark.asyncio
-    @pytest.mark.skip(reason="Password grant removed for OAuth 2.1 compliance")
     async def test_invalid_scope_error(self, test_server, committed_oauth_client, committed_user):
         """Test proper error response for invalid scope."""
         async with test_server.client as client:
-            # Login first using password grant
-            login_response = await client.post(
-                "/api/v1/oauth/token",
-                data={"grant_type": "password", "username": committed_user.username, "password": "TestPassword123!"},
-            )
-            login_data = await login_response.json()
-            access_token = login_data["access_token"]
+            # Get user access token for testing
+            access_token = await get_user_access_token(test_server, committed_user)
 
             # Generate PKCE
             code_verifier, code_challenge = generate_pkce_pair()
@@ -572,7 +558,6 @@ class TestTokenRotation:
     """Test refresh token rotation for enhanced security."""
 
     @pytest.mark.asyncio
-    @pytest.mark.skip(reason="Password grant removed for OAuth 2.1 compliance")
     async def test_refresh_token_rotation(self, test_server, committed_user, committed_oauth_client):
         """Test that refresh tokens are rotated on use."""
         async with test_server.client as client:
@@ -580,13 +565,8 @@ class TestTokenRotation:
             code_verifier, code_challenge = generate_pkce_pair()
 
             # Step 1: Complete authorization flow to get initial tokens
-            # Login using password grant
-            login_response = await client.post(
-                "/api/v1/oauth/token",
-                data={"grant_type": "password", "username": committed_user.username, "password": "TestPassword123!"},
-            )
-            login_data = await login_response.json()
-            access_token = login_data["access_token"]
+            # Get user access token for testing
+            access_token = await get_user_access_token(test_server, committed_user)
 
             # Authorize
             auth_params = {

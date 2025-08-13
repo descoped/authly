@@ -34,7 +34,7 @@ def setup_structured_logging(
 
     # Determine format from environment if not explicitly specified
     if json_format is None:
-        json_format = os.getenv("LOG_JSON", "true").lower() in ("true", "1", "yes")
+        json_format = os.getenv("LOG_JSON", "false").lower() in ("true", "1", "yes")
 
     # Clear existing handlers
     root_logger = logging.getLogger()
