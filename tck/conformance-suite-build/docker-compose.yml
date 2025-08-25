@@ -6,7 +6,7 @@ version: '3.8'
 services:
   # MongoDB for conformance suite storage
   tck-mongodb:
-    image: mongo:8.0.12
+    image: mongo:8.0.13
     container_name: tck-mongodb
     volumes:
       - tck_mongo_data:/data/db
