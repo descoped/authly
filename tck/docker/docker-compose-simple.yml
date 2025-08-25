@@ -3,7 +3,7 @@ version: '3.8'
 services:
   # MongoDB for conformance suite storage
   conformance-mongo:
-    image: mongo:8.0.12
+    image: mongo:8.0.13
     container_name: tck-conformance-mongo
     environment:
       MONGO_INITDB_ROOT_USERNAME: admin
