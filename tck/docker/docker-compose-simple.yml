@@ -21,7 +21,7 @@ services:
 
   # Conformance suite server (will use built JAR)
   conformance-server:
-    image: eclipse-temurin:21.0.8_9-jre
+    image: eclipse-temurin:25-jre
     container_name: tck-conformance-server
     volumes:
       - ../conformance-suite/target:/server

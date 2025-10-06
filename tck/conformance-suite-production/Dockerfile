@@ -1,5 +1,5 @@
 # Production Dockerfile for OIDC Conformance Suite
-FROM eclipse-temurin:21
+FROM eclipse-temurin:25
 
 # Install required packages
 RUN apt-get update && apt-get install -y redir curl && rm -rf /var/lib/apt/lists/*

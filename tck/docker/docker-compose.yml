@@ -3,7 +3,7 @@ version: '3.8'
 services:
   # PostgreSQL for conformance suite data storage
   conformance-db:
-    image: postgres:17-alpine
+    image: postgres:18-alpine
     environment:
       POSTGRES_DB: conformance
       POSTGRES_USER: conformance
@@ -111,7 +111,7 @@ services:
 
   # PostgreSQL for Authly (when running in Docker)
   authly-db:
-    image: postgres:17-alpine
+    image: postgres:18-alpine
     environment:
       POSTGRES_DB: authly
       POSTGRES_USER: authly
