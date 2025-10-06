@@ -14,7 +14,7 @@ COPY scripts ./scripts
 RUN mvn clean package -B -DskipTests=true
 
 # Stage 2: Final runtime image
-FROM eclipse-temurin:21.0.8_9-jre
+FROM eclipse-temurin:25-jre
 
 # Create non-root user for security
 RUN groupadd -r conformance && useradd -r -g conformance conformance
