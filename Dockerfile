@@ -1,5 +1,5 @@
 # Multi-stage Dockerfile for Authly authentication service
-FROM python:3.13-slim AS builder
+FROM python:3.14-slim AS builder
 
 # Build arguments for flexible installation
 ARG USE_WHEEL=false
@@ -67,7 +67,7 @@ RUN if [ -f "/tmp/has_wheels" ] && [ "$(cat /tmp/has_wheels)" = "true" ] && ls /
     fi
 
 # Production stage
-FROM python:3.13-slim AS production
+FROM python:3.14-slim AS production
 
 # Pass build argument to production stage
 ARG USE_WHEEL=false
