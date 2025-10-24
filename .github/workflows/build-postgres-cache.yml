@@ -90,7 +90,7 @@ jobs:
           echo "✅ Built ${{ matrix.arch }}: ${digest}"
       
       - name: Upload digest
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: digests-${{ matrix.arch }}
           path: /tmp/digests/*
@@ -119,7 +119,7 @@ jobs:
           echo "tag=postgres-builder-${PG_VERSION}-alpine${ALPINE_VERSION}" >> $GITHUB_OUTPUT
       
       - name: Download digests
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           path: /tmp/digests
           pattern: digests-*
