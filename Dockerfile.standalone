@@ -69,7 +69,7 @@ RUN strip /opt/postgresql/bin/* 2>/dev/null || true && \
 FROM ${POSTGRES_BUILDER_IMAGE:-postgres-builder-build} AS postgres-builder
 
 # Build stage for Python dependencies using uv
-FROM python:3.13-alpine AS python-builder
+FROM python:3.14-alpine AS python-builder
 
 # Install build dependencies 
 RUN apk add --no-cache \
