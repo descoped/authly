@@ -75,7 +75,7 @@ jobs:
           file: ./Dockerfile.standalone
           target: postgres-builder-build
           platforms: ${{ matrix.platform }}
-          push: true
+          push: false
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.tag }}-${{ matrix.arch }}
           cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache-${{ matrix.arch }}
