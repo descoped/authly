@@ -13,9 +13,11 @@
 
 # Allow using a pre-built postgres-builder image for caching
 ARG POSTGRES_BUILDER_IMAGE=""
+ARG PG_VERSION=17.2
+ARG ALPINE_VERSION=3.22
 
 # Build stage for minimal PostgreSQL
-FROM alpine:3.22 AS postgres-builder-build
+FROM alpine:${ALPINE_VERSION} AS postgres-builder-build
 
 # Install build dependencies
 RUN apk add --no-cache \
@@ -27,11 +29,11 @@ RUN apk add --no-cache \
     e2fsprogs-dev \
     readline-dev
 
-# Download and extract PostgreSQL 17 source
+# Download and extract PostgreSQL source
 WORKDIR /build
-RUN wget -q https://ftp.postgresql.org/pub/source/v17.2/postgresql-17.2.tar.gz && \
-    tar -xzf postgresql-17.2.tar.gz && \
-    cd postgresql-17.2 && \
+RUN wget -q https://ftp.postgresql.org/pub/source/v${PG_VERSION}/postgresql-${PG_VERSION}.tar.gz && \
+    tar -xzf postgresql-${PG_VERSION}.tar.gz && \
+    cd postgresql-${PG_VERSION} && \
     ./configure \
         --prefix=/opt/postgresql \
         --with-readline \
