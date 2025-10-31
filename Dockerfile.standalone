@@ -19,6 +19,9 @@ ARG ALPINE_VERSION=3.22
 # Build stage for minimal PostgreSQL
 FROM alpine:${ALPINE_VERSION} AS postgres-builder-build
 
+# Re-declare ARG for use within this stage
+ARG PG_VERSION=17.2
+
 # Install build dependencies
 RUN apk add --no-cache \
     alpine-sdk \
@@ -29,9 +32,10 @@ RUN apk add --no-cache \
     e2fsprogs-dev \
     readline-dev
 
-# Download and extract PostgreSQL source
+# Download and extract PostgreSQL source (version from ARG)
 WORKDIR /build
-RUN wget -q https://ftp.postgresql.org/pub/source/v${PG_VERSION}/postgresql-${PG_VERSION}.tar.gz && \
+RUN echo "Downloading PostgreSQL ${PG_VERSION}..." && \
+    wget https://ftp.postgresql.org/pub/source/v${PG_VERSION}/postgresql-${PG_VERSION}.tar.gz && \
     tar -xzf postgresql-${PG_VERSION}.tar.gz && \
     cd postgresql-${PG_VERSION} && \
     ./configure \
