@@ -27,7 +27,7 @@ jobs:
             runner: ubuntu-latest
             arch: amd64
           - platform: linux/arm64
-            runner: ubuntu-latest  # Uses QEMU emulation (slower but works)
+            runner: ubuntu-24.04-arm  # Native ARM64 runner - free for public repos!
             arch: arm64
     
     runs-on: ${{ matrix.runner }}
@@ -52,11 +52,6 @@ jobs:
           echo "alpine_version=${ALPINE_VERSION}" >> $GITHUB_OUTPUT
           echo "tag=postgres-builder-${PG_VERSION}-alpine${ALPINE_VERSION}" >> $GITHUB_OUTPUT
           echo "🔨 Building PostgreSQL ${PG_VERSION} on Alpine ${ALPINE_VERSION} for ${{ matrix.arch }}"
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: ${{ matrix.platform }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -159,12 +154,12 @@ jobs:
           echo "**Image**: \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Supported Platforms" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ linux/amd64 (built natively)" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ linux/arm64 (built with QEMU emulation)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ linux/amd64 (built natively on ubuntu-latest)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ linux/arm64 (built natively on ubuntu-24.04-arm)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Build Details" >> $GITHUB_STEP_SUMMARY
-          echo "- 🚀 **AMD64**: Native build (fast)" >> $GITHUB_STEP_SUMMARY
-          echo "- 🐢 **ARM64**: QEMU emulation (slower, ~30-60 minutes)" >> $GITHUB_STEP_SUMMARY
+          echo "- 🚀 **Both platforms**: Native builds using GitHub's free ARM64 runners" >> $GITHUB_STEP_SUMMARY
+          echo "- ⚡ **Fast builds**: No QEMU emulation overhead (~5-15 minutes per platform)" >> $GITHUB_STEP_SUMMARY
           echo "- 💾 **Cached for future builds** in release workflow" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "This pre-built image will be used automatically in the release workflow." >> $GITHUB_STEP_SUMMARY
