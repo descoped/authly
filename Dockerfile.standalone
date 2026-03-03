@@ -14,7 +14,7 @@
 # Allow using a pre-built postgres-builder image for caching
 ARG POSTGRES_BUILDER_IMAGE=""
 ARG PG_VERSION=17.2
-ARG ALPINE_VERSION=3.22
+ARG ALPINE_VERSION=3.23
 
 # Build stage for minimal PostgreSQL
 FROM alpine:${ALPINE_VERSION} AS postgres-builder-build
@@ -112,7 +112,7 @@ RUN uv sync --group dev && \
     du -sh .venv
 
 # Final stage - minimal runtime
-FROM alpine:3.22
+FROM alpine:3.23
 
 # S6 Overlay version
 ARG S6_OVERLAY_VERSION=3.2.0.2
