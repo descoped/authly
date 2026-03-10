@@ -10,7 +10,7 @@ RUN git clone https://gitlab.com/openid/conformance-suite.git .
 RUN mvn clean package -B -DskipTests=true
 
 # Runtime stage
-FROM eclipse-temurin:25-jre
+FROM eclipse-temurin:25.0.2_10-jre
 
 COPY --from=builder /build/target/fapi-test-suite.jar /server/fapi-test-suite.jar
 
