@@ -20,7 +20,7 @@ services:
 
   # MongoDB for conformance suite results storage
   conformance-mongo:
-    image: mongo:8
+    image: mongo:9
     environment:
       MONGO_INITDB_ROOT_USERNAME: admin
       MONGO_INITDB_ROOT_PASSWORD: admin
